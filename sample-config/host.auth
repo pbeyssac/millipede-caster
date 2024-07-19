@@ -1,0 +1,4 @@
+#
+# Authentication for client access to external hosts
+#
+here_host:here_user:here_password

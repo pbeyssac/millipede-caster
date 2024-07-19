@@ -1,0 +1,5 @@
+#
+# Source authentication
+#
+# Format:
+#	MOUNTPOINT:username:password

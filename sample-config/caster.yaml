@@ -1,0 +1,44 @@
+#
+# Main configuration file for the Millipede RTK caster
+#
+
+#
+# IP/ports to listen to.
+# IPv6 and IPv4 supported.
+# ::0 (IPv6) or 0.0.0.0 (IPv4) to bind to all addresses.
+#
+listen:
+  - port:		2101
+    ip:			127.0.0.1
+  - port:		2101
+    ip:			::1
+
+#
+# Optional caster from which we can get and announce sources.
+#
+proxy:
+  - table_refresh_delay:	600
+    host:			caster.centipede.fr
+    port:			2101
+
+#
+# Source credentials and their SRC lines
+#
+source_auth_file:	/usr/local/etc/millipede/source.auth
+sourcetable_file:	/usr/local/etc/millipede/sourcetable.dat
+
+#
+# Credentials to remote hosts
+#
+host_auth_file:		/usr/local/etc/millipede/host.auth
+
+#
+# Log files
+#
+access_log:		/var/log/millipede/access.log
+log:			/var/log/millipede/caster.log
+
+#
+# Distance hysteresis to avoid spurious base change
+#
+hysteresis_m:		500.
