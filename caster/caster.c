@@ -62,12 +62,9 @@ static struct auth_entry *parse_auth(struct caster_state *caster, const char *fi
 
 	int n;
 	for (n = 0; n < p->nlines; n++) {
-		for (int i = 0; i < 3; i++)
-			printf("%d:%d=%s\n", n, i, p->pls[n][i]);
 		auth[n].key = mystrdup(p->pls[n][0]);
 		auth[n].user = mystrdup(p->pls[n][1]);
 		auth[n].password = mystrdup(p->pls[n][2]);
-		printf("key=%s user=%s\n", auth[n].key, auth[n].user);
 	}
 	auth[n].key = NULL;
 	auth[n].user = NULL;

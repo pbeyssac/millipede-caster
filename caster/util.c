@@ -476,7 +476,6 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 		int n;
 		for (n = 0; n < nfields && (token = strsep(&septmp, seps)) != NULL; n++) {
 			char *ctoken = mystrdup(token);
-			//printf("got \"%s\"\n", ctoken);
 			pl[n] = ctoken;
 		}
 		if (n != nfields) {
