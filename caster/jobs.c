@@ -45,7 +45,6 @@ void joblist_run(struct joblist *this) {
 
 	/*
 	 * Initial lock acquisition on the job list
-
 	 */
 	P_MUTEX_LOCK(&this->mutex);
 

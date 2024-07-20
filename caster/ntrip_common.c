@@ -40,6 +40,11 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	return this;
 }
 
+/*
+ * Free a ntrip_state record.
+ *
+ * Required lock: ntrip_state
+ */
 void ntrip_free(struct ntrip_state *this, char *orig) {
 	if (this->refcnt) {
 		ntrip_log(this, LOG_DEBUG, "DEFERRED FREE %p (%d refs, orig %s)\n", this, this->refcnt, orig);
