@@ -117,7 +117,7 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_FLOAT(
 		"hysteresis", CYAML_FLAG_DEFAULT|CYAML_FLAG_OPTIONAL, struct config, hysteresis_m),
 	CYAML_FIELD_SEQUENCE(
-		"proxy", CYAML_FLAG_POINTER,
+		"proxy", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, proxy, &proxy_schema, 0, 1),
 	CYAML_FIELD_STRING_PTR(
 		"source_auth_file", CYAML_FLAG_POINTER, struct config, source_auth_filename, 0, CYAML_UNLIMITED),
