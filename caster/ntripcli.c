@@ -30,7 +30,7 @@ static void display_headers(struct evkeyvalq *headers) {
 /*
  * Build a full HTTP request, including headers.
  */
-char *ntripcli_http_request_str(struct caster_state *caster, char *method, char *host, unsigned short port, char *uri, int version, struct evkeyvalq *opt_headers) {
+static char *ntripcli_http_request_str(struct caster_state *caster, char *method, char *host, unsigned short port, char *uri, int version, struct evkeyvalq *opt_headers) {
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 
