@@ -537,8 +537,6 @@ static void malloc_write_cb(void *opaque, const char *string) {
 }
 
 char *malloc_stats_dump(int json) {
-	time_t tstamp = time(NULL);
-	struct tm *t = localtime(&tstamp);
 	struct malloc_cb_opaque malloc_str;
 
 	malloc_str.result = (char *)strmalloc(1);
