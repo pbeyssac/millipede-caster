@@ -3,6 +3,7 @@
 
 #include <cyaml/cyaml.h>
 
+#include "ntrip_common.h"
 #include "config.h"
 #include "util.h"
 
@@ -49,6 +50,7 @@ static struct config default_config = {
 	.ntripsrv_default_write_timeout = 60,
 	.access_log = "/var/log/millipede/access.log",
 	.log = "/var/log/millipede/caster.log",
+	.log_level = LOG_INFO,
 	.disable_zero_copy = 0,
 	.zero_copy = 1
 };
@@ -60,6 +62,21 @@ static struct config_bind default_config_bind = {
 
 static struct config_proxy default_config_proxy = {
 	.table_refresh_delay = 600
+};
+
+/*
+ * YAML mapping from log level to integer values
+ */
+static const cyaml_strval_t log_level_strings[] = {
+	{ "EMERG", LOG_EMERG },
+	{ "ALERT", LOG_ALERT },
+	{ "CRIT", LOG_CRIT },
+	{ "ERR", LOG_ERR },
+	{ "WARNING", LOG_WARNING },
+	{ "NOTICE", LOG_NOTICE },
+	{ "INFO", LOG_INFO },
+	{ "DEBUG", LOG_DEBUG },
+	{ "EDEBUG", LOG_EDEBUG },
 };
 
 static const cyaml_schema_field_t bind_fields_schema[] = {
@@ -122,6 +139,10 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 		"access_log", CYAML_FLAG_POINTER, struct config, access_log, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"log", CYAML_FLAG_POINTER, struct config, log, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_ENUM(
+			"log_level", CYAML_FLAG_DEFAULT,
+			struct config, log_level, log_level_strings,
+			CYAML_ARRAY_LEN(log_level_strings)),
 	CYAML_FIELD_END
 };
 
@@ -170,6 +191,7 @@ struct config *config_parse(struct config **pthis, struct log *log, const char *
 	DEFAULT_ASSIGN(this, ntripsrv_default_write_timeout);
 	DEFAULT_ASSIGN(this, access_log);
 	DEFAULT_ASSIGN(this, log);
+	DEFAULT_ASSIGN(this, log_level);
 
 	// Undocumented
 	DEFAULT_ASSIGN(this, disable_zero_copy);

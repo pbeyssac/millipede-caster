@@ -98,10 +98,11 @@ struct config {
 	int test_default;
 
 	/*
-	 * Log files
+	 * Log files and log level
 	 */
 	const char *access_log;
 	const char *log;
+	int log_level;
 
 	/*
 	 * Zero copy mode shares outgoing queued RTCM packets, saving memory, but incurring

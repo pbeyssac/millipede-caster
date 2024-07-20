@@ -42,11 +42,11 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 
 void ntrip_free(struct ntrip_state *this, char *orig) {
 	if (this->refcnt) {
-		ntrip_log(this, "DEFERRED FREE %p (%d refs, orig %s)\n", this, this->refcnt, orig);
+		ntrip_log(this, LOG_DEBUG, "DEFERRED FREE %p (%d refs, orig %s)\n", this, this->refcnt, orig);
 		P_RWLOCK_UNLOCK(&this->lock);
 		return;
 	}
-	ntrip_log(this, "FREE %p\n", this);
+	ntrip_log(this, LOG_DEBUG, "FREE %p\n", this);
 	if (this->mountpoint)
 		strfree(this->mountpoint);
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
@@ -84,7 +84,7 @@ void ntrip_decref(struct ntrip_state *this, char *orig) {
 }
 
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint) {
-	ntrip_log(this, "Registering livesource %s\n", mountpoint);
+	ntrip_log(this, LOG_INFO, "Registering livesource %s\n", mountpoint);
 
 	P_RWLOCK_WRLOCK(&this->caster->livesources.lock);
 	if (livesource_find_unlocked(this->caster, mountpoint)) {
@@ -103,7 +103,7 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 }
 
 void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint) {
-	ntrip_log(this, "Unregister livesource %s\n", mountpoint);
+	ntrip_log(this, LOG_INFO, "Unregister livesource %s\n", mountpoint);
 	struct livesource *l = livesource_find(this->caster, mountpoint);
 	if (l)
 		caster_del_livesource(this->caster, l);
@@ -142,8 +142,10 @@ void ntrip_alog(void *arg, const char *fmt, ...) {
 	va_end(ap);
 }
 
-void ntrip_log(void *arg, const char *fmt, ...) {
+void ntrip_log(void *arg, int level, const char *fmt, ...) {
 	struct ntrip_state *this = (struct ntrip_state *)arg;
+	if (level > this->caster->config->log_level)
+		return;
 	va_list ap;
 	va_start(ap, fmt);
 	_ntrip_log(this->caster->flog.logfile, this, fmt, ap);
@@ -166,11 +168,11 @@ int ntrip_handle_raw(struct ntrip_state *st, struct bufferevent *bev) {
 		struct packet *rawp = packet_new(len_raw, st->caster);
 		if (rawp == NULL) {
 			evbuffer_drain(input, len_raw);
-			ntrip_log(st, "Raw: Not enough memory, dropping %d bytes\n", len_raw);
+			ntrip_log(st, LOG_CRIT, "Raw: Not enough memory, dropping %d bytes\n", len_raw);
 			return 1;
 		}
 		evbuffer_remove(input, &rawp->data[0], len_raw);
-		//ntrip_log(st, "Raw: packet source %s size %d\n", st->mountpoint, len_raw);
+		//ntrip_log(st, LOG_DEBUG, "Raw: packet source %s size %d\n", st->mountpoint, len_raw);
 		if (livesource_send_subscribers(st->own_livesource, rawp, st->caster))
 			st->last_send = time(NULL);
 		packet_free(rawp);
@@ -198,9 +200,9 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 			*p = '\0';
 
 			if (sscanf(line, "%zx", &chunk_len) == 1) {
-				// ntrip_log(st, "ok chunk_len: \"%s\" (%zu)\n", line, chunk_len);
+				// ntrip_log(st, LOG_DEBUG, "ok chunk_len: \"%s\" (%zu)\n", line, chunk_len);
 			} else {
-				ntrip_log(st, "failed chunk_len: \"%s\"\n", line);
+				ntrip_log(st, LOG_INFO, "failed chunk_len: \"%s\"\n", line);
 				return 0;
 			}
 			st->chunk_state = CHUNK_IN_PROGRESS;
@@ -225,7 +227,7 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 			len_raw = evbuffer_get_length(st->chunk_buf);
 			struct packet *packet = packet_new(len_raw, st->caster);
 			if (packet == NULL) {
-				ntrip_log(st, "Not enough memory, dropping packet\n");
+				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping packet\n");
 				return 1;
 			}
 			evbuffer_remove(st->chunk_buf, &packet->data[0], len_raw);
@@ -241,7 +243,7 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 			// skip trailing CR LF
 			evbuffer_remove(input, data, 2);
 			if (data[0] != '\r' || data[1] != '\n')
-				ntrip_log(st, "Wrong chunk trailer\n");
+				ntrip_log(st, LOG_INFO, "Wrong chunk trailer\n");
 			st->chunk_state = CHUNK_WAIT_LEN;
 		}
 	}
@@ -267,24 +269,24 @@ static int ntrip_handle_rtcm(struct ntrip_state *st, struct bufferevent *bev) {
 		if (drain != NULL) {
 			evbuffer_remove(input, drain, len);
 			drain[len] = '\0';
-			ntrip_log(st, "RTCM: draining %zd bytes: \"%s\"\n", len, drain);
+			ntrip_log(st, LOG_INFO, "RTCM: draining %zd bytes: \"%s\"\n", len, drain);
 			free(drain);
 		} else
 #endif
 		{
-			ntrip_log(st, "draining %zd bytes\n", len);
+			ntrip_log(st, LOG_INFO, "draining %zd bytes\n", len);
 			evbuffer_drain(input, len);
 		}
 		return 0;
 	}
 	if (p.pos > 0) {
-		ntrip_log(st, "RTCM: found packet start, draining %zd bytes\n", p.pos);
+		ntrip_log(st, LOG_DEBUG, "RTCM: found packet start, draining %zd bytes\n", p.pos);
 		evbuffer_drain(input, p.pos);
 	}
 
 	unsigned char *mem = evbuffer_pullup(input, 3);
 	if (mem == NULL) {
-		ntrip_log(st, "RTCM: not enough data, waiting\n");
+		ntrip_log(st, LOG_DEBUG, "RTCM: not enough data, waiting\n");
 		return 0;
 	}
 
@@ -299,7 +301,7 @@ static int ntrip_handle_rtcm(struct ntrip_state *st, struct bufferevent *bev) {
 	struct packet *rtcmp = packet_new(len_rtcm, st->caster);
 	if (rtcmp == NULL) {
 		evbuffer_drain(input, len_rtcm);
-		ntrip_log(st, "RTCM: Not enough memory, dropping packet\n");
+		ntrip_log(st, LOG_CRIT, "RTCM: Not enough memory, dropping packet\n");
 		return 1;
 	}
 
@@ -307,9 +309,9 @@ static int ntrip_handle_rtcm(struct ntrip_state *st, struct bufferevent *bev) {
 	unsigned long crc = crc24q_hash(&rtcmp->data[0], len_rtcm-3);
 	if (crc == (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]) {
 		unsigned short type = rtcmp->data[3]*16 + rtcmp->data[4]/16;
-		ntrip_log(st, "RTCM source %s size %d type %d\n", st->mountpoint, len_rtcm, type);
+		ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d\n", st->mountpoint, len_rtcm, type);
 	} else {
-		ntrip_log(st, "RTCM: bad checksum! %08lx %08x\n", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
+		ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x\n", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
 	}
 
 	//struct livesource *l = livesource_find(st->caster, st->mountpoint);

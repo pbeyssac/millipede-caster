@@ -53,7 +53,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 			 * Double decrement the reference count
 			 * to enforce connection closing.
 			 */
-			ntrip_log(np->ntrip_state, "dropping %p due to %s\n", np->ntrip_state, kill_backlogged?"backlog":"closed source");
+			ntrip_log(np->ntrip_state, LOG_NOTICE, "dropping %p due to %s\n", np->ntrip_state, kill_backlogged?"backlog":"closed source");
 			np->ntrip_state->refcnt--;
 			killed++;
 		} else if (kill_backlogged == 0 && np->virtual) {
@@ -110,7 +110,7 @@ struct subscriber *livesource_add_subscriber(struct livesource *this, struct buf
 
 		P_RWLOCK_UNLOCK(&this->lock);
 
-		ntrip_log(st, "subscription done to %s\n", this->mountpoint);
+		ntrip_log(st, LOG_INFO, "subscription done to %s\n", this->mountpoint);
 	}
 	return sub;
 }
@@ -169,7 +169,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
 		if (packet->caster->config->zero_copy) {
 			if (evbuffer_add_reference(bufferevent_get_output(np->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
-				ntrip_log(np->ntrip_state, "RTCM: evbuffer_add_reference failed\n");
+				ntrip_log(np->ntrip_state, LOG_CRIT, "RTCM: evbuffer_add_reference failed\n");
 				ns++;
 			}
 		} else {
@@ -179,7 +179,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		}
 		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(np->bev));
 		if (backlog_len > backlog_evbuffer) {
-			// ntrip_log(np->ntrip, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
+			// ntrip_log(np->ntrip, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
 		}

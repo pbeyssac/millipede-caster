@@ -21,7 +21,7 @@ const char *server_headers = "Server: NTRIP " SERVER_VERSION_STRING "\r\n";
  */
 int ntripsrv_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource, struct bufferevent *output_bev) {
 	//logfmt(&this->caster->flog, "Switching virtual source from %s to %s\n", this->virtual_mountpoint, new_mountpoint);
-	ntrip_log(this, "Switching virtual source from %s to %s\n", this->virtual_mountpoint, new_mountpoint);
+	ntrip_log(this, LOG_INFO, "Switching virtual source from %s to %s\n", this->virtual_mountpoint, new_mountpoint);
 	new_mountpoint = mystrdup(new_mountpoint);
 	if (new_mountpoint == NULL)
 		return -1;
@@ -53,7 +53,7 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 			gettimeofday(&t1, NULL);
 			timersub(&t1, &redis_args->t0, &t1);
 
-			ntrip_log(st, "On-demand source subscribed from %s:%d/%s, %.3f ms\n",
+			ntrip_log(st, LOG_INFO, "On-demand source subscribed from %s:%d/%s, %.3f ms\n",
 				redis_args->source_st->host,
 				redis_args->source_st->port,
 				redis_args->mountpoint,
@@ -148,15 +148,15 @@ static int check_password(struct ntrip_state *this, char *mountpoint, char *user
 		return 0;
 	}
 
-	ntrip_log(this, "mountpoint %s user %s\n", mountpoint, user);
+	ntrip_log(this, LOG_DEBUG, "mountpoint %s user %s\n", mountpoint, user);
 	for (; auth->key != NULL; auth++) {
 		if (!strcmp(auth->key, mountpoint)) {
-			ntrip_log(this, "mountpoint %s found\n", mountpoint);
+			ntrip_log(this, LOG_DEBUG, "mountpoint %s found\n", mountpoint);
 			if (user && strcmp(auth->user, user))
 				break;
 
 			if (!strcmp(auth->password, passwd)) {
-				ntrip_log(this, "source %s auth ok\n", mountpoint);
+				ntrip_log(this, LOG_DEBUG, "source %s auth ok\n", mountpoint);
 				r = 1;
 				break;
 			}
@@ -187,15 +187,15 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 		return -1;
 	}
 
-	ntrip_log(st, "GGAOK pos (%f, %f) list of %d\n", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
+	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d\n", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
 	dist_table_display(st, s, 10);
 
 	if (st->source_virtual) {
 		if (s->dist_array[0].dist > st->max_min_dist) {
 			st->max_min_dist = s->dist_array[0].dist;
-			ntrip_log(st, "New maximum distance to source: %.2f\n", st->max_min_dist);
+			ntrip_log(st, LOG_DEBUG, "New maximum distance to source: %.2f\n", st->max_min_dist);
 		} else
-			ntrip_log(st, "Current maximum distance to source: %.2f\n", st->max_min_dist);
+			ntrip_log(st, LOG_DEBUG, "Current maximum distance to source: %.2f\n", st->max_min_dist);
 
 		char *m = s->dist_array[0].mountpoint;
 
@@ -212,14 +212,14 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 			float current_dist = st->virtual_mountpoint ? (distance(&st->mountpoint_pos, &st->last_pos)-st->caster->config->hysteresis_m) : 1e10;
 
 			if (current_dist < s->dist_array[0].dist) {
-				ntrip_log(st, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis\n", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
+				ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis\n", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
 			} else {
 				struct livesource *l = livesource_find(st->caster, m);
 				if (l) {
 					if (ntripsrv_switch_source(st, m, &s->dist_array[0].pos, l, st->bev) < 0)
 						r = -1;
 				} else {
-					ntrip_log(st, "Trying to switch virtual source from %s to %s\n", st->virtual_mountpoint, m);
+					ntrip_log(st, LOG_INFO, "Trying to switch virtual source from %s to %s\n", st->virtual_mountpoint, m);
 					struct redistribute_cb_args *redis_args = redistribute_args_new(st, m, &s->dist_array[0].pos, st->caster->config->reconnect_delay, 0);
 					if (redis_args != NULL) {
 						st->refcnt++;
@@ -251,18 +251,18 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 1) {
-		//ntrip_log(st, "srv_readcb %d\n", st->state);
+		ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb %p state %d len %d\n", st, st->state, evbuffer_get_length(input));
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, "Got \"%s\", %zd bytes\n", line, len);
+			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes\n", line, len);
 			int i = 0;
 			char *septmp = line;
 			while ((token = strsep(&septmp, " \t")) != NULL && i < SIZE_HTTP_ARGS) {
-				//ntrip_log(st, "TOKEN %s\n", token);
+				//ntrip_log(st, LOG_DEBUG, "TOKEN %s\n", token);
 				st->http_args[i] = mystrdup(token);
 				if (st->http_args[i] == NULL) {
 					err = 503;
@@ -280,11 +280,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, "Got \"%s\", %zd bytes\n", line, len);
+			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes\n", line, len);
 			if (strlen(line) != 0) {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
-					ntrip_log(st, "parse_header failed\n");
+					ntrip_log(st, LOG_DEBUG, "parse_header failed\n");
 					err = 1;
 					break;
 				}
@@ -307,7 +307,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (strcasestr(value, "ntrip"))
 						st->user_agent_ntrip = 1;
 				} else if (!strcasecmp(key, "authorization")) {
-					ntrip_log(st, "Header %s: *****\n", key);
+					ntrip_log(st, LOG_DEBUG, "Header %s: *****\n", key);
 					if (!strncmp(value, "Basic ", 6)) {
 						char *auth = b64decode(value+6, strlen(value+6), 1);
 						char *user, *password;
@@ -317,24 +317,32 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 								auth[colon] = '\0';
 								user = auth;
 								password = auth + colon +1;
-								ntrip_log(st, "Decoded auth: %s, %s\n", user, password);
+								ntrip_log(st, LOG_DEBUG, "Decoded auth: %s, %s\n", user, password);
 								st->user = user;
 								st->password = password;
 							} else {
-								ntrip_log(st, "No ':' in %s\n", auth);
+								ntrip_log(st, LOG_DEBUG, "No ':' in %s\n", auth);
 								strfree(auth);
 							}
 						} else {
-							ntrip_log(st, "Can't decode Base64 string: %s\n", value+6);
+							if (st->caster->config->log_level >= LOG_DEBUG) {
+								ntrip_log(st, LOG_DEBUG, "Can't decode Base64 string: %s\n", value+6);
+							} else {
+								ntrip_log(st, LOG_INFO, "Can't decode Base64 string\n");
+							}
 						}
 					} else {
-						ntrip_log(st, "Can't decode Authorization: \"%s\"\n", value);
+						if (st->caster->config->log_level >= LOG_DEBUG) {
+							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"\n", value);
+						} else {
+							ntrip_log(st, LOG_INFO, "Can't decode Authorization\n");
+						}
 					}
 				} else {
-					ntrip_log(st, "Header %s: %s\n", key, value);
+					ntrip_log(st, LOG_DEBUG, "Header %s: %s\n", key, value);
 				}
 			} else {
-				ntrip_log(st, "[End headers]\n");
+				ntrip_log(st, LOG_DEBUG, "[End headers]\n");
 				if (!strcmp(st->http_args[0], "SOURCE")) {
 					/* Don't log the password */
 					ntrip_alog(st, "%s *** %s\n", st->http_args[0], st->http_args[2]);
@@ -399,7 +407,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							/* Regular NTRIP stream client: disable read and write timeouts */
 							bufferevent_set_timeouts(bev, NULL, NULL);
 						} else if (st->source_on_demand) {
-							ntrip_log(st, "Trying to subcribe to on-demand source %s\n", mountpoint);
+							ntrip_log(st, LOG_INFO, "Trying to subcribe to on-demand source %s\n", mountpoint);
 							struct redistribute_cb_args *redis_args = redistribute_args_new(st, mountpoint, &sourceline->pos, st->caster->config->reconnect_delay, 0);
 							if (redis_args == NULL) {
 								err = 503;
@@ -484,7 +492,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			if (!line)
 				break;
 			pos_t pos;
-			ntrip_log(st, "GGA? \"%s\", %zd bytes\n", line, len);
+			ntrip_log(st, LOG_DEBUG, "GGA? \"%s\", %zd bytes\n", line, len);
 			if (parse_gga(line, &pos) >= 0) {
 				st->last_pos = pos;
 				st->last_pos_valid = 1;
@@ -534,22 +542,26 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
  */
 void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 {
+	size_t len;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-	struct evbuffer *output = bufferevent_get_output(bev);
+	struct evbuffer *output;
 
 	P_RWLOCK_WRLOCK(&st->lock);
 
-	if (evbuffer_get_length(output) == 0) {
-		//printf("flushed answer ntripsrv %p\n", st);
+	output = bufferevent_get_output(bev);
+	len = evbuffer_get_length(output);
+	if (len == 0) {
+		ntrip_log(st, LOG_DEBUG, "flushed answer ntripsrv %p\n", st);
 		if (st->state == NTRIP_WAIT_CLOSE) {
-			ntrip_log(st, "ntrip_free srv_writecb %p bev %p\n", st, bev);
+			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_decref %p bev %p\n", st, bev);
 
 			my_bufferevent_free(st, bev);
 			st->refcnt--;
 			ntrip_free(st, "ntripsrv_writecb");
 			return;
 		}
-	}
+	} else
+		ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb %p remaining len %d\n", st, len);
 
 	P_RWLOCK_UNLOCK(&st->lock);
 }
@@ -562,16 +574,16 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	if (events & BEV_EVENT_CONNECTED) {
-		ntrip_log(st, "Connected srv %p\n", st);
+		ntrip_log(st, LOG_INFO, "Connected srv %p\n", st);
 		P_RWLOCK_UNLOCK(&st->lock);
 		return;
 	}
 
 	if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_EOF)
-			ntrip_log(st, "Connection closed (EOF) ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_INFO, "Connection closed (EOF) ntrip_state %p.\n", st);
 		else
-			ntrip_log(st, "Got an error on connection: %s\n", strerror(initial_errno));
+			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s\n", strerror(initial_errno));
 		if (st->registered) {
 			ntrip_unregister_livesource(st, st->mountpoint);
 			st->registered = 0;
@@ -581,9 +593,9 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)
-			ntrip_log(st, "ntripsrv read timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout ntrip_state %p.\n", st);
 		if (events & BEV_EVENT_WRITING)
-			ntrip_log(st, "ntripsrv write timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout ntrip_state %p.\n", st);
 		if (st->registered) {
 			ntrip_unregister_livesource(st, st->mountpoint);
 			st->registered = 0;
@@ -593,7 +605,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 		}
 	}
 	my_bufferevent_free(st, bev);
-	ntrip_log(st, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
+	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
 	st->refcnt--;
 	ntrip_free(st, "ntripsrv_eventcb");
 }

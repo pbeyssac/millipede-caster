@@ -215,14 +215,15 @@ void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 #if 0
 	int n = joblist_count_bev(this->caster->joblist, bev, this->caster);
 	if (n) {
-		ntrip_log(this, "Freeing bufferevent with %d references\n", n);
+		ntrip_log(this, LOG_DEBUG, "Freeing bufferevent with %d references\n", n);
 	}
 #endif
 	//bufferevent_decref(bev);
 	if (!this->bev_freed) {
 		bufferevent_free(bev);
 		this->bev_freed = 1;
-	}
+	} else
+		ntrip_log(this, LOG_DEBUG, "double free for bufferevent %p\n", bev);
 }
 
 static void
@@ -248,13 +249,13 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	sndbuf = backlog_socket;
 	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, size_sndbuf) < 0)
-		ntrip_log(st, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
+		ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
 
 	if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, &size_sndbuf) >= 0) {
-		ntrip_log(st, "New connection, ntrip_state=%p sndbuf=%d\n", st, sndbuf);
+		ntrip_log(st, LOG_INFO, "New connection, ntrip_state=%p sndbuf=%d\n", st, sndbuf);
 	} else {
 		size_sndbuf = -1;
-		ntrip_log(st, "New connection, ntrip_state=%p\n", st);
+		ntrip_log(st, LOG_INFO, "New connection, ntrip_state=%p\n", st);
 	}
 
 	st->state = NTRIP_WAIT_HTTP_METHOD;
@@ -266,7 +267,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 #endif
 
 	if (bev == NULL) {
-		ntrip_log(st, "Error constructing bufferevent!");
+		ntrip_log(st, LOG_CRIT, "Error constructing bufferevent!");
 		event_base_loopbreak(base);
 		P_RWLOCK_WRLOCK(&st->lock);
 		st->refcnt--;
@@ -283,7 +284,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct timeval read_timeout = { st->caster->config->ntripsrv_default_read_timeout, 0 };
 	struct timeval write_timeout = { st->caster->config->ntripsrv_default_write_timeout, 0 };
 	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
-	ntrip_log(st, "ntrip_state=%p bev=%p\n", st, bev);
+	ntrip_log(st, LOG_DEBUG, "ntrip_state=%p bev=%p\n", st, bev);
 	st->bev = bev;
 }
 

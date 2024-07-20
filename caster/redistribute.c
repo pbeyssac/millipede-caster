@@ -52,12 +52,12 @@ redistribute_schedule(struct ntrip_state *st, struct redistribute_cb_args *redis
 	struct timeval timeout_interval = { st->caster->config->reconnect_delay, 0 };
 	struct event *ev = event_new(st->caster->base, -1, 0, redistribute_cb, redis_args);
 	if (ev != NULL) {
-		ntrip_log(st, "Scheduling retry callback for source %s in %d seconds\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
+		ntrip_log(st, LOG_INFO, "Scheduling retry callback for source %s in %d seconds\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
 		redis_args->ev = ev;
 		event_add(ev, &timeout_interval);
 		return 0;
 	} else {
-		ntrip_log(st, "Can't schedule retry callback for source %s in %d seconds, canceling\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
+		ntrip_log(st, LOG_CRIT, "Can't schedule retry callback for source %s in %d seconds, canceling\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
 		redistribute_args_free(redis_args);
 		return -1;
 	}

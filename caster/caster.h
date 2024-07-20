@@ -61,6 +61,7 @@ struct caster_state {
 
 	sourcetable_stack_t sourcetablestack;
 
+	/* Logs */
 	struct log flog, alog;
 };
 

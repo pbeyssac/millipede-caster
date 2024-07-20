@@ -115,7 +115,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	struct job *j = (struct job *)malloc(sizeof(struct job));
 
 	if (j == NULL) {
-		logfmt(&st->caster->flog, "Out of memory, cannot allocate job.");
+		ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
 		return;
 	}
 

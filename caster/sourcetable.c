@@ -218,7 +218,6 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 	} else {
 		P_RWLOCK_WRLOCK(&this->lock);
 		int new_len = strlen(this->header) + strlen(sourcetable_entry) + 3;
-		printf("header=\"%s\"\nentry=\"%s\"\n", this->header, sourcetable_entry);
 		char *s = (char *)strrealloc(this->header, new_len);
 		if (s == NULL) {
 			P_RWLOCK_UNLOCK(&this->lock);
@@ -365,9 +364,9 @@ void dist_table_free(struct dist_table *this) {
 void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max) {
 	float max_dist = this->size_dist_array ? this->dist_array[this->size_dist_array-1].dist : 40000;
 
-	ntrip_log(st, "dist_table from (%f, %f) %s:%d, furthest base dist %.2f:\n", this->pos.lat, this->pos.lon, this->sourcetable->caster, this->sourcetable->port, max_dist);
+	ntrip_log(st, LOG_INFO, "dist_table from (%f, %f) %s:%d, furthest base dist %.2f:\n", this->pos.lat, this->pos.lon, this->sourcetable->caster, this->sourcetable->port, max_dist);
 	for (int i = 0; i < max && i < this->size_dist_array; i++) {
-		ntrip_log(st, "%.2f: %s\n", this->dist_array[i].dist, this->dist_array[i].mountpoint);
+		ntrip_log(st, LOG_INFO, "%.2f: %s\n", this->dist_array[i].dist, this->dist_array[i].mountpoint);
 	}
 }
 

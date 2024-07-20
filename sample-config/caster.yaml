@@ -41,6 +41,19 @@ access_log:		/var/log/millipede/access.log
 log:			/var/log/millipede/caster.log
 
 #
+# Log levels, syslog-like:
+#	EMERG
+#	ALERT
+#	CRIT
+#	ERR
+#	WARNING
+#	NOTICE
+#	INFO
+#	DEBUG	=> WARNING: leaks passwords to the logs
+#
+log_level:		INFO
+
+#
 # Distance hysteresis to avoid spurious base change
 #
 hysteresis_m:		500.

@@ -17,20 +17,20 @@
 const char *client_ntrip_version = "Ntrip/2.0";
 const char *client_user_agent = "NTRIP " CLIENT_VERSION_STRING;
 
-static void display_headers(struct evkeyvalq *headers) {
+static void display_headers(struct ntrip_state *st, struct evkeyvalq *headers) {
 	struct evkeyval *np;
 	TAILQ_FOREACH(np, headers, next) {
 		if (!strcasecmp(np->key, "authorization"))
-			fprintf(stderr, "%s: *****\n", np->key);
+			ntrip_log(st, LOG_DEBUG, "%s: *****\n", np->key);
 		else
-			fprintf(stderr, "%s: %s\n", np->key, np->value);
+			ntrip_log(st, LOG_DEBUG, "%s: %s\n", np->key, np->value);
 	}
 }
 
 /*
  * Build a full HTTP request, including headers.
  */
-static char *ntripcli_http_request_str(struct caster_state *caster, char *method, char *host, unsigned short port, char *uri, int version, struct evkeyvalq *opt_headers) {
+static char *ntripcli_http_request_str(struct ntrip_state *st, char *method, char *host, unsigned short port, char *uri, int version, struct evkeyvalq *opt_headers) {
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 
@@ -49,15 +49,15 @@ static char *ntripcli_http_request_str(struct caster_state *caster, char *method
 		return NULL;
 	}
 
-	P_RWLOCK_RDLOCK(&caster->authlock);
+	P_RWLOCK_RDLOCK(&st->caster->authlock);
 
-	if (caster->host_auth) {
-		for (struct auth_entry *a = &caster->host_auth[0]; a->user != NULL; a++) {
+	if (st->caster->host_auth) {
+		for (struct auth_entry *a = &st->caster->host_auth[0]; a->user != NULL; a++) {
 			if (!strcasecmp(a->key, host)) {
 				if (http_headers_add_auth(&headers, a->user, a->password) < 0) {
 					evhttp_clear_headers(&headers);
 					strfree(host_port);
-					P_RWLOCK_UNLOCK(&caster->authlock);
+					P_RWLOCK_UNLOCK(&st->caster->authlock);
 					return NULL;
 				} else
 					break;
@@ -65,9 +65,9 @@ static char *ntripcli_http_request_str(struct caster_state *caster, char *method
 		}
 	}
 
-	P_RWLOCK_UNLOCK(&caster->authlock);
+	P_RWLOCK_UNLOCK(&st->caster->authlock);
 
-	display_headers(&headers);
+	display_headers(st, &headers);
 
 	int hlen = 0;
 	TAILQ_FOREACH(np, &headers, next) {
@@ -106,7 +106,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	P_RWLOCK_WRLOCK(&st->lock);
 	struct evbuffer *input = bufferevent_get_input(bev);
 
-	//ntrip_log(st, "readcb %zd bytes\n", evbuffer_get_length(input));
+	//ntrip_log(st, LOG_DEBUG, "readcb %zd bytes\n", evbuffer_get_length(input));
 	while (!end && !st->bev_freed && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 5) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
@@ -114,7 +114,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, "Got \"%s\", %zd bytes on /%s\n", line, len, st->mountpoint);
+			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes on /%s\n", line, len, st->mountpoint);
 
 			char *septmp = line;
 			for (arg = &st->http_args[0];
@@ -132,7 +132,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 
 			if (!strcmp(st->http_args[0], "ERROR")) {
-				ntrip_log(st, "NTRIP1 error reply: %s\n", line);
+				ntrip_log(st, LOG_NOTICE, "NTRIP1 error reply: %s\n", line);
 				strfree(line);
 				end = 1;
 				break;
@@ -154,7 +154,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			if (status_code == 200)
 				st->state = NTRIP_WAIT_HTTP_HEADER;
 			else {
-				ntrip_log(st, "failed request on /%s, status_code %d\n", st->mountpoint, st->status_code);
+				ntrip_log(st, LOG_NOTICE, "failed request on /%s, status_code %d\n", st->mountpoint, st->status_code);
 				end = 1;
 			}
 
@@ -162,7 +162,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, "Got header \"%s\", %zd bytes\n", line, len);
+			ntrip_log(st, LOG_DEBUG, "Got header \"%s\", %zd bytes\n", line, len);
 			if (strlen(line) == 0) {
 				if (strlen(st->mountpoint)) {
 					st->state = NTRIP_REGISTER_SOURCE;
@@ -172,7 +172,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					st->tmp_sourcetable = sourcetable_new();
 					if (st->tmp_sourcetable == NULL) {
 						end =1;
-						ntrip_log(st, "Out of memory when allocating sourcetable\n");
+						ntrip_log(st, LOG_CRIT, "Out of memory when allocating sourcetable\n");
 					} else {
 						st->tmp_sourcetable->caster = st->host;
 						st->tmp_sourcetable->port = st->port;
@@ -182,7 +182,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			} else {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
-					ntrip_log(st, "parse_header failed\n");
+					ntrip_log(st, LOG_DEBUG, "parse_header failed\n");
 					end = 1;
 					break;
 				}
@@ -205,7 +205,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			if (!line)
 				break;
 			if (!strcmp(line, "ENDSOURCETABLE")) {
-				ntrip_log(st, "Complete sourcetable, %d entries\n", sourcetable_nentries(st->tmp_sourcetable, 0));
+				ntrip_log(st, LOG_INFO, "Complete sourcetable, %d entries\n", sourcetable_nentries(st->tmp_sourcetable, 0));
 				st->tmp_sourcetable->pullable = 1;
 				gettimeofday(&st->tmp_sourcetable->fetch_time, NULL);
 				if (st->sourcetable_cb_arg) {
@@ -227,7 +227,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				struct sourceline *sourceline = stack_find_pullable(&st->caster->sourcetablestack, st->mountpoint, NULL);
 				if ((st->own_livesource = ntrip_add_livesource(st, st->mountpoint)) == NULL) {
 					end = 1;
-					ntrip_log(st, "Can't register live source for %s\n", st->mountpoint);
+					ntrip_log(st, LOG_NOTICE, "Can't register live source for %s\n", st->mountpoint);
 					if (st->callback_subscribe) {
 						st->callback_subscribe(st->callback_subscribe_arg, 0);
 						st->callback_subscribe = NULL;
@@ -235,7 +235,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					break;
 				}
 				if (sourceline) {
-					ntrip_log(st, "starting redistribute for %s\n", st->mountpoint);
+					ntrip_log(st, LOG_INFO, "starting redistribute for %s\n", st->mountpoint);
 					if (st->callback_subscribe) {
 						st->callback_subscribe(st->callback_subscribe_arg, 1);
 						st->callback_subscribe = NULL;
@@ -247,14 +247,14 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 			st->state = NTRIP_WAIT_STREAM_GET;
 		} else if (st->state == NTRIP_WAIT_STREAM_GET) {
-			//ntrip_log(st, "testing redistribute %d for %s\n", st->redistribute, st->mountpoint);
+			//ntrip_log(st, LOG_INFO, "testing redistribute %d for %s\n", st->redistribute, st->mountpoint);
 			if (!ntrip_handle_raw(st, bev))
 				break;
 			if (st->persistent)
 				continue;
 			int idle_time = time(NULL) - st->last_send;
 			if (idle_time > st->caster->config->idle_max_delay) {
-				ntrip_log(st, "last_send %s: %d seconds ago, dropping\n", st->mountpoint, idle_time);
+				ntrip_log(st, LOG_NOTICE, "last_send %s: %d seconds ago, dropping\n", st->mountpoint, idle_time);
 				if (st->registered) {
 					ntrip_unregister_livesource(st, st->mountpoint);
 					st->registered = 0;
@@ -284,14 +284,14 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 void ntripcli_writecb(struct bufferevent *bev, void *arg)
 {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-	ntrip_log(st, "ntripcli_writecb\n");
+	ntrip_log(st, LOG_DEBUG, "ntripcli_writecb\n");
 
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	if (!st->bev_freed) {
 		struct evbuffer *output = bufferevent_get_output(bev);
 		if (evbuffer_get_length(output) == 0) {
-			ntrip_log(st, "flushed answer ntripcli\n");
+			ntrip_log(st, LOG_DEBUG, "flushed answer ntripcli\n");
 		}
 	}
 
@@ -310,24 +310,24 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 			if (getpeername(fd, &st->peeraddr.generic, &psocklen) >= 0) {
 				st->remote = 1;
 			} else {
-				ntrip_log(st, "getpeername failed: %s\n", strerror(errno));
+				ntrip_log(st, LOG_NOTICE, "getpeername failed: %s\n", strerror(errno));
 			}
 		}
-		ntrip_log(st, "Connected to %s:%d for /%s\n", st->host, st->port, st->mountpoint);
+		ntrip_log(st, LOG_INFO, "Connected to %s:%d for /%s\n", st->host, st->port, st->mountpoint);
 		char *uri = (char *)strmalloc(strlen(st->mountpoint) + 3);
 		if (uri == NULL) {
 			my_bufferevent_free(st, bev);
-			ntrip_log(st, "Not enough memory, dropping connection to %s:%d\n", st->host, st->port);
+			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d\n", st->host, st->port);
 
 			P_RWLOCK_UNLOCK(&st->lock);
 			return;
 		}
 		sprintf(uri, "/%s", st->mountpoint);
-		char *s = ntripcli_http_request_str(st->caster, "GET", st->host, st->port, uri, 2, NULL);
+		char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, uri, 2, NULL);
 		strfree(uri);
 		if (s == NULL) {
 			my_bufferevent_free(st, bev);
-			ntrip_log(st, "Not enough memory, dropping connection from %s:%d\n", st->host, st->port);
+			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d\n", st->host, st->port);
 
 			P_RWLOCK_UNLOCK(&st->lock);
 			return;
@@ -341,15 +341,15 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
-			ntrip_log(st, "Error: %s\n", strerror(errno));
+			ntrip_log(st, LOG_NOTICE, "Error: %s\n", strerror(errno));
 		} else {
-			ntrip_log(st, "Client EOF\n");
+			ntrip_log(st, LOG_INFO, "Client EOF\n");
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)
-			ntrip_log(st, "ntripcli read timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripcli read timeout ntrip_state %p.\n", st);
 		if (events & BEV_EVENT_WRITING)
-			ntrip_log(st, "ntripcli write timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripcli write timeout ntrip_state %p.\n", st);
 	}
 
 	/* Unregister live source, if any */
@@ -370,9 +370,9 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	}
 	if (!st->bev_freed) {
 		struct evbuffer *input = bufferevent_get_input(bev);
-		ntrip_log(st, "Connection closed, %zu bytes left.\n", evbuffer_get_length(input));
+		ntrip_log(st, LOG_INFO, "Connection closed, %zu bytes left.\n", evbuffer_get_length(input));
 	} else {
-		ntrip_log(st, "Connection closed, bufferevent already freed.\n");
+		ntrip_log(st, LOG_NOTICE, "Connection closed, bufferevent already freed.\n");
 	}
 
 	my_bufferevent_free(st, bev);
