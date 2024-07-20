@@ -7,6 +7,8 @@
 # IPv6 and IPv4 supported.
 # ::0 (IPv6) or 0.0.0.0 (IPv4) to bind to all addresses.
 #
+# Default port: 2101
+#
 listen:
   - port:		2101
     ip:			127.0.0.1

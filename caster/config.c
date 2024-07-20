@@ -54,7 +54,7 @@ static struct config default_config = {
 };
 
 static struct config_bind default_config_bind = {
-	.port = 2102,
+	.port = 2101,
 	.queue_size = 2000
 };
 
@@ -66,7 +66,7 @@ static const cyaml_schema_field_t bind_fields_schema[] = {
 	CYAML_FIELD_STRING_PTR(
 		"ip", CYAML_FLAG_POINTER, struct config_bind, ip, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_INT(
-		"port", CYAML_FLAG_DEFAULT, struct config_bind, port),
+		"port", CYAML_FLAG_OPTIONAL, struct config_bind, port),
 	CYAML_FIELD_INT(
 		"queue_size", CYAML_FLAG_OPTIONAL, struct config_bind, queue_size),
 	CYAML_FIELD_END
