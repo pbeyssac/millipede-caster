@@ -121,7 +121,6 @@ extern size_t backlog_socket;
 extern size_t backlog_evbuffer;
 
 struct config *config_new();
-struct config *config_parse(struct config **this, struct log *log, const char *filename);
-struct config *config_parse_old(struct config **this, struct log *log, const char *filename);
+struct config *config_parse(struct config **this, const char *filename);
 
 #endif

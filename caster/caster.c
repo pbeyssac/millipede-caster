@@ -343,18 +343,18 @@ int caster_main(char *config_file) {
 #endif
 
 	struct config *config = config_new();
-	caster = caster_new(config);
 
+	if (!config_parse(&config, config_file)) {
+		fprintf(stderr, "Can't parse configuration from %s\n", config_file);
+		return 1;
+	}
+
+	caster = caster_new(config);
 	if (!caster) {
 		fprintf(stderr, "Can't allocate caster\n");
 		return 1;
 	}
 
-	if (!config_parse(&caster->config, &caster->flog, config_file)) {
-		fprintf(stderr, "Can't parse configuration from %s\n", config_file);
-		free(caster);
-		return 1;
-	}
 
 	caster_reload_auth(caster);
 

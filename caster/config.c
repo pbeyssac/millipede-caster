@@ -162,11 +162,10 @@ static const cyaml_config_t cyaml_config = {
 
 struct config *config_new() {
 	struct config *this = (struct config *)malloc(sizeof(struct config));
-	memcpy(this, &default_config, sizeof default_config);
 	return this;
 }
 
-struct config *config_parse(struct config **pthis, struct log *log, const char *filename) {
+struct config *config_parse(struct config **pthis, const char *filename) {
 	cyaml_err_t err;
 
 	/* Load YAML file */
