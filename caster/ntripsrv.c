@@ -365,13 +365,16 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							break;
 						}
 						st->client_version = 2;
-						ntripsrv_send_result_ok(st, output, "text/plain", NULL);
 						char *r = malloc_stats_dump(json);
 						if (r) {
+							ntripsrv_send_result_ok(st, output, "text/plain", NULL);
 							if (evbuffer_add_reference(output, r, strlen(r), free_callback, NULL) < 0)
 								strfree(r);
 						} else {
+							ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory\n", line, len);
+							err = 500;
 							evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
+							break;
 						}
 						st->state = NTRIP_WAIT_CLOSE;
 						break;
@@ -525,6 +528,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			send_server_reply(st, output, 404, "Not Found", NULL, NULL);
 		else if (err == 409)
 			send_server_reply(st, output, 409, "Conflict", NULL, NULL);
+		else if (err == 500)
+			send_server_reply(st, output, 500, "Internal Server Error", NULL, NULL);
 		else if (err == 501)
 			send_server_reply(st, output, 501, "Not Implemented", NULL, NULL);
 		else if (err == 503)
