@@ -286,6 +286,7 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	ntrip_log(st, LOG_DEBUG, "ntripcli_writecb\n");
 
+	bufferevent_lock(bev);
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	if (!st->bev_freed) {
@@ -296,11 +297,13 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 	}
 
 	P_RWLOCK_UNLOCK(&st->lock);
+	bufferevent_unlock(bev);
 }
 
 void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
+	bufferevent_lock(bev);
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	if (events & BEV_EVENT_CONNECTED) {
@@ -320,6 +323,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d\n", st->host, st->port);
 
 			P_RWLOCK_UNLOCK(&st->lock);
+			bufferevent_unlock(bev);
 			return;
 		}
 		sprintf(uri, "/%s", st->mountpoint);
@@ -330,6 +334,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d\n", st->host, st->port);
 
 			P_RWLOCK_UNLOCK(&st->lock);
+			bufferevent_unlock(bev);
 			return;
 		}
 		if (!st->bev_freed)
@@ -338,6 +343,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		st->state = NTRIP_WAIT_HTTP_STATUS;
 
 		P_RWLOCK_UNLOCK(&st->lock);
+		bufferevent_unlock(bev);
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
@@ -375,9 +381,9 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		ntrip_log(st, LOG_NOTICE, "Connection closed, bufferevent already freed.\n");
 	}
 
-	my_bufferevent_free(st, bev);
-
 	P_RWLOCK_UNLOCK(&st->lock);
+	bufferevent_unlock(bev);
+	my_bufferevent_free(st, bev);
 }
 
 #ifdef THREADS

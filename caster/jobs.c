@@ -77,6 +77,12 @@ void joblist_run(struct joblist *this) {
 		/*
 		 * Run the job.
 		 */
+
+		/*
+		 * libevent locks the bufferevent during callbacks if threading is activated,
+		 * so in the following callbacks we need to get our own locks beginning
+		 * with bufferevent to avoid deadlocks due to lock order reversal.
+		 */
 		struct ntrip_state *st = (struct ntrip_state *)j->arg;
 		if (j->cb) {
 			j->cb(j->bev, j->arg);
@@ -86,19 +92,21 @@ void joblist_run(struct joblist *this) {
 		n++;
 
 		/*
-		 * Unreferefence the buffervent so it can be freed.
+		 * Unref the ntrip state and free the job record.
+		 */
+
+		int bev_freed = st->bev_freed;
+
+		bufferevent_lock(j->bev);
+		ntrip_decref(st, "joblist_run");
+		bufferevent_unlock(j->bev);
+
+		/*
+		 * Unreference the buffervent so it can be freed.
 		 */
 		bufferevent_decref(j->bev);
 
-		/*
-		 * Free the job record and unref the ntrip state.
-		 */
 		free(j);
-
-		P_RWLOCK_WRLOCK(&st->lock);
-		st->refcnt--;
-		ntrip_free(st, "joblist_run");
-		//ntrip_decref(st, "joblist_run");
 
 		/*
 		 * Lock the list again for the next job.
@@ -137,10 +145,8 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	/*
 	 * Make sure the bufferevent is not freed in our back
 	 * before we have a chance to use it.
-	 *
-	 * libevent does its own locking on the buffer if threading is activated,
-	 * so keep it out of our locks.
 	 */
+
 	bufferevent_incref(bev);
 
 	ntrip_incref(st);

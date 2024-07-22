@@ -63,6 +63,7 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 
 	st->refcnt--;
 	P_RWLOCK_WRLOCK(&st->lock);
+	bufferevent_unlock(st->bev);
 	redistribute_args_free(redis_args);
 
 	ntrip_free(st, "ntripsrv_switch_source_cb");
@@ -248,6 +249,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	struct evkeyvalq opt_headers;
 	TAILQ_INIT(&opt_headers);
 
+	bufferevent_lock(bev);
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 1) {
@@ -538,6 +540,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	}
 
 	P_RWLOCK_UNLOCK(&st->lock);
+	bufferevent_unlock(bev);
 }
 
 /*
@@ -551,6 +554,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	struct evbuffer *output;
 
+	bufferevent_lock(bev);
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	output = bufferevent_get_output(bev);
@@ -559,6 +563,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 		ntrip_log(st, LOG_DEBUG, "flushed answer ntripsrv %p\n", st);
 		if (st->state == NTRIP_WAIT_CLOSE) {
 			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_decref %p bev %p\n", st, bev);
+			bufferevent_unlock(bev);
 
 			my_bufferevent_free(st, bev);
 			st->refcnt--;
@@ -569,6 +574,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 		ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb %p remaining len %d\n", st, len);
 
 	P_RWLOCK_UNLOCK(&st->lock);
+	bufferevent_unlock(bev);
 }
 
 void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
@@ -576,11 +582,13 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	int initial_errno = errno;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
+	bufferevent_lock(bev);
 	P_RWLOCK_WRLOCK(&st->lock);
 
 	if (events & BEV_EVENT_CONNECTED) {
 		ntrip_log(st, LOG_INFO, "Connected srv %p\n", st);
 		P_RWLOCK_UNLOCK(&st->lock);
+		bufferevent_unlock(bev);
 		return;
 	}
 
@@ -609,6 +617,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			st->subscription = NULL;
 		}
 	}
+	bufferevent_unlock(bev);
 	my_bufferevent_free(st, bev);
 	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
 	st->refcnt--;
