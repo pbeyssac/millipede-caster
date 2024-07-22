@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 
@@ -126,6 +127,12 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	j->bev = bev;
 	j->arg = arg;
 	j->events = events;
+
+	/*
+	 * Check the bufferevent has not been freed.
+	 * If it was, we shouldn't be called here.
+	 */
+	assert(!st->bev_freed);
 
 	/*
 	 * Make sure the bufferevent is not freed in our back
