@@ -266,6 +266,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	if (end) {
 		if (st->sourcetable_cb_arg != NULL) {
 			/* Notify the callback the transfer is over, and failed. */
+			ntrip_log(st, LOG_DEBUG, "sourcetable loading failed\n");
 			st->sourcetable_cb_arg->sourcetable = NULL;
 			st->sourcetable_cb_arg->sourcetable_cb(-1, 0, st->sourcetable_cb_arg);
 			st->sourcetable_cb_arg = NULL;
@@ -354,7 +355,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		if (events & BEV_EVENT_ERROR) {
 			ntrip_log(st, LOG_NOTICE, "Error: %s\n", strerror(errno));
 		} else {
-			ntrip_log(st, LOG_INFO, "Client EOF\n");
+			ntrip_log(st, LOG_INFO, "Server EOF\n");
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)

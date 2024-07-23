@@ -20,7 +20,6 @@ const char *server_headers = "Server: NTRIP " SERVER_VERSION_STRING "\r\n";
  * Switch client from a given source to another.
  */
 int ntripsrv_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource, struct bufferevent *output_bev) {
-	//logfmt(&this->caster->flog, "Switching virtual source from %s to %s\n", this->virtual_mountpoint, new_mountpoint);
 	ntrip_log(this, LOG_INFO, "Switching virtual source from %s to %s\n", this->virtual_mountpoint, new_mountpoint);
 	new_mountpoint = mystrdup(new_mountpoint);
 	if (new_mountpoint == NULL)

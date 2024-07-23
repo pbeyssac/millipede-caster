@@ -106,7 +106,6 @@ struct ntrip_state {
 
 	struct bufferevent *bev;	// associated bufferevent
 	char bev_freed;
-	//struct event_base *base;	// libevent event base
 
 	char remote;				// Flag: remote address is filled in peeraddr
 	union {
