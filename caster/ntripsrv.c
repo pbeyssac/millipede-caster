@@ -92,6 +92,7 @@ static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *
 	struct evkeyvalq headers;
 	struct sourcetable *sourcetable = stack_flatten(this->caster, &this->caster->sourcetablestack);
 	char *s = sourcetable_get(sourcetable);
+	sourcetable_free(sourcetable);
 	if (s == NULL)
 		return 503;
 

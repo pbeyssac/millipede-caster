@@ -215,6 +215,7 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 			TAILQ_INSERT_TAIL(&this->sources, n1, next);
 			P_RWLOCK_UNLOCK(&this->lock);
 		}
+		free(valueparse);
 	} else {
 		P_RWLOCK_WRLOCK(&this->lock);
 		int new_len = strlen(this->header) + strlen(sourcetable_entry) + 3;
