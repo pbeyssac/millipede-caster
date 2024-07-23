@@ -66,7 +66,7 @@ struct sourcetable *sourcetable_new() {
 	return this;
 }
 
-void sourcetable_free_unlock(struct sourcetable *this) {
+void sourcetable_free_unlocked(struct sourcetable *this) {
 	struct sourceline *n;
 	struct sourceline *tmpn;
 
@@ -80,7 +80,7 @@ void sourcetable_free_unlock(struct sourcetable *this) {
 
 void sourcetable_free(struct sourcetable *this) {
 	P_RWLOCK_WRLOCK(&this->lock);
-	sourcetable_free_unlock(this);
+	sourcetable_free_unlocked(this);
 }
 
 /*
@@ -438,7 +438,7 @@ void stack_replace_host(sourcetable_stack_t *stack, char *host, unsigned port, s
 
 	if (r) {
 		TAILQ_REMOVE(&stack->list, r, next);
-		sourcetable_free(r);
+		sourcetable_free_unlocked(r);
 	}
 	TAILQ_INSERT_TAIL(&stack->list, new_sourcetable, next);
 
