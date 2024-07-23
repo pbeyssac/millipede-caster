@@ -4,10 +4,12 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 #include <netinet/in.h>
 
 #include "conf.h"
 #include "config.h"
+#include "jobs.h"
 #include "livesource.h"
 #include "log.h"
 #include "redistribute.h"
@@ -23,7 +25,8 @@ enum ntrip_session_state {
 	NTRIP_WAIT_STREAM_SOURCE,
 	NTRIP_WAIT_SOURCETABLE_LINE,
 	NTRIP_WAIT_CLIENT_INPUT,
-	NTRIP_WAIT_CLOSE
+	NTRIP_WAIT_CLOSE,
+	NTRIP_END
 };
 
 /*
@@ -85,6 +88,13 @@ struct ntrip_state {
 	int refcnt;
 	struct caster_state *caster;
 	enum ntrip_session_state state;
+
+#ifdef THREADS
+	/* linked-list pointers for main job queue */
+	STAILQ_ENTRY(ntrip_state) next;
+	/* job list for this particular session */
+	struct jobq jobq;
+#endif
 
 	/*
 	 * State for a NTRIP client or server

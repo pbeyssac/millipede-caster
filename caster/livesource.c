@@ -128,7 +128,6 @@ void livesource_del_subscriber(struct subscriber *sub, struct caster_state *cast
 	TAILQ_REMOVE(&sub->livesource->subscribers, sub, next);
 	sub->livesource->nsubs--;
 	sub->ntrip_state->refcnt--;
-	ntrip_free(sub->ntrip_state, "livesource_del_subscriber");
 
 	P_RWLOCK_UNLOCK(&sub->livesource->lock);
 

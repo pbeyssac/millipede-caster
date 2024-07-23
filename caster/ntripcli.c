@@ -274,9 +274,14 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			sourcetable_free(st->tmp_sourcetable);
 			st->tmp_sourcetable = NULL;
 		}
+		st->state = NTRIP_END;
 		my_bufferevent_free(st, bev);
+#ifndef THREADS
+		ntrip_free(st, "ntripcli_readcb/sourcetable");
+#endif
+		bufferevent_unlock(bev);
+		return;
 	}
-
 	P_RWLOCK_UNLOCK(&st->lock);
 	bufferevent_unlock(bev);
 }
@@ -384,6 +389,10 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	P_RWLOCK_UNLOCK(&st->lock);
 	bufferevent_unlock(bev);
 	my_bufferevent_free(st, bev);
+	st->state = NTRIP_END;
+#ifndef THREADS
+	ntrip_free(st, "ntripcli_eventcb");
+#endif
 }
 
 #ifdef THREADS

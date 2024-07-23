@@ -16,21 +16,20 @@ struct job {
 	/* If not NULL, this is an event callback job */
 	void (*cbe)(struct bufferevent *bev, short events, void *arg);
 
-	/* Parameters for all jobs */
-	struct bufferevent *bev;
+	/* Parameter for all jobs */
 	void *arg;
 
 	/* Event flags for event jobs only */
 	short events;
 };
 STAILQ_HEAD (jobq, job);
-
+STAILQ_HEAD (ntripq, ntrip_state);
 /*
  *  FIFO list for worker threads to get new jobs.
  */
 struct joblist {
 	/* The queue itself */
-	struct jobq queue;
+	struct ntripq ntrip_queue;
 
 	/* Protect access to the queue */
 	P_MUTEX_T mutex;

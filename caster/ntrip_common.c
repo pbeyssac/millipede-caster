@@ -37,6 +37,9 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->client_version = 1;
 	this->callback_subscribe = NULL;
 	this->max_min_dist = 0;
+#ifdef THREADS
+	STAILQ_INIT(&this->jobq);
+#endif
 	return this;
 }
 
@@ -46,11 +49,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
  * Required lock: ntrip_state
  */
 void ntrip_free(struct ntrip_state *this, char *orig) {
-	if (this->refcnt) {
-		ntrip_log(this, LOG_DEBUG, "DEFERRED FREE %p (%d refs, orig %s)\n", this, this->refcnt, orig);
-		P_RWLOCK_UNLOCK(&this->lock);
-		return;
-	}
 	ntrip_log(this, LOG_DEBUG, "FREE %p\n", this);
 	if (this->mountpoint)
 		strfree(this->mountpoint);
@@ -70,22 +68,6 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
-}
-
-void ntrip_incref(struct ntrip_state *this) {
-	P_RWLOCK_WRLOCK(&this->lock);
-	this->refcnt++;
-	P_RWLOCK_UNLOCK(&this->lock);
-}
-
-void ntrip_decref(struct ntrip_state *this, char *orig) {
-	P_RWLOCK_WRLOCK(&this->lock);
-	this->refcnt--;
-	if (!this->refcnt) {
-		ntrip_free(this, orig);
-	} else {
-		P_RWLOCK_UNLOCK(&this->lock);
-	}
 }
 
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint) {

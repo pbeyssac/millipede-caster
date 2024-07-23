@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <pthread_np.h>
 
 #include "conf.h"
 #include "caster.h"
@@ -15,7 +16,7 @@ struct joblist *joblist_new(struct caster_state *caster) {
 	struct joblist *this = (struct joblist *)malloc(sizeof(struct joblist));
 	if (this != NULL) {
 		this->caster = caster;
-		STAILQ_INIT(&this->queue);
+		STAILQ_INIT(&this->ntrip_queue);
 		P_MUTEX_INIT(&this->mutex, NULL);
 		pthread_cond_init(&this->condjob, NULL);
 	}
@@ -27,10 +28,14 @@ struct joblist *joblist_new(struct caster_state *caster) {
  */
 void joblist_free(struct joblist *this) {
 	struct job *j;
+	struct ntrip_state *st;
 	P_MUTEX_LOCK(&this->mutex);
-	while ((j = STAILQ_FIRST(&this->queue))) {
-		STAILQ_REMOVE_HEAD(&this->queue, next);
-		free(j);
+	while ((st = STAILQ_FIRST(&this->ntrip_queue))) {
+		STAILQ_REMOVE_HEAD(&this->ntrip_queue, next);
+		while ((j = STAILQ_FIRST(&st->jobq))) {
+			STAILQ_REMOVE_HEAD(&st->jobq, next);
+			free(j);
+		}
 	}
 	P_MUTEX_DESTROY(&this->mutex);
 }
@@ -42,7 +47,7 @@ void joblist_free(struct joblist *this) {
  */
 void joblist_run(struct joblist *this) {
 	struct job *j;
-	int n = 0;
+	struct ntrip_state *st;
 
 	/*
 	 * Initial lock acquisition on the job list
@@ -53,60 +58,69 @@ void joblist_run(struct joblist *this) {
 	 * Now run jobs forever.
 	 */
 	while(1) {
-		j = STAILQ_FIRST(&this->queue);
-		if (j == NULL) {
+		int nst;
+		st = STAILQ_FIRST(&this->ntrip_queue);
+		if (st == NULL) {
 
 			/*
 			 * Empty queue.
 			 */
-			if (n != 1)
-				fprintf(stderr, "%p sleeping after running %d job(s)\n", pthread_self(), n);
 			pthread_cond_wait(&this->condjob, &this->mutex);
-			n = 0;
 			continue;
 		}
 
 		/*
-		 * We have the first job in the queue, remove it
+		 * We have the first ready session in the queue, remove it
 		 * so we can release the lock on the list.
 		 */
 
-		STAILQ_REMOVE_HEAD(&this->queue, next);
-		P_MUTEX_UNLOCK(&this->mutex);
+		STAILQ_REMOVE_HEAD(&this->ntrip_queue, next);
 
-		/*
-		 * Run the job.
-		 */
+		P_MUTEX_UNLOCK(&this->mutex);
 
 		/*
 		 * libevent locks the bufferevent during callbacks if threading is activated,
 		 * so in the following callbacks we need to get our own locks beginning
 		 * with bufferevent to avoid deadlocks due to lock order reversal.
+                 *
+                 * The buffervent is associated with the ntrip_state, it's the same for all jobs in the queue.
 		 */
-		struct ntrip_state *st = (struct ntrip_state *)j->arg;
-		if (j->cb) {
-			j->cb(j->bev, j->arg);
-		} else {
-			j->cbe(j->bev, j->events, j->arg);
-		}
-		n++;
+		struct bufferevent *bev = st->bev;
+		bufferevent_lock(bev);
 
 		/*
-		 * Unref the ntrip state and free the job record.
+		 * Run the jobs.
 		 */
 
-		int bev_freed = st->bev_freed;
+		nst = 0;
 
-		bufferevent_lock(j->bev);
-		ntrip_decref(st, "joblist_run");
-		bufferevent_unlock(j->bev);
+		while ((j = STAILQ_FIRST(&st->jobq))) {
+			STAILQ_REMOVE_HEAD(&st->jobq, next);
+			if (st->state != NTRIP_END) {
+				if (j->cb) {
+					j->cb(bev, j->arg);
+				} else {
+					j->cbe(bev, j->events, j->arg);
+				}
+			}
+
+			nst++;
+			free(j);
+		}
+
+		ntrip_log(st, LOG_EDEBUG, "LWP %d ran %d jobs for ntrip state %p\n", pthread_getthreadid_np(), nst, st);
+
+		/*
+		 * Unref the ntrip state
+		 */
+		if (st->state == NTRIP_END)
+			ntrip_free(st, "joblist_run");
+		bufferevent_unlock(bev);
 
 		/*
 		 * Unreference the buffervent so it can be freed.
 		 */
-		bufferevent_decref(j->bev);
-
-		free(j);
+		bufferevent_decref(bev);
 
 		/*
 		 * Lock the list again for the next job.
@@ -120,42 +134,58 @@ void joblist_run(struct joblist *this) {
  */
 void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-	struct job *j = (struct job *)malloc(sizeof(struct job));
-
-	if (j == NULL) {
-		ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
-		return;
-	}
-
-	/*
-	 * Create the job record.
-	 */
-	j->cb = cb;
-	j->cbe = cbe;
-	j->bev = bev;
-	j->arg = arg;
-	j->events = events;
-
 	/*
 	 * Check the bufferevent has not been freed.
 	 * If it was, we shouldn't be called here.
 	 */
 	assert(!st->bev_freed);
 
-	/*
-	 * Make sure the bufferevent is not freed in our back
-	 * before we have a chance to use it.
-	 */
-
-	bufferevent_incref(bev);
-
-	ntrip_incref(st);
-
-	/*
-	 * Insert in the queue.
-	 */
 	P_MUTEX_LOCK(&this->mutex);
-	STAILQ_INSERT_TAIL(&this->queue, j, next);
+
+	/*
+	 * Check whether the ntrip_state queue is empty.
+	 * If it is, we will need to insert the ntrip_state in the main job queue.
+	 *
+	 * In other words:
+	 *	!jobq_was_empty <=> ntrip_state is in the main job queue
+	 */
+	int jobq_was_empty = STAILQ_EMPTY(&st->jobq);
+	struct job *lastj = STAILQ_LAST(&st->jobq, job, next);
+
+	/*
+	 * Check the last recorded callback, if any. Skip if identical to the new one.
+	 */
+	if (lastj == NULL || lastj->events != events || lastj->cb != cb  || lastj->cbe != cbe) {
+		struct job *j = (struct job *)malloc(sizeof(struct job));
+		if (j == NULL) {
+			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
+			P_MUTEX_UNLOCK(&this->mutex);
+			return;
+		}
+
+		/*
+		 * Create and insert a new job record in the queue for this ntrip_state.
+		 */
+		j->cb = cb;
+		j->cbe = cbe;
+		j->arg = arg;
+		j->events = events;
+		STAILQ_INSERT_TAIL(&st->jobq, j, next);
+	}
+
+	if (jobq_was_empty) {
+		/*
+		 * Insertion needed in the main job queue.
+		 */
+		ntrip_log(st, LOG_EDEBUG, "inserting in joblist ntrip_queue %p\n", st);
+		STAILQ_INSERT_TAIL(&this->ntrip_queue, st, next);
+		/*
+		 * Make sure the bufferevent is not freed in our back
+		 * before we have a chance to use it.
+		 */
+		bufferevent_incref(bev);
+	} else
+		ntrip_log(st, LOG_EDEBUG, "ntrip_state %p already in job list\n", st);
 
 	/*
 	 * Signal "some" waiting workers there is a new job.
@@ -166,7 +196,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 
 void *jobs_start_routine(void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
-	printf("started thread %p\n", pthread_self());
+	printf("started LWP %d\n", pthread_getthreadid_np());
 	joblist_run(caster->joblist);
 	return NULL;
 }
@@ -197,21 +227,5 @@ int jobs_start_threads(struct caster_state *caster, int nthreads) {
 	pthread_attr_destroy(&attr);
 	return 0;
 }
-
-#if 0
-static int joblist_count_bev(struct joblist *this, struct bufferevent *bev, struct caster_state *caster) {
-	struct job *j;
-	int ref = 0;
-	P_MUTEX_LOCK(&this->mutex);
-	STAILQ_FOREACH(j, &this->queue, next) {
-		if (j->bev == bev) {
-			logfmt(&caster->flog, "bev %p for job %p %p %p %d\n", j->bev, j->cb, j->cbe, j->arg, j->events);
-			ref++;
-		}
-	}
-	P_MUTEX_UNLOCK(&this->mutex);
-	return ref;
-}
-#endif
 
 #endif

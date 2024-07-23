@@ -61,12 +61,14 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 		}
 	}
 
-	st->refcnt--;
 	P_RWLOCK_WRLOCK(&st->lock);
 	bufferevent_unlock(st->bev);
 	redistribute_args_free(redis_args);
 
+	st->state = NTRIP_END;
+#ifndef THREADS
 	ntrip_free(st, "ntripsrv_switch_source_cb");
+#endif
 }
 
 static void
@@ -253,8 +255,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	bufferevent_lock(bev);
 	P_RWLOCK_WRLOCK(&st->lock);
 
+	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb %p state %d len %d\n", st, st->state, evbuffer_get_length(input));
+
 	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 1) {
-		ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb %p state %d len %d\n", st, st->state, evbuffer_get_length(input));
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
@@ -563,12 +566,14 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 	if (len == 0) {
 		ntrip_log(st, LOG_DEBUG, "flushed answer ntripsrv %p\n", st);
 		if (st->state == NTRIP_WAIT_CLOSE) {
-			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_decref %p bev %p\n", st, bev);
+			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_free %p bev %p\n", st, bev);
 			bufferevent_unlock(bev);
 
 			my_bufferevent_free(st, bev);
-			st->refcnt--;
+			st->state = NTRIP_END;
+#ifndef THREADS
 			ntrip_free(st, "ntripsrv_writecb");
+#endif
 			return;
 		}
 	} else
@@ -618,11 +623,14 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			st->subscription = NULL;
 		}
 	}
+	P_RWLOCK_UNLOCK(&st->lock);
+	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
+	st->state = NTRIP_END;
 	bufferevent_unlock(bev);
 	my_bufferevent_free(st, bev);
-	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
-	st->refcnt--;
+#ifndef THREADS
 	ntrip_free(st, "ntripsrv_eventcb");
+#endif
 }
 
 #ifdef THREADS
