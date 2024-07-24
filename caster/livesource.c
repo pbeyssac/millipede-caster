@@ -177,7 +177,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			}
 		}
 		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(np->bev));
-		if (backlog_len > backlog_evbuffer) {
+		if (backlog_len > caster->config->backlog_evbuffer) {
 			// ntrip_log(np->ntrip, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;

@@ -26,14 +26,6 @@
  */
 int backlog_delay = 60;
 
-#if DEBUG
-size_t backlog_socket = 8*1024;
-size_t backlog_evbuffer = 8*1024;
-#else
-size_t backlog_socket = 112*1024;
-size_t backlog_evbuffer = 16*1024;
-#endif
-
 static struct config default_config = {
 	.hysteresis_m = 500,
 	.idle_max_delay = 60,
@@ -43,6 +35,8 @@ static struct config default_config = {
 	.source_auth_filename = "source.auth",
 	.host_auth_filename = "host.auth",
 	.sourcetable_filename = "sourcetable.dat",
+	.backlog_socket = 112*1024,
+	.backlog_evbuffer = 16*1024,
 	.sourcetable_fetch_timeout = 60,
 	.on_demand_source_timeout = 60,
 	.source_read_timeout = 60,
@@ -126,6 +120,10 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_STRING_PTR(
 		"sourcetable_file", CYAML_FLAG_POINTER, struct config, sourcetable_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_INT(
+		"backlog_socket", CYAML_FLAG_OPTIONAL, struct config, backlog_socket),
+	CYAML_FIELD_INT(
+		"backlog_evbuffer", CYAML_FLAG_OPTIONAL, struct config, backlog_evbuffer),
+	CYAML_FIELD_INT(
 		"sourcetable_fetch_timeout", CYAML_FLAG_OPTIONAL, struct config, sourcetable_fetch_timeout),
 	CYAML_FIELD_INT(
 		"on_demand_source_timeout", CYAML_FLAG_OPTIONAL, struct config, on_demand_source_timeout),
@@ -186,6 +184,8 @@ struct config *config_parse(struct config **pthis, const char *filename) {
 	DEFAULT_ASSIGN(this, max_raw_packet);
 	DEFAULT_ASSIGN(this, on_demand_source_timeout);
 	DEFAULT_ASSIGN(this, source_read_timeout);
+	DEFAULT_ASSIGN(this, backlog_socket);
+	DEFAULT_ASSIGN(this, backlog_evbuffer);
 	DEFAULT_ASSIGN(this, ntripsrv_default_read_timeout);
 	DEFAULT_ASSIGN(this, ntripsrv_default_write_timeout);
 	DEFAULT_ASSIGN(this, access_log);

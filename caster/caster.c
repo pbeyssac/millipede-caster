@@ -244,7 +244,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	memcpy(&st->peeraddr, sa, socklen);
 	st->remote = 1;
 
-	sndbuf = backlog_socket;
+	sndbuf = caster->config->backlog_socket;
 	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, size_sndbuf) < 0)
 		ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
 

@@ -45,6 +45,12 @@ struct config {
 	int			proxy_count;
 
 	/*
+	 * Sizes of accepted backlogs before we drop a client.
+	 */
+	size_t			backlog_socket;		// used to set the socket buffer size
+	size_t			backlog_evbuffer;
+
+	/*
 	 * Read timeout for sources
 	 */
 	int			source_read_timeout;
