@@ -69,6 +69,8 @@ struct sourcetable *sourcetable_new() {
 void sourcetable_free_unlocked(struct sourcetable *this) {
 	struct sourceline *n;
 
+	strfree(this->header);
+
 	while ((n = TAILQ_FIRST(&this->sources))) {
                 TAILQ_REMOVE_HEAD(&this->sources, next);
 		sourceline_free(n);
