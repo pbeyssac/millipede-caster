@@ -192,7 +192,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	 * Adjust reference count to account for failed calls
 	 */
 	if (packet->caster->config->zero_copy && ns) {
-		/* Don't need to free the packet as it will be done by the caller, the refnct should never be 0 here */
+		/* Don't need to free the packet as it will be done by the caller, the refcnt should never be 0 here */
 		P_MUTEX_LOCK(&packet->mutex);
 		if (!packet->refcnt)
 			logfmt(&caster->flog, "assertion failed: packet refcnt != 0 (%d instead)\n", packet->refcnt);
