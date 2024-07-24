@@ -68,12 +68,12 @@ struct sourcetable *sourcetable_new() {
 
 void sourcetable_free_unlocked(struct sourcetable *this) {
 	struct sourceline *n;
-	struct sourceline *tmpn;
 
-	TAILQ_FOREACH_SAFE(n, &this->sources, next, tmpn) {
-		TAILQ_REMOVE(&this->sources, n, next);
+	while ((n = TAILQ_FIRST(&this->sources))) {
+                TAILQ_REMOVE_HEAD(&this->sources, next);
 		sourceline_free(n);
 	}
+
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
 }
