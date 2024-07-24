@@ -37,6 +37,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->client_version = 1;
 	this->callback_subscribe = NULL;
 	this->max_min_dist = 0;
+	this->user = NULL;
+	this->password = NULL;
 #ifdef THREADS
 	STAILQ_INIT(&this->jobq);
 #endif
@@ -56,6 +58,13 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 		if (this->http_args[i])
 			strfree(this->http_args[i]);
 	}
+
+	if (this->user)
+		strfree(this->user);
+	/*
+	 * Don't need to explicitly free this->password as it's in the
+	 * same allocation as this->user
+	 */
 
 	if (this->chunk_buf)
 		evbuffer_free(this->chunk_buf);
