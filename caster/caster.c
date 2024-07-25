@@ -175,6 +175,8 @@ caster_reload_sourcetables(struct caster_state *caster) {
 				TAILQ_REMOVE(&caster->sourcetablestack.list, s, next);
 				TAILQ_INSERT_TAIL(&newtables, snew, next);
 				sourcetable_free_unlocked(s);
+				/* Skip the unlock below! */
+				continue;
 			}
 		}
 		P_RWLOCK_UNLOCK(&s->lock);
