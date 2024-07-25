@@ -4,8 +4,6 @@
 #include <sys/time.h>
 #include <event2/event.h>
 
-#include "caster.h"
-#include "ntrip_common.h"
 #include "util.h"
 
 struct redistribute_cb_args {

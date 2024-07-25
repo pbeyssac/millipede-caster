@@ -1,7 +1,8 @@
 #ifndef __JOBS_H__
 #define __JOBS_H__
 
-#include "caster.h"
+#include <pthread_np.h>
+#include <event2/bufferevent.h>
 
 /*
  * Job entry for the FIFO list, to dispatch tasks to workers.

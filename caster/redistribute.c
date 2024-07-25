@@ -3,9 +3,7 @@
 #include <event2/bufferevent.h>
 
 #include "conf.h"
-#include "caster.h"
 #include "redistribute.h"
-#include "ntrip_common.h"
 #include "ntripcli.h"
 
 /*
