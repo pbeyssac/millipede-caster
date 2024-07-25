@@ -2,13 +2,13 @@
 #define __CASTER_H__
 
 #include <sys/types.h>
-#include <sys/queue.h>
 
 #include "conf.h"
 #include "config.h"
 #include "jobs.h"
 #include "livesource.h"
 #include "log.h"
+#include "queue.h"
 #include "sourcetable.h"
 #include "util.h"
 

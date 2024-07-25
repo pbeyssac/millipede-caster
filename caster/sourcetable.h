@@ -3,9 +3,8 @@
 
 #include "conf.h"
 
-#include <sys/queue.h>
-
 #include "ntrip_common.h"
+#include "queue.h"
 #include "sourceline.h"
 
 struct caster_state;

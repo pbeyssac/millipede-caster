@@ -3,6 +3,7 @@
 
 #include <pthread_np.h>
 #include <event2/bufferevent.h>
+#include "queue.h"
 
 /*
  * Job entry for the FIFO list, to dispatch tasks to workers.

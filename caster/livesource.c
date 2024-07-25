@@ -1,5 +1,4 @@
 #include <string.h>
-#include <sys/queue.h>
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -9,6 +8,7 @@
 #include "livesource.h"
 #include "ntrip_common.h"
 #include "packet.h"
+#include "queue.h"
 
 struct livesource *livesource_new(char *mountpoint) {
 	struct livesource *this = (struct livesource *)malloc(sizeof(struct livesource));

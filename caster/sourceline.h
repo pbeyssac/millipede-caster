@@ -1,8 +1,7 @@
 #ifndef __SOURCELINE_H__
 #define __SOURCELINE_H__
 
-#include <sys/queue.h>
-
+#include "queue.h"
 #include "util.h"
 
 /*
