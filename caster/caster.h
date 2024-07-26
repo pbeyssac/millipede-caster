@@ -33,7 +33,7 @@ struct caster_state {
 	 */
 	struct {
 		struct livesourceq queue;
-		pthread_rwlock_t lock;
+		P_RWLOCK_T lock;
 	} livesources;
 
 	sourcetable_stack_t sourcetablestack;
