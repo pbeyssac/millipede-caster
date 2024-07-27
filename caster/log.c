@@ -15,6 +15,7 @@ int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg)
 	this->log_cb = log_cb;
 	this->state = arg;
 	setlinebuf(this->logfile);
+	P_RWLOCK_INIT(&this->lock, NULL);
 	return this->logfile == NULL ? -1:0;
 }
 

@@ -5,6 +5,7 @@
 
 #include "conf.h"
 #include "caster.h"
+#include "log.h"
 #include "livesource.h"
 #include "ntrip_common.h"
 
@@ -111,10 +112,12 @@ void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint) {
 }
 
 static void
-_ntrip_log(FILE *log, struct ntrip_state *this, const char *fmt, va_list ap) {
+_ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list ap) {
 	char date[36];
 	logdate(date, sizeof date);
-	fputs(date, log);
+
+	P_RWLOCK_WRLOCK(&log->lock);
+	fputs(date, log->logfile);
 
 	if (this->remote) {
 		char inetaddr[64];
@@ -122,24 +125,25 @@ _ntrip_log(FILE *log, struct ntrip_state *this, const char *fmt, va_list ap) {
 		switch(sa->sa_family) {
 		case AF_INET:
 			inet_ntop(sa->sa_family, &this->peeraddr.v4.sin_addr, inetaddr, sizeof inetaddr);
-			fprintf(log, "%s:%hu ", inetaddr, ntohs(this->peeraddr.v4.sin_port));
+			fprintf(log->logfile, "%s:%hu ", inetaddr, ntohs(this->peeraddr.v4.sin_port));
 			break;
 		case AF_INET6:
 			inet_ntop(sa->sa_family, &this->peeraddr.v6.sin6_addr, inetaddr, sizeof inetaddr);
-			fprintf(log, "%s.%hu ", inetaddr, ntohs(this->peeraddr.v6.sin6_port));
+			fprintf(log->logfile, "%s.%hu ", inetaddr, ntohs(this->peeraddr.v6.sin6_port));
 			break;
 		default:
-			fprintf(log, "[???] ");
+			fprintf(log->logfile, "[???] ");
 		}
 	}
-	vfprintf(log, fmt, ap);
+	vfprintf(log->logfile, fmt, ap);
+	P_RWLOCK_UNLOCK(&log->lock);
 }
 
 void ntrip_alog(void *arg, const char *fmt, ...) {
 	struct ntrip_state *this = (struct ntrip_state *)arg;
 	va_list ap;
 	va_start(ap, fmt);
-	_ntrip_log(this->caster->alog.logfile, this, fmt, ap);
+	_ntrip_log(&this->caster->alog, this, fmt, ap);
 	va_end(ap);
 }
 
@@ -149,7 +153,7 @@ void ntrip_log(void *arg, int level, const char *fmt, ...) {
 		return;
 	va_list ap;
 	va_start(ap, fmt);
-	_ntrip_log(this->caster->flog.logfile, this, fmt, ap);
+	_ntrip_log(&this->caster->flog, this, fmt, ap);
 	va_end(ap);
 }
 
