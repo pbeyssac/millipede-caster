@@ -18,21 +18,22 @@ listen:
 #
 # Optional caster from which we can get and announce sources.
 #
-proxy:
-  - table_refresh_delay:	600
-    host:			caster.centipede.fr
-    port:			2101
+#proxy:
+#  - table_refresh_delay:	600
+#    host:			maincaster.fr
+#    port:			2101
 
 #
-# Source credentials and their SRC lines
+# Credentials to connect to remote hosts, especially for the proxy mode.
+#
+host_auth_file:		/usr/local/etc/millipede/host.auth
+
+#
+# Source credentials for local sources and their STR lines
 #
 source_auth_file:	/usr/local/etc/millipede/source.auth
 sourcetable_file:	/usr/local/etc/millipede/sourcetable.dat
 
-#
-# Credentials to remote hosts
-#
-host_auth_file:		/usr/local/etc/millipede/host.auth
 
 #
 # Log files
@@ -54,6 +55,12 @@ log:			/var/log/millipede/caster.log
 log_level:		INFO
 
 #
-# Distance hysteresis to avoid spurious base change
+# Distance hysteresis to avoid spurious base change on the virtual base.
 #
 hysteresis_m:		500.
+
+# default size set for sending buffers (SO_SNDBUF), 112 KB
+# currently for all client sockets.
+backlog_socket = 114688
+# max backlog in the caster over which we drop a client connection
+backlog_evbuffer = 16384

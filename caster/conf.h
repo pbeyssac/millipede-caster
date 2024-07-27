@@ -33,7 +33,10 @@
 #define	P_MUTEX_DESTROY(arg)
 #endif
 
-#define	SERVER_VERSION_STRING	"pbs/0"
-#define	CLIENT_VERSION_STRING	"pbc/0"
+/*
+ * Server and client version strings for HTTP
+ */
+#define	SERVER_VERSION_STRING	"Millipede Server 0.3"		// For Server: header
+#define	CLIENT_VERSION_STRING	"Millipede Client 0.3"		// User-Agent header, prepended with "NTRIP "
 
 #endif
