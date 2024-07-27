@@ -52,6 +52,11 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
  */
 void ntrip_free(struct ntrip_state *this, char *orig) {
 	ntrip_log(this, LOG_DEBUG, "FREE %p %s\n", this, orig);
+
+	if (!this->bev_freed) {
+		ntrip_log(this, LOG_EDEBUG, "force-freeing bev %p for %p\n", this->bev, this);
+		my_bufferevent_free(this, this->bev);
+	}
 	if (this->mountpoint)
 		strfree(this->mountpoint);
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
