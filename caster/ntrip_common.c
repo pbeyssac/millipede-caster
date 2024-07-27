@@ -51,7 +51,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
  * Required lock: ntrip_state
  */
 void ntrip_free(struct ntrip_state *this, char *orig) {
-	ntrip_log(this, LOG_DEBUG, "FREE %p\n", this);
+	ntrip_log(this, LOG_DEBUG, "FREE %p %s\n", this, orig);
 	if (this->mountpoint)
 		strfree(this->mountpoint);
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
