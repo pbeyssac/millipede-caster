@@ -26,6 +26,8 @@ struct job {
 };
 STAILQ_HEAD (jobq, job);
 STAILQ_HEAD (ntripq, ntrip_state);
+TAILQ_HEAD (general_ntripq, ntrip_state);
+
 /*
  *  FIFO list for worker threads to get new jobs.
  */

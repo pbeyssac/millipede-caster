@@ -114,6 +114,8 @@ caster_new(struct config *config) {
 	}
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
+	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
+	this->ntrips.next_id = 1;
 
 	// Used only for access to source_auth and host_auth
 	P_RWLOCK_INIT(&this->authlock, NULL);
@@ -142,6 +144,7 @@ caster_new(struct config *config) {
 	this->base = base;
 	this->dns_base = dns_base;
 	TAILQ_INIT(&this->livesources.queue);
+	TAILQ_INIT(&this->ntrips.queue);
 	return this;
 }
 

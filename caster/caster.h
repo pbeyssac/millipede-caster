@@ -17,6 +17,11 @@
  * State for a caster
  */
 struct caster_state {
+	struct {
+		struct general_ntripq queue;
+		P_RWLOCK_T lock;
+		int next_id;
+	} ntrips;
 	struct config *config;
 #ifdef THREADS
 	struct joblist *joblist;

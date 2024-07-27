@@ -40,9 +40,13 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
+	this->id = this->caster->ntrips.next_id++;
 #ifdef THREADS
 	STAILQ_INIT(&this->jobq);
 #endif
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
+	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
+	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 	return this;
 }
 
@@ -80,6 +84,10 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 
 	if (this->tmp_sourcetable)
 		sourcetable_free(this->tmp_sourcetable);
+
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
+	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
+	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);

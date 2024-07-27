@@ -65,6 +65,7 @@ struct ntrip_state {
 	int refcnt;
 	struct caster_state *caster;
 	enum ntrip_session_state state;
+	int id;		// Unique id for external reference
 
 #ifdef THREADS
 	/* linked-list pointers for main job queue */
@@ -72,6 +73,7 @@ struct ntrip_state {
 	/* job list for this particular session */
 	struct jobq jobq;
 #endif
+	TAILQ_ENTRY(ntrip_state) nextg;
 
 	/*
 	 * State for a NTRIP client or server
