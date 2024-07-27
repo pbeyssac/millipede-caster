@@ -7,6 +7,7 @@
 #include <event2/http.h>
 
 #include "conf.h"
+#include "adm.h"
 #include "caster.h"
 #include "jobs.h"
 #include "ntrip_common.h"
@@ -113,7 +114,7 @@ static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *
 	return 0;
 }
 
-static int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, char *mime_type, struct evkeyvalq *opt_headers) {
+int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, char *mime_type, struct evkeyvalq *opt_headers) {
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 	if (this->client_version == 1)
@@ -140,7 +141,7 @@ static int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *ou
 /*
  * Check password in the base
  */
-static int check_password(struct ntrip_state *this, char *mountpoint, char *user, char *passwd) {
+int check_password(struct ntrip_state *this, char *mountpoint, char *user, char *passwd) {
 	int r = 0;
 
 	P_RWLOCK_RDLOCK(&this->caster->authlock);
@@ -359,33 +360,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 400;
 						break;
 					}
-#if DEBUG
-					if (!strcmp(st->http_args[1], "/adm/mem") || !strcmp(st->http_args[1], "/adm/mem.json")) {
-						int len = strlen(st->http_args[1]);
-						int json = (len >= 5 && !strcmp(st->http_args[1]+len-5, ".json"))?1:0;
-
-						if (!st->user || !check_password(st, "admin", st->user, st->password)) {
-							err = 401;
-							evhttp_add_header(&opt_headers, "WWW-Authenticate", "Basic realm=\"/adm\"");
-							break;
-						}
-						st->client_version = 2;
-						char *r = malloc_stats_dump(json);
-						if (r) {
-							ntripsrv_send_result_ok(st, output, "text/plain", NULL);
-							if (evbuffer_add_reference(output, r, strlen(r), free_callback, NULL) < 0)
-								strfree(r);
-						} else {
-							ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory\n", line, len);
-							err = 500;
-							evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
-							break;
-						}
-						st->state = NTRIP_WAIT_CLOSE;
+					if (strlen(st->http_args[1]) >= 5 && !memcmp(st->http_args[1], "/adm/", 5)) {
+						admsrv(st, "/adm", st->http_args[1] + 4, &err, &opt_headers);
 						break;
 					}
 
-#endif
 					char *mountpoint = st->http_args[1]+1;
 					struct sourceline *sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, mountpoint);
 
@@ -528,7 +507,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		else if (err == 401) {
 			send_server_reply(st, output, 401, "Unauthorized", &opt_headers, NULL);
 			evbuffer_add_reference(output, "401\r\n", 5, NULL, NULL);
-			evhttp_clear_headers(&opt_headers);
 		} else if (err == 404)
 			send_server_reply(st, output, 404, "Not Found", NULL, NULL);
 		else if (err == 409)
@@ -541,6 +519,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			send_server_reply(st, output, 503, "Service Unavailable", NULL, NULL);
 		st->state = NTRIP_WAIT_CLOSE;
 	}
+	evhttp_clear_headers(&opt_headers);
 
 	P_RWLOCK_UNLOCK(&st->lock);
 	bufferevent_unlock(bev);

@@ -4,8 +4,8 @@ OPT	=
 CFLAGS	=	-g $(OPT) -I/usr/local/include -Wall
 LDFLAGS	=	-L/usr/local/lib -levent_core -levent_extra -levent_pthreads -lcyaml -lpthread -lm
 
-SRCS	=	caster.c config.c fetcher_sourcetable.c http.c jobs.c livesource.c log.c main.c ntrip_common.c ntripcli.c ntripsrv.c packet.c redistribute.c sourceline.c sourcetable.c util.c
-OBJS	=	caster.o config.o fetcher_sourcetable.o http.o jobs.o livesource.o log.o main.o ntrip_common.o ntripcli.o ntripsrv.o packet.o redistribute.o sourceline.o sourcetable.o util.o
+SRCS	=	adm.c caster.c config.c fetcher_sourcetable.c http.c jobs.c livesource.c log.c main.c ntrip_common.c ntripcli.c ntripsrv.c packet.c redistribute.c sourceline.c sourcetable.c util.c
+OBJS	=	adm.o caster.o config.o fetcher_sourcetable.o http.o jobs.o livesource.o log.o main.o ntrip_common.o ntripcli.o ntripsrv.o packet.o redistribute.o sourceline.o sourcetable.o util.o
 BINS	=	tests caster
 
 all:	$(BINS)
