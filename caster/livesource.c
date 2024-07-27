@@ -7,6 +7,7 @@
 #include "caster.h"
 #include "livesource.h"
 #include "ntrip_common.h"
+#include "ntripsrv.h"
 #include "packet.h"
 #include "queue.h"
 
