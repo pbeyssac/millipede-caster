@@ -10,20 +10,22 @@ SRCS	=	adm.c caster.c config.c fetcher_sourcetable.c http.c jobs.c livesource.c 
 OBJS	=	adm.o caster.o config.o fetcher_sourcetable.o http.o jobs.o livesource.o log.o main.o ntrip_common.o ntripcli.o ntripsrv.o packet.o redistribute.o sourceline.o sourcetable.o util.o
 BINS	=	tests caster
 
+TESTOBJS	=	tests.o util.o
+
 all:	$(BINS)
 
 depend:
 	mkdep $(CFLAGS) $(SRCS)
 
 install:	caster
-	install -m 0755 $> $(DEST_DIR)
+	install -m 0755 caster $(DEST_DIR)
 
 
 clean:
 	rm -f .depend $(OBJS) $(BINS) tests.o
 
-tests:	tests.o util.o
-	cc -o tests -lm $>
+tests:	$(TESTOBJS)
+	cc -o tests -lm $(TESTOBJS)
 
 caster:	$(OBJS)
-	cc -Wall -g $(LDFLAGS) -o caster $>
+	cc -Wall -g $(LDFLAGS) -o caster $(OBJS)
