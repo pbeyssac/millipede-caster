@@ -158,6 +158,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 void ntrip_free(struct ntrip_state *this, char *orig);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint);
 void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint);
+char *ntrip_peer_ipstr(struct ntrip_state *this);
+unsigned short ntrip_peer_port(struct ntrip_state *this);
 void ntrip_alog(void *arg, const char *fmt, ...);
 void ntrip_log(void *arg, int level, const char *fmt, ...);
 int ntrip_handle_raw(struct ntrip_state *st, struct bufferevent *bev);

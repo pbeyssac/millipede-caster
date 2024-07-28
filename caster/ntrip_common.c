@@ -119,6 +119,37 @@ void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint) {
 		caster_del_livesource(this->caster, l);
 }
 
+char *ntrip_peer_ipstr(struct ntrip_state *this) {
+	char *r;
+	char inetaddr[64];
+	struct sockaddr *sa = &this->peeraddr.generic;
+	switch(sa->sa_family) {
+	case AF_INET:
+		inet_ntop(sa->sa_family, &this->peeraddr.v4.sin_addr, inetaddr, sizeof inetaddr);
+		r = inetaddr;
+		break;
+	case AF_INET6:
+		inet_ntop(sa->sa_family, &this->peeraddr.v6.sin6_addr, inetaddr, sizeof inetaddr);
+		r = inetaddr;
+		break;
+	default:
+		return NULL;
+	}
+	return mystrdup(r);
+}
+
+unsigned short ntrip_peer_port(struct ntrip_state *this) {
+	struct sockaddr *sa = &this->peeraddr.generic;
+	switch(sa->sa_family) {
+	case AF_INET:
+		return ntohs(this->peeraddr.v4.sin_port);
+	case AF_INET6:
+		return ntohs(this->peeraddr.v6.sin6_port);
+	default:
+		return 0;
+	}
+}
+
 static void
 _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list ap) {
 	char date[36];
@@ -128,20 +159,20 @@ _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list a
 	fputs(date, log->logfile);
 
 	if (this->remote) {
-		char inetaddr[64];
+		unsigned port = ntrip_peer_port(this);
+		char *inetaddr = ntrip_peer_ipstr(this);
 		struct sockaddr *sa = &this->peeraddr.generic;
 		switch(sa->sa_family) {
 		case AF_INET:
-			inet_ntop(sa->sa_family, &this->peeraddr.v4.sin_addr, inetaddr, sizeof inetaddr);
-			fprintf(log->logfile, "%s:%hu ", inetaddr, ntohs(this->peeraddr.v4.sin_port));
+			fprintf(log->logfile, "%s:%hu ", inetaddr, port);
 			break;
 		case AF_INET6:
-			inet_ntop(sa->sa_family, &this->peeraddr.v6.sin6_addr, inetaddr, sizeof inetaddr);
-			fprintf(log->logfile, "%s.%hu ", inetaddr, ntohs(this->peeraddr.v6.sin6_port));
+			fprintf(log->logfile, "%s.%hu ", inetaddr, port);
 			break;
 		default:
 			fprintf(log->logfile, "[???] ");
 		}
+		strfree(inetaddr);
 	}
 	vfprintf(log->logfile, fmt, ap);
 	P_RWLOCK_UNLOCK(&log->lock);
