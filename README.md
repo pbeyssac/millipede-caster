@@ -50,7 +50,7 @@ A start/restart/stop script for FreeBSD is provided as `sample-config/caster.sh`
 Documentation
 =============
 
-There are 3 main functions the caster can fulfill simulataneously, configured from `caster.yaml`.
+There are 3 main functions the caster can fulfill simultaneously, configured from `caster.yaml`.
 
 ## Regular NTRIP caster
 
