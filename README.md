@@ -44,6 +44,8 @@ Running
 
 Start the `/usr/local/sbin/millipede` binary.
 
+A start/restart/stop script for FreeBSD is provided as `sample-config/caster.sh` and can be installed in `/usr/local/etc/rc.d`.
+
 Documentation
 =============
 
