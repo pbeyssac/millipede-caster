@@ -156,6 +156,7 @@ struct ntrip_state {
 };
 struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned short port, char *mountpoint);
 void ntrip_free(struct ntrip_state *this, char *orig);
+const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint);
 void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint);
 char *ntrip_peer_ipstr(struct ntrip_state *this);

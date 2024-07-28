@@ -3,6 +3,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <json-c/json.h>
+
 #include "conf.h"
 #include "caster.h"
 #include "log.h"
@@ -40,11 +42,11 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
-	this->id = this->caster->ntrips.next_id++;
 #ifdef THREADS
 	STAILQ_INIT(&this->jobq);
 #endif
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
+	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 	return this;
@@ -91,6 +93,52 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
+}
+
+static json_object *ntrip_json(struct ntrip_state *st, int lock) {
+        bufferevent_lock(st->bev);
+	if (lock)
+		P_RWLOCK_RDLOCK(&st->lock);
+
+	char *ipstr = ntrip_peer_ipstr(st);
+	json_object *jsonip;
+	unsigned port = ntrip_peer_port(st);
+	jsonip = ipstr ? json_object_new_string(ipstr) : json_object_new_null();
+	strfree(ipstr);
+	json_object *new_obj = json_object_new_object();
+	json_object *jsonid = json_object_new_int(st->id);
+	json_object *jsonport = json_object_new_int(port);
+	json_object_object_add(new_obj, "id", jsonid);
+	json_object_object_add(new_obj, "ip", jsonip);
+	json_object_object_add(new_obj, "port", jsonport);
+
+	if (lock)
+		P_RWLOCK_UNLOCK(&st->lock);
+        bufferevent_unlock(st->bev);
+	return new_obj;
+}
+
+/*
+ * Return a list of ntrip_state as a JSON object.
+ */
+const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st) {
+	const char *s;
+	json_object *new_list = json_object_new_object();
+	struct ntrip_state *sst;
+	P_RWLOCK_RDLOCK(&caster->ntrips.lock);
+	TAILQ_FOREACH(sst, &caster->ntrips.queue, nextg) {
+		char idstr[40];
+		/*
+		 * Don't require a lock from ntrip_json on the current connection
+		 */
+		json_object *nj = ntrip_json(sst, st != sst);
+		snprintf(idstr, sizeof idstr, "%d", sst->id);
+		json_object_object_add(new_list, idstr, nj);
+	}
+	P_RWLOCK_UNLOCK(&caster->ntrips.lock);
+	s = mystrdup(json_object_to_json_string(new_list));
+	json_object_put(new_list);
+	return s;
 }
 
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint) {

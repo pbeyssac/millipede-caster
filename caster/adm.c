@@ -29,6 +29,7 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 		strfree(www_auth_value);
 		return 0;
 	}
+#endif
 	st->client_version = 2;
 
 	if (!strcmp(uri, "/mem") || !strcmp(uri, "/mem.json")) {
@@ -48,8 +49,15 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 		}
 		st->state = NTRIP_WAIT_CLOSE;
 		return 0;
+	} else if (!strcmp(uri, "/net")) {
+		const char *r = ntrip_list_json(st->caster, st);
+		ntripsrv_send_result_ok(st, output, "application/json", NULL);
+		if (evbuffer_add_reference(output, r, strlen(r), free_callback, NULL) < 0)
+			strfree((void *)r);
+		st->state = NTRIP_WAIT_CLOSE;
+		return 0;
+	} else {
+		*err = 404;
+		return -1;
 	}
-#endif
-	return 0;
 }
-
