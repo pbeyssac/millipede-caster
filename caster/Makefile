@@ -1,8 +1,8 @@
 DEST_DIR	=	/usr/local/sbin/
-OPT	=
-#OPT	=
+OPT	=	-DDEBUG_JEMALLOC
 # Note: threads code currently experimental. Enable -DTHREADS at your own risk!
-#OPT	=	-DTHREADS
+#OPT	=	-DTHREADS -DDEBUG_JEMALLOC
+
 CFLAGS	=	-g $(OPT) -I/usr/local/include -Wall
 LDFLAGS	=	-L/usr/local/lib -levent_core -levent_extra -levent_pthreads -lcyaml -lpthread -lm
 

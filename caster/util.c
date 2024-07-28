@@ -1,10 +1,13 @@
-#include <malloc_np.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <ctype.h>
+
+#ifdef DEBUG_JEMALLOC
+#include <malloc_np.h>
+#endif
 
 #include "util.h"
 
@@ -512,7 +515,7 @@ void logdate(char *date, size_t len) {
 	snprintf(date, len, "%s.%03ld ", tmp_date, tstamp.tv_usec/1000);
 }
 
-#if DEBUG
+#ifdef DEBUG_JEMALLOC
 /*
  * Callback for jemalloc statistics.
  */
@@ -553,4 +556,11 @@ char *malloc_stats_dump(int json) {
 	}
 	return malloc_str.result;
 }
+
+#else
+
+char *malloc_stats_dump(int json) {
+	return mystrdup("[no malloc stats available]\n");
+}
+
 #endif
