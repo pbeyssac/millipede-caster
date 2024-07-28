@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
-#include <pthread_np.h>
+#include <pthread.h>
 
 #include "conf.h"
 #include "caster.h"
@@ -108,7 +108,7 @@ void joblist_run(struct joblist *this) {
 			free(j);
 		}
 
-		ntrip_log(st, LOG_EDEBUG, "LWP %d ran %d jobs for ntrip state %p\n", pthread_getthreadid_np(), nst, st);
+		ntrip_log(st, LOG_EDEBUG, "thread %p ran %d jobs for ntrip state %p\n", pthread_self(), nst, st);
 
 		/*
 		 * Unref the ntrip state
@@ -196,7 +196,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 
 void *jobs_start_routine(void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
-	printf("started LWP %d\n", pthread_getthreadid_np());
+	printf("started thread %p\n", pthread_self());
 	joblist_run(caster->joblist);
 	return NULL;
 }

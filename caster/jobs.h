@@ -1,7 +1,6 @@
 #ifndef __JOBS_H__
 #define __JOBS_H__
 
-#include <pthread_np.h>
 #include <event2/bufferevent.h>
 #include "queue.h"
 
