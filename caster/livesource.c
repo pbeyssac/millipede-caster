@@ -166,6 +166,12 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	int nbacklogged = 0;
 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
+		if (np->ntrip_state->state == NTRIP_END || np->ntrip_state->bev_freed) {
+			/* Subscriber currently closing, skip */
+			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: skipping %p pending close\n");
+			n++;
+			continue;
+		}
 		if (packet->caster->config->zero_copy) {
 			if (evbuffer_add_reference(bufferevent_get_output(np->ntrip_state->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 				ntrip_log(np->ntrip_state, LOG_CRIT, "RTCM: evbuffer_add_reference failed\n");
