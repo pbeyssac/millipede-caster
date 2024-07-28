@@ -22,6 +22,7 @@ Features:
 The current version requires:
  * libcyaml
  * libevent2
+ * json-c
 
 Building
 ========
