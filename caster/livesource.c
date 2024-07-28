@@ -94,10 +94,9 @@ void livesource_free(struct livesource *this) {
  *
  * Required lock: ntrip_state
  */
-struct subscriber *livesource_add_subscriber(struct livesource *this, struct bufferevent *bev, struct ntrip_state *st) {
+struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntrip_state *st) {
 	struct subscriber *sub = (struct subscriber *)malloc(sizeof(struct subscriber));
 	if (sub != NULL) {
-		sub->bev = bev;
 		sub->livesource = this;
 		sub->ntrip_state = st;
 		sub->ntrip_state->refcnt++;
@@ -168,16 +167,16 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
 		if (packet->caster->config->zero_copy) {
-			if (evbuffer_add_reference(bufferevent_get_output(np->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
+			if (evbuffer_add_reference(bufferevent_get_output(np->ntrip_state->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 				ntrip_log(np->ntrip_state, LOG_CRIT, "RTCM: evbuffer_add_reference failed\n");
 				ns++;
 			}
 		} else {
-			if (evbuffer_add(bufferevent_get_output(np->bev), packet->data, packet->datalen) < 0) {
+			if (evbuffer_add(bufferevent_get_output(np->ntrip_state->bev), packet->data, packet->datalen) < 0) {
 				ns++;
 			}
 		}
-		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(np->bev));
+		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(np->ntrip_state->bev));
 		if (backlog_len > caster->config->backlog_evbuffer) {
 			// ntrip_log(np->ntrip, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
 			np->backlogged = 1;

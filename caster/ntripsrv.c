@@ -20,7 +20,7 @@ const char *server_headers = "Server: NTRIP " SERVER_VERSION_STRING "\r\n";
  *
  * Switch client from a given source to another.
  */
-int ntripsrv_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource, struct bufferevent *output_bev) {
+int ntripsrv_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource) {
 	ntrip_log(this, LOG_INFO, "Switching virtual source from %s to %s\n", this->virtual_mountpoint, new_mountpoint);
 	new_mountpoint = mystrdup(new_mountpoint);
 	if (new_mountpoint == NULL)
@@ -28,7 +28,7 @@ int ntripsrv_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t
 	if (this->subscription) {
 		livesource_del_subscriber(this->subscription, this->caster);
 	}
-	this->subscription = livesource_add_subscriber(livesource, output_bev, this);
+	this->subscription = livesource_add_subscriber(livesource, this);
 	this->subscription->virtual = 1;
 	if (this->virtual_mountpoint)
 		strfree(this->virtual_mountpoint);
@@ -49,7 +49,7 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 	if (success) {
 		struct livesource *livesource = livesource_find(st->caster, redis_args->mountpoint);
 		if (livesource) {
-			ntripsrv_switch_source(st, redis_args->mountpoint, &redis_args->mountpoint_pos, livesource, st->bev);
+			ntripsrv_switch_source(st, redis_args->mountpoint, &redis_args->mountpoint_pos, livesource);
 			gettimeofday(&t1, NULL);
 			timersub(&t1, &redis_args->t0, &t1);
 
@@ -220,7 +220,7 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 			} else {
 				struct livesource *l = livesource_find(st->caster, m);
 				if (l) {
-					if (ntripsrv_switch_source(st, m, &s->dist_array[0].pos, l, st->bev) < 0)
+					if (ntripsrv_switch_source(st, m, &s->dist_array[0].pos, l) < 0)
 						r = -1;
 				} else {
 					ntrip_log(st, LOG_INFO, "Trying to switch virtual source from %s to %s\n", st->virtual_mountpoint, m);
@@ -387,7 +387,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (!st->source_virtual) {
 						struct livesource *l = livesource_find(st->caster, mountpoint);
 						if (l) {
-							st->subscription = livesource_add_subscriber(l, bev, st);
+							st->subscription = livesource_add_subscriber(l, st);
 							ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
 							st->state = NTRIP_WAIT_CLIENT_INPUT;
 

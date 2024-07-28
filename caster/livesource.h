@@ -12,7 +12,6 @@
  */
 struct subscriber {
 	TAILQ_ENTRY(subscriber) next;
-	struct bufferevent *bev;
 	struct livesource *livesource;
 	struct ntrip_state *ntrip_state;
 
@@ -44,7 +43,7 @@ struct livesource *livesource_new(char *mountpoint);
 struct livesource *livesource_find(struct caster_state *this, char *mountpoint);
 int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backlogged);
 void livesource_free(struct livesource *this);
-struct subscriber *livesource_add_subscriber(struct livesource *this, struct bufferevent *bev, struct ntrip_state *st);
+struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntrip_state *st);
 void livesource_del_subscriber(struct subscriber *sub, struct caster_state *caster);
 int livesource_send_subscribers(struct livesource *this, struct packet *packet, struct caster_state *caster);
 struct livesource *livesource_find_unlocked(struct caster_state *this, char *mountpoint);
