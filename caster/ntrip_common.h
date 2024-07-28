@@ -93,6 +93,7 @@ struct ntrip_state {
 		struct sockaddr_in6 v6;
 		struct sockaddr generic;
 	} peeraddr;
+	char remote_addr[40];		// Conversion of the IP address part to an ASCII string
 
 	char *http_args[SIZE_HTTP_ARGS];
 

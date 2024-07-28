@@ -318,6 +318,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 			socklen_t psocklen = sizeof(st->peeraddr);
 			if (getpeername(fd, &st->peeraddr.generic, &psocklen) >= 0) {
 				st->remote = 1;
+				sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);
 			} else {
 				ntrip_log(st, LOG_NOTICE, "getpeername failed: %s\n", strerror(errno));
 			}

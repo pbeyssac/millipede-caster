@@ -1,9 +1,10 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
-#include "conf.h"
-
+#include <sys/socket.h>
 #include <sys/types.h>
+
+#include "conf.h"
 
 
 // Geographical position
@@ -59,6 +60,9 @@ int parse_header(char *line, char **key, char **val);
 struct parsed_file *file_parse(const char *filename, int nfields, const char *seps);
 void file_free(struct parsed_file *p);
 void logdate(char *date, size_t len);
+
+char *sockaddr_ipstr(struct sockaddr *sa, char *dest, int size_dest);
+unsigned short sockaddr_port(struct sockaddr *sa);
 
 #if DEBUG
 extern int str_alloc;

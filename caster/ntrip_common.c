@@ -10,6 +10,7 @@
 #include "log.h"
 #include "livesource.h"
 #include "ntrip_common.h"
+#include "util.h"
 
 /*
  * Create a NTRIP session state for a client or a server connection.
@@ -33,6 +34,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->chunk_buf = NULL;
 	this->host = host;
 	this->port = port;
+	this->remote_addr[0] = '\0';
 	this->refcnt = 1;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
@@ -100,11 +102,10 @@ static json_object *ntrip_json(struct ntrip_state *st, int lock) {
 	if (lock)
 		P_RWLOCK_RDLOCK(&st->lock);
 
-	char *ipstr = ntrip_peer_ipstr(st);
+	char *ipstr = st->remote_addr;
 	json_object *jsonip;
-	unsigned port = ntrip_peer_port(st);
-	jsonip = ipstr ? json_object_new_string(ipstr) : json_object_new_null();
-	strfree(ipstr);
+	unsigned port = sockaddr_port(&st->peeraddr.generic);
+	jsonip = ipstr[0] ? json_object_new_string(ipstr) : json_object_new_null();
 	json_object *new_obj = json_object_new_object();
 	json_object *jsonid = json_object_new_int(st->id);
 	json_object *jsonport = json_object_new_int(port);
@@ -170,20 +171,8 @@ void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint) {
 char *ntrip_peer_ipstr(struct ntrip_state *this) {
 	char *r;
 	char inetaddr[64];
-	struct sockaddr *sa = &this->peeraddr.generic;
-	switch(sa->sa_family) {
-	case AF_INET:
-		inet_ntop(sa->sa_family, &this->peeraddr.v4.sin_addr, inetaddr, sizeof inetaddr);
-		r = inetaddr;
-		break;
-	case AF_INET6:
-		inet_ntop(sa->sa_family, &this->peeraddr.v6.sin6_addr, inetaddr, sizeof inetaddr);
-		r = inetaddr;
-		break;
-	default:
-		return NULL;
-	}
-	return mystrdup(r);
+	r = sockaddr_ipstr(&this->peeraddr.generic, inetaddr, sizeof inetaddr);
+	return r?mystrdup(r):NULL;
 }
 
 unsigned short ntrip_peer_port(struct ntrip_state *this) {
@@ -208,19 +197,17 @@ _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list a
 
 	if (this->remote) {
 		unsigned port = ntrip_peer_port(this);
-		char *inetaddr = ntrip_peer_ipstr(this);
 		struct sockaddr *sa = &this->peeraddr.generic;
 		switch(sa->sa_family) {
 		case AF_INET:
-			fprintf(log->logfile, "%s:%hu ", inetaddr, port);
+			fprintf(log->logfile, "%s:%hu ", this->remote_addr, port);
 			break;
 		case AF_INET6:
-			fprintf(log->logfile, "%s.%hu ", inetaddr, port);
+			fprintf(log->logfile, "%s.%hu ", this->remote_addr, port);
 			break;
 		default:
 			fprintf(log->logfile, "[???] ");
 		}
-		strfree(inetaddr);
 	}
 	vfprintf(log->logfile, fmt, ap);
 	P_RWLOCK_UNLOCK(&log->lock);
