@@ -14,13 +14,14 @@ enum ntrip_session_state {
 	NTRIP_WAIT_HTTP_METHOD,		// Wait for HTTP method (first request line)
 	NTRIP_WAIT_HTTP_STATUS,		// Wait for HTTP status (first reply line)
 	NTRIP_WAIT_HTTP_HEADER,		// Wait for HTTP header or empty line
-	NTRIP_REGISTER_SOURCE,
-	NTRIP_WAIT_STREAM_GET,
-	NTRIP_WAIT_STREAM_SOURCE,
-	NTRIP_WAIT_SOURCETABLE_LINE,
-	NTRIP_WAIT_CLIENT_INPUT,
-	NTRIP_WAIT_CLOSE,
-	NTRIP_END
+	NTRIP_REGISTER_SOURCE,		// Register new source as live.
+					// Ephemeral, immediately followed by NTRIP_WAIT_STREAM_GET
+	NTRIP_WAIT_STREAM_GET,		// Source connected, get data (client)
+	NTRIP_WAIT_STREAM_SOURCE,	// Source connected, receive data (server)
+	NTRIP_WAIT_SOURCETABLE_LINE,	// Client waiting for the next sourcetable line
+	NTRIP_WAIT_CLIENT_INPUT,	// Server waiting for GGA lines from client
+	NTRIP_WAIT_CLOSE,		// End of connection, close
+	NTRIP_END			// Ready for ntrip_free
 };
 
 /*
