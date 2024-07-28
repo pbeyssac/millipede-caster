@@ -110,17 +110,21 @@ void joblist_run(struct joblist *this) {
 
 		ntrip_log(st, LOG_EDEBUG, "thread %p ran %d jobs for ntrip state %p\n", pthread_self(), nst, st);
 
-		/*
-		 * Unref the ntrip state
-		 */
-		if (st->state == NTRIP_END)
-			ntrip_free(st, "joblist_run");
 		bufferevent_unlock(bev);
 
 		/*
-		 * Unreference the buffervent so it can be freed.
+		 * Unreference the buffervent
 		 */
-		bufferevent_decref(bev);
+		int r = bufferevent_decref(bev);
+
+		/*
+		 * Free the ntrip state if adequate, and log bufferevent freeing problems.
+		 */
+		if (st->state == NTRIP_END) {
+			if (r == 0)
+				ntrip_log(st, LOG_EDEBUG, "bufferevent %p not freed, ntrip state %p\n", bev, st);
+			ntrip_free(st, "joblist_run");
+		}
 
 		/*
 		 * Lock the list again for the next job.
