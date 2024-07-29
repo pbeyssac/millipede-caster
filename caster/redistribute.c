@@ -74,7 +74,7 @@ redistribute_cb(evutil_socket_t fd, short what, void *cbarg) {
 	logfmt(&caster->flog, "Trying to restart source %s\n", redis_args->mountpoint);
 	event_del(redis_args->ev);
 	redis_args->ev = NULL;
-	redistribute_source_stream(redis_args, ntripsrv_switch_source_cb);
+	redistribute_source_stream(redis_args, NULL);
 }
 
 /*
