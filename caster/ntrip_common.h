@@ -79,12 +79,15 @@ struct ntrip_state {
 	 * State for a NTRIP client or server
 	 */
 
-	struct evbuffer *chunk_buf;
-	size_t chunk_len;
-	enum ntrip_chunk_state chunk_state;
+	struct bufferevent *bev;		// main bufferevent associated with the session
+	char bev_freed;				// has it been freed already?
 
-	struct bufferevent *bev;	// associated bufferevent
-	char bev_freed;
+	/*
+	 * HTTP chunk handling
+	 */
+	struct evbuffer *chunk_buf;		// HTTP chunk reassembling
+	size_t chunk_len;			// remaining chunk len to receive
+	enum ntrip_chunk_state chunk_state;	// current state in chunk reassembly
 
 	char remote;				// Flag: remote address is filled in peeraddr
 	union {
@@ -110,9 +113,10 @@ struct ntrip_state {
 	 */
 	short status_code;			// HTTP status code received (client)
 	short client_version;			// NTRIP version in use
-	char *host;
-	unsigned short port;
+	char *host;				// host to connect to
+	unsigned short port;			// port to connect to
 	struct sourcetable *tmp_sourcetable;	// sourcetable we are currently downloading
+	struct sourcetable_fetch_args *sourcetable_cb_arg;	// sourcetable download callback
 	struct subscriber *subscription;	// current source subscription
 
 	/*
@@ -120,8 +124,9 @@ struct ntrip_state {
 	 */
 	char *user, *password;
 	char *mountpoint;
-	pos_t mountpoint_pos;
-	char user_agent_ntrip;			// set if the User-Agent header contraints "ntrip" (case-insensitive)
+	pos_t mountpoint_pos;			// geographical position of the current source
+	char user_agent_ntrip;			// Flag: set if the User-Agent header
+						// contains "ntrip" (case-insensitive)
 
 	/*
 	 * Relevant sourceline if the connection is from a source.
@@ -138,13 +143,12 @@ struct ntrip_state {
 	char source_on_demand;				// source is on-demand
 
 	short server_version;				// NTRIP version
-	struct sourcetable_fetch_args *sourcetable_cb_arg;
 
 	// Position gathered from GGA lines sent by a NTRIP client
 	char last_pos_valid;			// last_pos and max_min_dist are valid
 	pos_t last_pos;				// last known position
 	float last_dist;			// last known base distance (for hysteresis)
-	float max_min_dist;
+	float max_min_dist;			// maximum distance to the closest base
 
 	/*
 	 * Virtual mountpoint handling
