@@ -34,23 +34,27 @@ Building
 
 `cd caster; make`
 
-Installation
-============
+Installation (FreeBSD)
+======================
 
-1. `cd caster; sudo make install`
-2. Create configuration files in (default) `/usr/local/etc/millipede/`,
+As root:
+1. Create a `caster` user: `pw useradd -n caster -d /nonexistent -s /bin/nologin`
+2. `cd caster; make install`
+3. Create configuration files in (default) `/usr/local/etc/millipede/`,
    samples in `sample-config/`.
 	* `caster.yaml` main configuration file
 	* `sourcetable.dat` our local sourcetable
 	* `source.auth` authentication of sources from our sourcetable
 	* `host.auth` authentication as a client to other hosts
+4. `mkdir /var/log/millipede && chown caster /var/log/millipede`
+5. `install -m 0755 sample-config/caster.sh /usr/local/etc/rc.d/caster`
+6. `sysrc caster_enable=YES`
+
 
 Running
 =======
 
-Start the `/usr/local/sbin/millipede` binary.
-
-A start/restart/stop script for FreeBSD is provided as `sample-config/caster.sh` and can be installed in `/usr/local/etc/rc.d`.
+`service caster start`, or start the `/usr/local/sbin/caster` binary.
 
 Documentation
 =============
