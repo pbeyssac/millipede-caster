@@ -61,8 +61,8 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 		}
 	}
 
+	bufferevent_lock(st->bev);
 	P_RWLOCK_WRLOCK(&st->lock);
-	bufferevent_unlock(st->bev);
 	redistribute_args_free(redis_args);
 
 	st->state = NTRIP_END;
