@@ -41,7 +41,7 @@ int ntripsrv_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t
  * Redistribute source stream.
  * Last step (optional): switch the requester to the source.
  */
-static void
+void
 ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) {
 	struct timeval t1;
 	struct ntrip_state *st = redis_args->requesting_st;
