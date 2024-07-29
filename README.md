@@ -24,6 +24,11 @@ The current version requires:
  * libevent2
  * json-c
 
+Dependencies
+============
+
+FreeBSD: `sudo pkg install libevent libcyaml json-c`
+
 Building
 ========
 
