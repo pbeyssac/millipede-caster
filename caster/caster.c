@@ -336,6 +336,7 @@ int caster_main(char *config_file) {
 	struct event *signalhup_event;
 
 #if DEBUG_EVENT
+	event_enable_debug_mode();
 	event_enable_debug_logging(EVENT_DBG_ALL);
 	event_set_log_callback(event_log_redirect);
 #endif
