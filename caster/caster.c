@@ -214,6 +214,7 @@ caster_reload_auth(struct caster_state *caster) {
 
 void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 	if (!this->bev_freed) {
+		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p\n", bev);
 		bufferevent_free(bev);
 		this->bev_freed = 1;
 	} else

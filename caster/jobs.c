@@ -123,6 +123,8 @@ void joblist_run(struct joblist *this) {
 		if (st->state == NTRIP_END) {
 			if (r == 0)
 				ntrip_log(st, LOG_EDEBUG, "bufferevent %p not freed, ntrip state %p\n", bev, st);
+			else
+				ntrip_log(st, LOG_EDEBUG, "bufferevent %p freed, ntrip state %p\n", bev, st);
 			ntrip_free(st, "joblist_run");
 		}
 

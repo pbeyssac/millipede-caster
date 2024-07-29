@@ -58,7 +58,8 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 				redis_args->source_st->port,
 				redis_args->mountpoint,
 				t1.tv_sec*1000 + t1.tv_usec/1000.);
-		}
+		} else
+			ntrip_log(st, LOG_INFO, "callback called but no on-demand source ready %p\n", st);
 	}
 
 	bufferevent_lock(st->bev);

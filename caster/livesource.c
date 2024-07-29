@@ -168,7 +168,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
 		if (np->ntrip_state->state == NTRIP_END || np->ntrip_state->bev_freed) {
 			/* Subscriber currently closing, skip */
-			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: skipping %p pending close\n");
+			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: skipping %p pending close state=%d bev_freed=%d\n", np->ntrip_state, np->ntrip_state->state, np->ntrip_state->bev_freed);
 			n++;
 			continue;
 		}
@@ -184,7 +184,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		}
 		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(np->ntrip_state->bev));
 		if (backlog_len > caster->config->backlog_evbuffer) {
-			// ntrip_log(np->ntrip, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
+			ntrip_log(np->ntrip_state, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
 		}
