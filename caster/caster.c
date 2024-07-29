@@ -213,13 +213,6 @@ caster_reload_auth(struct caster_state *caster) {
 }
 
 void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
-#if 0
-	int n = joblist_count_bev(this->caster->joblist, bev, this->caster);
-	if (n) {
-		ntrip_log(this, LOG_DEBUG, "Freeing bufferevent with %d references\n", n);
-	}
-#endif
-	//bufferevent_decref(bev);
 	if (!this->bev_freed) {
 		bufferevent_free(bev);
 		this->bev_freed = 1;
