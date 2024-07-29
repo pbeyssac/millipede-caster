@@ -62,14 +62,23 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 			ntrip_log(st, LOG_INFO, "callback called but no on-demand source ready %p\n", st);
 	}
 
-	bufferevent_lock(st->bev);
-	P_RWLOCK_WRLOCK(&st->lock);
 	redistribute_args_free(redis_args);
 
-	st->state = NTRIP_END;
+	if (!success) {
+		/*
+		 * Failed to get the requested source.
+		 *
+		 * Close the requesting connection.
+		 * We should do something more clever here in the case of "virtual" bases,
+		 * since we can try another source.
+		 */
+		bufferevent_lock(st->bev);
+		P_RWLOCK_WRLOCK(&st->lock);
+		st->state = NTRIP_END;
 #ifndef THREADS
-	ntrip_free(st, "ntripsrv_switch_source_cb");
+		ntrip_free(st, "ntripsrv_switch_source_cb");
 #endif
+	}
 }
 
 static void
