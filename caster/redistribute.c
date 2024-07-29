@@ -132,9 +132,6 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 	st->callback_subscribe = switch_source_cb;
 	st->callback_subscribe_arg = redis_args;
 
-	if (switch_source_cb)
-		redis_args->requesting_st->refcnt++;
-
 #ifdef THREADS
 	bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
 #else

@@ -35,7 +35,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->host = host;
 	this->port = port;
 	this->remote_addr[0] = '\0';
-	this->refcnt = 1;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
 	this->server_version = 1;

@@ -50,20 +50,11 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 			my_bufferevent_free(np->ntrip_state, np->ntrip_state->bev);
 			np->ntrip_state->state = NTRIP_WAIT_CLOSE;
 
-			/*
-			 * Double decrement the reference count
-			 * to enforce connection closing.
-			 */
 			ntrip_log(np->ntrip_state, LOG_NOTICE, "dropping %p due to %s\n", np->ntrip_state, kill_backlogged?"backlog":"closed source");
-			np->ntrip_state->refcnt--;
 			killed++;
 		} else if (kill_backlogged == 0 && np->virtual) {
 			/*
 			 * Try to resubscribe virtual sources to a new source
-			 *
-			 * refcnt on the ntrip_state will be reincremented,
-			 * preventing a drop of the connection while waiting for
-			 * the resubscription.
 			 */
 			ntripsrv_redo_virtual_pos(np->ntrip_state);
 		}
@@ -71,7 +62,6 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 		if (kill_backlogged == 0 || np->backlogged) {
 			TAILQ_REMOVE(&this->subscribers, np, next);
 			this->nsubs--;
-			np->ntrip_state->refcnt--;
 			np->ntrip_state->subscription = NULL;
 			ntrip_free(np->ntrip_state, "livesource_kill_subscribers_unlocked");
 			free(np);
@@ -99,7 +89,6 @@ struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntr
 	if (sub != NULL) {
 		sub->livesource = this;
 		sub->ntrip_state = st;
-		sub->ntrip_state->refcnt++;
 		sub->backlogged = 0;
 		sub->virtual = 0;
 
@@ -127,7 +116,6 @@ void livesource_del_subscriber(struct subscriber *sub, struct caster_state *cast
 
 	TAILQ_REMOVE(&sub->livesource->subscribers, sub, next);
 	sub->livesource->nsubs--;
-	sub->ntrip_state->refcnt--;
 
 	P_RWLOCK_UNLOCK(&sub->livesource->lock);
 

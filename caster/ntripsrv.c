@@ -236,7 +236,6 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 					ntrip_log(st, LOG_INFO, "Trying to switch virtual source from %s to %s\n", st->virtual_mountpoint, m);
 					struct redistribute_cb_args *redis_args = redistribute_args_new(st, m, &s->dist_array[0].pos, st->caster->config->reconnect_delay, 0);
 					if (redis_args != NULL) {
-						st->refcnt++;
 						redistribute_source_stream(redis_args, ntripsrv_switch_source_cb);
 					}
 				}

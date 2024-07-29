@@ -266,7 +266,6 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		ntrip_log(st, LOG_CRIT, "Error constructing bufferevent!");
 		event_base_loopbreak(base);
 		P_RWLOCK_WRLOCK(&st->lock);
-		st->refcnt--;
 		ntrip_free(st, "listener_cb");
 		return;
 	}

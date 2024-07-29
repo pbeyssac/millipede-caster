@@ -63,7 +63,6 @@ enum ntrip_chunk_state {
 
 struct ntrip_state {
 	P_RWLOCK_T lock;
-	int refcnt;
 	struct caster_state *caster;
 	enum ntrip_session_state state;
 	int id;		// Unique id for external reference
