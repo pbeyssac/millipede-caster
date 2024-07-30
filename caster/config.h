@@ -131,7 +131,7 @@ extern int backlog_delay;
 extern size_t backlog_socket;
 extern size_t backlog_evbuffer;
 
-struct config *config_new();
-struct config *config_parse(struct config **this, const char *filename);
+struct config *config_parse(const char *filename);
+void config_free(struct config *this);
 
 #endif

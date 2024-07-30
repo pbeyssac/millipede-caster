@@ -161,23 +161,17 @@ static const cyaml_config_t cyaml_config = {
 	.log_level = CYAML_LOG_WARNING,	/* Logging errors and warnings only. */
 };
 
-struct config *config_new() {
-	struct config *this = (struct config *)malloc(sizeof(struct config));
-	return this;
-}
-
-struct config *config_parse(struct config **pthis, const char *filename) {
+struct config *config_parse(const char *filename) {
+	struct config *this;
 	cyaml_err_t err;
 
 	/* Load YAML file */
         err = cyaml_load_file(filename, &cyaml_config,
-		&top_schema, (cyaml_data_t **)pthis, NULL);
+		&top_schema, (cyaml_data_t **)&this, NULL);
 	if (err != CYAML_OK) {
 		fprintf(stderr, "ERROR: %s\n", cyaml_strerror(err));
 		return NULL;
         }
-
-	struct config *this = *pthis;
 
 #define	DEFAULT_ASSIGN(this, field)	{if (!(this)->field) {(this)->field = default_config.field;}}
 
@@ -214,5 +208,12 @@ struct config *config_parse(struct config **pthis, const char *filename) {
 		if (this->bind[i].queue_size == 0)
 			this->bind[i].queue_size = default_config_bind.queue_size;
 	}
-	return *pthis;
+	return this;
+}
+
+void config_free(struct config *this) {
+	cyaml_err_t err;
+	err = cyaml_free(&cyaml_config, &top_schema, this, 0);
+	if (err != CYAML_OK)
+		fprintf(stderr, "ERROR: %s\n", cyaml_strerror(err));
 }

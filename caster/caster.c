@@ -342,9 +342,9 @@ int caster_main(char *config_file) {
 	}
 #endif
 
-	struct config *config = config_new();
+	struct config *config = config_parse(config_file);
 
-	if (!config_parse(&config, config_file)) {
+	if (!config) {
 		fprintf(stderr, "Can't parse configuration from %s\n", config_file);
 		return 1;
 	}
