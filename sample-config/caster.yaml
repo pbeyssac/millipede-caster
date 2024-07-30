@@ -51,16 +51,18 @@ log:			/var/log/millipede/caster.log
 #	NOTICE
 #	INFO
 #	DEBUG	=> WARNING: leaks passwords to the logs
+# Extension over syslog levels:
+#	EDEBUG	=> WARNING: leaks passwords to the logs
 #
 log_level:		INFO
 
 #
-# Distance hysteresis to avoid spurious base change on the virtual base.
+# Distance hysteresis (in meters) to avoid spurious base change on the virtual base.
 #
-hysteresis_m:		500.
+hysteresis_m:		500.0
 
 # default size set for sending buffers (SO_SNDBUF), 112 KB
 # currently for all client sockets.
-backlog_socket = 114688
+backlog_socket: 114688
 # max backlog in the caster over which we drop a client connection
-backlog_evbuffer = 16384
+backlog_evbuffer: 16384
