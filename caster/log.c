@@ -10,7 +10,7 @@ int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg)
 	this->logfile = fopen(filename, "a+");
 	if (!this->logfile) {
 		fprintf(stderr, "Can't open log file %s: %s\n", filename, strerror(errno));
-		exit(1);
+		return -1;
 	}
 	this->log_cb = log_cb;
 	this->state = arg;
