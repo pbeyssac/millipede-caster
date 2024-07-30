@@ -67,6 +67,7 @@ struct ntrip_state {
 	enum ntrip_session_state state;
 	int id;		// Unique id for external reference
 	const char *type;
+	time_t start;	// time the connection was established
 
 #ifdef THREADS
 	/* linked-list pointers for main job queue */

@@ -37,6 +37,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->host = host;
 	this->port = port;
 	this->remote_addr[0] = '\0';
+	this->start = 0;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
 	this->server_version = 1;
@@ -122,6 +123,12 @@ static json_object *ntrip_json(struct ntrip_state *st, int lock) {
 		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->mountpoint));
 	else if (!strcmp(st->type, "client"))
 		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->http_args[1]+1));
+
+	struct tm date;
+	gmtime_r(&st->start, &date);
+	char iso_date[22];
+	strftime(iso_date, sizeof iso_date, "%Y-%m-%dT%H:%M:%SZ", &date);
+	json_object_object_add(new_obj, "start", json_object_new_string(iso_date));
 
         bufferevent_unlock(st->bev);
 	return new_obj;
