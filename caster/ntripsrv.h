@@ -8,7 +8,7 @@
 void ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success);
 int ntripsrv_redo_virtual_pos(struct ntrip_state *st);
 int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, char *mime_type, struct evkeyvalq *opt_headers);
-int check_password(struct ntrip_state *this, char *mountpoint, char *user, char *passwd);
+int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd);
 
 void ntripsrv_readcb(struct bufferevent *bev, void *arg);
 void ntripsrv_writecb(struct bufferevent *bev, void *arg);

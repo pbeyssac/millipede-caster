@@ -151,7 +151,7 @@ int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, c
 /*
  * Check password in the base
  */
-int check_password(struct ntrip_state *this, char *mountpoint, char *user, char *passwd) {
+int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd) {
 	int r = 0;
 
 	P_RWLOCK_RDLOCK(&this->caster->authlock);
