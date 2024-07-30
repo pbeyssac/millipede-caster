@@ -66,3 +66,6 @@ hysteresis_m:		500.0
 backlog_socket: 114688
 # max backlog in the caster over which we drop a client connection
 backlog_evbuffer: 16384
+
+# admin user for the /adm section
+admin_user:	admin

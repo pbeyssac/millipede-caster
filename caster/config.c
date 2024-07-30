@@ -45,6 +45,7 @@ static struct config default_config = {
 	.access_log = "/var/log/millipede/access.log",
 	.log = "/var/log/millipede/caster.log",
 	.log_level = LOG_INFO,
+	.admin_user = "admin",
 	.disable_zero_copy = 0,
 	.zero_copy = 1
 };
@@ -141,6 +142,8 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 			"log_level", CYAML_FLAG_DEFAULT,
 			struct config, log_level, log_level_strings,
 			CYAML_ARRAY_LEN(log_level_strings)),
+	CYAML_FIELD_STRING_PTR(
+		"admin_user", CYAML_FLAG_POINTER, struct config, admin_user, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_END
 };
 
@@ -191,6 +194,7 @@ struct config *config_parse(struct config **pthis, const char *filename) {
 	DEFAULT_ASSIGN(this, access_log);
 	DEFAULT_ASSIGN(this, log);
 	DEFAULT_ASSIGN(this, log_level);
+	DEFAULT_ASSIGN(this, admin_user);
 
 	// Undocumented
 	DEFAULT_ASSIGN(this, disable_zero_copy);

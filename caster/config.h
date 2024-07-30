@@ -111,6 +111,11 @@ struct config {
 	int log_level;
 
 	/*
+	 * Username access to the /adm section (account from source.auth)
+	 */
+	const char *admin_user;
+
+	/*
 	 * Zero copy mode shares outgoing queued RTCM packets, saving memory, but incurring
 	 * some overhead.
 	 *
