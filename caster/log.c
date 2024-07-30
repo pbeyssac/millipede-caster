@@ -1,10 +1,10 @@
-#include "log.h"
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+
+#include "log.h"
 
 int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg) {
 	this->logfile = fopen(filename, "a+");
