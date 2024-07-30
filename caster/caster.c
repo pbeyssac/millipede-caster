@@ -45,6 +45,7 @@
 
 static void caster_log(void *arg, const char *fmt, va_list ap);
 static void caster_alog(void *arg, const char *fmt, va_list ap);
+static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *sa, int socklen, void *arg);
 
 /*
  * Read user authentication file for the NTRIP server.
@@ -112,12 +113,18 @@ caster_new(struct config *config) {
 		return NULL;
 	}
 
+	this->listeners = NULL;
+	this->socks = NULL;
+	this->sourcetable_fetcher = NULL;
+
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
 	this->ntrips.next_id = 1;
 
 	// Used only for access to source_auth and host_auth
 	P_RWLOCK_INIT(&this->authlock, NULL);
+
+	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
 	this->config = config;
 #ifdef THREADS
@@ -144,7 +151,104 @@ caster_new(struct config *config) {
 	this->dns_base = dns_base;
 	TAILQ_INIT(&this->livesources.queue);
 	TAILQ_INIT(&this->ntrips.queue);
+	TAILQ_INIT(&this->sourcetablestack.list);
 	return this;
+}
+
+void caster_free(struct caster_state *this) {
+	event_free(this->signalpipe_event);
+	event_free(this->signalhup_event);
+	event_free(this->signalint_event);
+
+	for (int i = 0; i < this->config->bind_count; i++)
+		evconnlistener_free(this->listeners[i]);
+	free(this->listeners);
+	free(this->socks);
+	free(this->sourcetable_fetcher);
+
+	evdns_base_free(this->dns_base, 1);
+	event_base_free(this->base);
+
+	P_RWLOCK_WRLOCK(&this->sourcetablestack.lock);
+	struct sourcetable *s;
+	while ((s = TAILQ_FIRST(&this->sourcetablestack.list))) {
+		TAILQ_REMOVE_HEAD(&this->sourcetablestack.list, next);
+		sourcetable_free(s);
+	}
+
+	if (this->joblist) joblist_free(this->joblist);
+	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
+	P_RWLOCK_DESTROY(&this->livesources.lock);
+	P_RWLOCK_DESTROY(&this->ntrips.lock);
+	P_RWLOCK_DESTROY(&this->authlock);
+	log_free(&this->flog);
+	log_free(&this->alog);
+	config_free(this->config);
+}
+
+/*
+ * Configure and activate listening ports.
+ */
+static int caster_listen(struct caster_state *this) {
+	if (this->config->bind_count == 0) {
+		fprintf(stderr, "No configured ports to listen to, aborting.\n");
+		return -1;
+	}
+
+	this->socks = (union sock *)malloc(sizeof(union sock)*this->config->bind_count);
+	if (!this->socks) {
+		fprintf(stderr, "Can't allocate socket addresses\n");
+		return -1;
+	}
+
+	this->listeners = (struct evconnlistener **)malloc(sizeof(struct evconnlistener *)*this->config->bind_count);
+	if (!this->listeners) {
+		fprintf(stderr, "Can't allocate listeners\n");
+		return -1;
+	}
+
+	/*
+	 * Create listening socket addresses.
+	 * Create a libevent listener for each.
+	 */
+	int err = 0;
+	for (int i = 0; i < this->config->bind_count; i++) {
+		int r, port;
+		struct sockaddr *sin = (struct sockaddr *)(this->socks+i);
+		size_t size_sin = 0;
+
+		memset(&this->socks[i], 0, sizeof(this->socks[i]));
+
+		port = htons(this->config->bind[i].port);
+		r = inet_pton(AF_INET6, this->config->bind[i].ip, &this->socks[i].sin6.sin6_addr);
+		if (r) {
+			this->socks[i].sin6.sin6_port = port;
+			this->socks[i].sin6.sin6_family = AF_INET6;
+			size_sin = sizeof(struct sockaddr_in6);
+		} else {
+			r = inet_pton(AF_INET, this->config->bind[i].ip, &this->socks[i].sin.sin_addr);
+			if (r) {
+				this->socks[i].sin.sin_port = port;
+				this->socks[i].sin.sin_family = AF_INET;
+				size_sin = sizeof(struct sockaddr_in);
+			} else {
+				fprintf(stderr, "Invalid IP %s\n", this->config->bind[i].ip);
+				err = 1;
+				continue;
+			}
+		}
+		this->listeners[i] = evconnlistener_new_bind(this->base, listener_cb, this,
+			LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, this->config->bind[i].queue_size,
+			sin, size_sin);
+		if (!this->listeners[i]) {
+			fprintf(stderr, "Could not create a listener for %s:%d!\n", this->config->bind[i].ip, this->config->bind[i].port);
+			err = 1;
+		}
+	}
+
+	if (err)
+		return -1;
+	return 0;
 }
 
 void caster_del_livesource(struct caster_state *this, struct livesource *livesource) {
@@ -317,17 +421,47 @@ void event_log_redirect(int severity, const char *msg) {
 		fprintf(stderr, "%s\n", msg);
 }
 
-int caster_main(char *config_file) {
-	union sock {
-		 struct sockaddr_in sin;
-		 struct sockaddr_in6 sin6;
-	};
-	union sock *socks;
-	struct evconnlistener **listeners;
+static int caster_set_signals(struct caster_state *this) {
+	this->signalint_event = evsignal_new(this->base, SIGINT, signal_cb, (void *)this->base);
+	if (!this->signalint_event || event_add(this->signalint_event, NULL) < 0) {
+		fprintf(stderr, "Could not create/add a signal event!\n");
+		return -1;
+	}
 
-	struct event *signal_event;
-	struct event *signalpipe_event;
-	struct event *signalhup_event;
+	this->signalpipe_event = evsignal_new(this->base, SIGPIPE, signalpipe_cb, (void *)this->base);
+	if (!this->signalpipe_event || event_add(this->signalpipe_event, NULL) < 0) {
+		fprintf(stderr, "Could not create/add a signal event!\n");
+		return -1;
+	}
+
+	this->signalhup_event = evsignal_new(this->base, SIGHUP, signalhup_cb, (void *)this);
+	if (!this->signalhup_event || event_add(this->signalhup_event, 0) < 0) {
+		fprintf(stderr, "Could not create/add a signal event!\n");
+		return -1;
+	}
+	return 0;
+}
+
+/*
+ * Start a sourcetable fetcher (proxy)
+ */
+static int caster_start_fetcher(struct caster_state *this) {
+	if (!this->config->proxy_count)
+		return 0;
+
+	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args));
+	this->sourcetable_fetcher = a;
+	a->host = this->config->proxy[0].host;
+	a->port = this->config->proxy[0].port;
+	a->refresh_delay = this->config->proxy[0].table_refresh_delay;
+	a->caster = this;
+	a->sourcetable = NULL;
+	a->sourcetable_cb = NULL;
+	fetcher_sourcetable_get(a);
+	return 0;
+}
+
+int caster_main(char *config_file) {
 
 #if DEBUG_EVENT
 	event_enable_debug_mode();
@@ -355,29 +489,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-
 	caster_reload_auth(caster);
-
-	if (caster->config->bind_count == 0) {
-		free(caster);
-		fprintf(stderr, "No configured ports to listen to, aborting.\n");
-		return 1;
-	}
-
-	socks = (union sock *)malloc(sizeof(union sock)*caster->config->bind_count);
-	if (!socks) {
-		free(caster);
-		fprintf(stderr, "Can't allocate socket addresses\n");
-		return 1;
-	}
-
-	listeners = (struct evconnlistener **)malloc(sizeof(struct evconnlistener *)*caster->config->bind_count);
-	if (!listeners) {
-		free(caster);
-		free(socks);
-		fprintf(stderr, "Can't allocate listeners\n");
-		return 1;
-	}
 
 #if 0
 	/*** v4+v6 SOCKET NOT USED AT THIS TIME ***/
@@ -408,101 +520,30 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	TAILQ_INIT(&caster->sourcetablestack.list);
 	TAILQ_INSERT_TAIL(&caster->sourcetablestack.list, local_table, next);
 
-	P_RWLOCK_INIT(&caster->sourcetablestack.lock, NULL);
-
-	/*
-	 * Create listening socket addresses.
-	 * Create a libevent listener for each.
-	 */
-	int err = 0;
-	for (int i = 0; i < caster->config->bind_count; i++) {
-		int r, port;
-		struct sockaddr *sin = (struct sockaddr *)(socks+i);
-		size_t size_sin = 0;
-
-		memset(&socks[i], 0, sizeof(socks[i]));
-
-		port = htons(caster->config->bind[i].port);
-		r = inet_pton(AF_INET6, caster->config->bind[i].ip, &socks[i].sin6.sin6_addr);
-		if (r) {
-			socks[i].sin6.sin6_port = port;
-			socks[i].sin6.sin6_family = AF_INET6;
-			size_sin = sizeof(struct sockaddr_in6);
-		} else {
-			r = inet_pton(AF_INET, caster->config->bind[i].ip, &socks[i].sin.sin_addr);
-			if (r) {
-				socks[i].sin.sin_port = port;
-				socks[i].sin.sin_family = AF_INET;
-				size_sin = sizeof(struct sockaddr_in);
-			} else {
-				fprintf(stderr, "Invalid IP %s\n", caster->config->bind[i].ip);
-				err = 1;
-				continue;
-			}
-		}
-		listeners[i] = evconnlistener_new_bind(caster->base, listener_cb, caster,
-			LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, caster->config->bind[i].queue_size,
-			sin, size_sin);
-		if (!listeners[i]) {
-			fprintf(stderr, "Could not create a listener for %s:%d!\n", caster->config->bind[i].ip, caster->config->bind[i].port);
-			err = 1;
-		}
-	}
-
-	if (err) {
+	if (caster_listen(caster) < 0) {
+		caster_free(caster);
 		return 1;
 	}
 
-	signal_event = evsignal_new(caster->base, SIGINT, signal_cb, (void *)caster->base);
-	if (!signal_event || event_add(signal_event, NULL) < 0) {
-		fprintf(stderr, "Could not create/add a signal event!\n");
-		return 1;
-	}
-
-	signalpipe_event = evsignal_new(caster->base, SIGPIPE, signalpipe_cb, (void *)caster->base);
-	if (!signalpipe_event || event_add(signalpipe_event, NULL) < 0) {
-		fprintf(stderr, "Could not create/add a signal event!\n");
-		return 1;
-	}
-	signalhup_event = evsignal_new(caster->base, SIGHUP, signalhup_cb, (void *)caster);
-	if (!signalhup_event || event_add(signalhup_event, 0) < 0) {
-		fprintf(stderr, "Could not create/add a signal event!\n");
+	if (caster_set_signals(caster) < 0) {
+		caster_free(caster);
 		return 1;
 	}
 
 #ifdef THREADS
 	if (jobs_start_threads(caster, NTHREADS) < 0) {
+		caster_free(caster);
 		fprintf(stderr, "Could not create threads!\n");
 		return 1;
 	}
 #endif
 
-	/*
-	 * Start a sourcetable fetcher.
-	 */
-	struct sourcetable_fetch_args a;
-	if (caster->config->proxy_count) {
-		a.host = caster->config->proxy[0].host;
-		a.port = caster->config->proxy[0].port;
-		a.refresh_delay = caster->config->proxy[0].table_refresh_delay;
-		a.caster = caster;
-		a.sourcetable = NULL;
-		a.sourcetable_cb = NULL;
-		fetcher_sourcetable_get(&a);
-	}
+	caster_start_fetcher(caster);
 
 	event_base_dispatch(caster->base);
 
-	for (int i = 0; i < caster->config->bind_count; i++) {
-		evconnlistener_free(listeners[i]);
-	}
-	free(listeners);
-	free(socks);
-	event_free(signal_event);
-	event_base_free(caster->base);
-	free(caster);
+	caster_free(caster);
 	return 0;
 }

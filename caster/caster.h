@@ -12,6 +12,10 @@
 #include "sourcetable.h"
 #include "util.h"
 
+union sock {
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
+};
 
 /*
  * State for a caster
@@ -29,6 +33,11 @@ struct caster_state {
 	struct event_base *base;
 	struct evdns_base *dns_base;
 
+	// Array of listening addresses
+	union sock *socks;
+	// Array of pointers to libevent listeners, same size
+        struct evconnlistener **listeners;
+
 	P_RWLOCK_T authlock;
 	struct auth_entry *host_auth;
 	struct auth_entry *source_auth;
@@ -45,6 +54,16 @@ struct caster_state {
 
 	/* Logs */
 	struct log flog, alog;
+
+	/* Signal handling */
+	struct event *signalint_event;
+	struct event *signalpipe_event;
+	struct event *signalhup_event;
+
+	/*
+	 * Sourcetable fetcher configuration.
+	 */
+	struct sourcetable_fetch_args *sourcetable_fetcher;
 };
 
 void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev);
