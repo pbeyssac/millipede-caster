@@ -110,7 +110,7 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 		"listen", CYAML_FLAG_POINTER,
 		struct config, bind, &bind_schema, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_FLOAT(
-		"hysteresis", CYAML_FLAG_DEFAULT|CYAML_FLAG_OPTIONAL, struct config, hysteresis_m),
+		"hysteresis_m", CYAML_FLAG_DEFAULT|CYAML_FLAG_OPTIONAL, struct config, hysteresis_m),
 	CYAML_FIELD_SEQUENCE(
 		"proxy", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, proxy, &proxy_schema, 0, 1),
