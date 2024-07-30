@@ -10,6 +10,10 @@
  */
 static char *conf_filename = "/usr/local/etc/millipede/caster.yaml";
 
+static void usage(char **argv) {
+	fprintf(stderr, "Usage: %s [-c config file] [-d]\n", argv[0]);
+}
+
 int
 main(int argc, char **argv) {
 	char *config_file = conf_filename;
@@ -25,7 +29,7 @@ main(int argc, char **argv) {
 			start_daemon = 1;
 			break;
 		default:
-			fprintf(stderr, "Usage: %s [config file]\n", argv[0]);
+			usage(argv);
 			exit(1);
 		}
 	}
@@ -34,7 +38,7 @@ main(int argc, char **argv) {
 	argv += optind;
 
 	if (argc != 0) {
-		fprintf(stderr, "Usage: %s [config file]\n", argv[0]);
+		usage(argv);
 		exit(1);
 	}
 
