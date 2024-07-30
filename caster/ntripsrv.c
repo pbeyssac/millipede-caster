@@ -321,6 +321,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				} else if (!strcasecmp(key, "user-agent")) {
 					if (strcasestr(value, "ntrip"))
 						st->user_agent_ntrip = 1;
+					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_DEBUG, "Header %s: *****\n", key);
 					if (!strncmp(value, "Basic ", 6)) {

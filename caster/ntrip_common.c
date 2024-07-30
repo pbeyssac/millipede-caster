@@ -47,6 +47,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->user = NULL;
 	this->password = NULL;
 	this->type = "starting";
+	this->user_agent = NULL;
 #ifdef THREADS
 	STAILQ_INIT(&this->jobq);
 #endif
@@ -82,6 +83,8 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 	 * Don't need to explicitly free this->password as it's in the
 	 * same allocation as this->user
 	 */
+
+	strfree((char *)this->user_agent);
 
 	if (this->chunk_buf)
 		evbuffer_free(this->chunk_buf);
@@ -123,6 +126,9 @@ static json_object *ntrip_json(struct ntrip_state *st, int lock) {
 		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->mountpoint));
 	else if (!strcmp(st->type, "client"))
 		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->http_args[1]+1));
+
+	if (st->user_agent)
+		json_object_object_add(new_obj, "user-agent", json_object_new_string(st->user_agent));
 
 	struct tm date;
 	gmtime_r(&st->start, &date);

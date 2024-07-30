@@ -129,6 +129,7 @@ struct ntrip_state {
 	pos_t mountpoint_pos;			// geographical position of the current source
 	char user_agent_ntrip;			// Flag: set if the User-Agent header
 						// contains "ntrip" (case-insensitive)
+	const char *user_agent;			// User-Agent header, if present
 
 	/*
 	 * Relevant sourceline if the connection is from a source.
