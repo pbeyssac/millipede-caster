@@ -176,7 +176,9 @@ void caster_free(struct caster_state *this) {
 		sourcetable_free(s);
 	}
 
+#ifdef THREADS
 	if (this->joblist) joblist_free(this->joblist);
+#endif
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
 	P_RWLOCK_DESTROY(&this->livesources.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
