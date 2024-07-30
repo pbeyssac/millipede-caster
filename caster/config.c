@@ -143,7 +143,7 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 			struct config, log_level, log_level_strings,
 			CYAML_ARRAY_LEN(log_level_strings)),
 	CYAML_FIELD_STRING_PTR(
-		"admin_user", CYAML_FLAG_POINTER, struct config, admin_user, 0, CYAML_UNLIMITED),
+		"admin_user", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config, admin_user, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_END
 };
 
