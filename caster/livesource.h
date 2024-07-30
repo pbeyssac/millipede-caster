@@ -27,7 +27,7 @@ TAILQ_HEAD (subscribersq, subscriber);
  * or one we pull from a caster.
  */
 struct livesource {
-#if THREADS
+#ifdef THREADS
 	P_RWLOCK_T lock;
 #endif
 	TAILQ_ENTRY(livesource) next;
