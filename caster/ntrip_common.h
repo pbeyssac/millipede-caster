@@ -66,6 +66,7 @@ struct ntrip_state {
 	struct caster_state *caster;
 	enum ntrip_session_state state;
 	int id;		// Unique id for external reference
+	const char *type;
 
 #ifdef THREADS
 	/* linked-list pointers for main job queue */

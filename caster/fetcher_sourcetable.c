@@ -63,6 +63,7 @@ fetcher_sourcetable_get(struct sourcetable_fetch_args *arg_cb) {
 	struct ntrip_state *st = ntrip_new(arg_cb->caster, arg_cb->host, arg_cb->port, NULL);
 	st->sourcetable_cb_arg = arg_cb;
 	st->bev = bev;
+	st->type = "sourcetable_fetcher";
 #ifdef THREADS
 	bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
 #else

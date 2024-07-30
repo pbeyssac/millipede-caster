@@ -370,6 +370,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					if (strlen(st->http_args[1]) >= 5 && !memcmp(st->http_args[1], "/adm/", 5)) {
+						st->type = "adm";
 						admsrv(st, "/adm", st->http_args[1] + 4, &err, &opt_headers);
 						break;
 					}
@@ -382,6 +383,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					 * reply with the sourcetable.
 					 */
 					if (!sourceline && st->client_version == 1) {
+						st->type = "client";
 						err = ntripsrv_send_sourcetable(st, output);
 						st->state = NTRIP_WAIT_CLOSE;
 						break;
@@ -393,6 +395,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->source_virtual = sourceline->virtual;
 					st->source_on_demand = sourceline->on_demand;
 
+					st->type = "client";
 					if (!st->source_virtual) {
 						struct livesource *l = livesource_find(st->caster, mountpoint);
 						if (l) {
@@ -437,6 +440,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 404;
 						break;
 					}
+					st->type = "source";
 					if (livesource_find(st->caster, st->http_args[2])) {
 						err = 409;
 						break;
@@ -468,6 +472,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					//st->sourceline = sourceline;
+					st->type = "source";
 					st->mountpoint = mystrdup(st->http_args[2]);
 					if (st->mountpoint == NULL) {
 						err = 503;

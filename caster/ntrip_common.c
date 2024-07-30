@@ -1,6 +1,7 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <netinet/in.h>
+#include <string.h>
 #include <arpa/inet.h>
 
 #include <json-c/json.h>
@@ -43,6 +44,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
+	this->type = "starting";
 #ifdef THREADS
 	STAILQ_INIT(&this->jobq);
 #endif
@@ -114,6 +116,12 @@ static json_object *ntrip_json(struct ntrip_state *st, int lock) {
 
 	if (lock)
 		P_RWLOCK_UNLOCK(&st->lock);
+	json_object_object_add(new_obj, "type", json_object_new_string(st->type));
+	if (!strcmp(st->type, "source") || !strcmp(st->type, "source_fetcher"))
+		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->mountpoint));
+	else if (!strcmp(st->type, "client"))
+		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->http_args[1]+1));
+
         bufferevent_unlock(st->bev);
 	return new_obj;
 }

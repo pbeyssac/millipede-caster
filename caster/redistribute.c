@@ -109,6 +109,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
 	}
+	st->type = "source_fetcher";
 
 	struct sourceline *s = stack_find_pullable(&st->caster->sourcetablestack, redis_args->mountpoint, &sp);
 	if (s == NULL) {
