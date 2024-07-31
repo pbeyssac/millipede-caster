@@ -128,7 +128,7 @@ caster_new(struct config *config, const char *config_file) {
 
 	this->listeners = NULL;
 	this->socks = NULL;
-	this->sourcetable_fetcher = NULL;
+	this->sourcetable_fetchers = NULL;
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
@@ -178,7 +178,7 @@ void caster_free(struct caster_state *this) {
 		evconnlistener_free(this->listeners[i]);
 	free(this->listeners);
 	free(this->socks);
-	free(this->sourcetable_fetcher);
+	free(this->sourcetable_fetchers);
 
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
@@ -481,21 +481,30 @@ static int caster_set_signals(struct caster_state *this) {
 }
 
 /*
- * Start a sourcetable fetcher (proxy)
+ * Start sourcetable fetchers (proxy)
+ *
+ * Currently only available for proxy_count <= 1, enforced by the configuration reader.
  */
-static int caster_start_fetcher(struct caster_state *this) {
+static int caster_start_fetchers(struct caster_state *this) {
 	if (!this->config->proxy_count)
 		return 0;
 
-	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args));
-	this->sourcetable_fetcher = a;
-	a->host = this->config->proxy[0].host;
-	a->port = this->config->proxy[0].port;
-	a->refresh_delay = this->config->proxy[0].table_refresh_delay;
-	a->caster = this;
-	a->sourcetable = NULL;
-	a->sourcetable_cb = NULL;
-	fetcher_sourcetable_get(a);
+	struct sourcetable_fetch_args *fetchers = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args)*this->config->proxy_count);
+
+	this->sourcetable_fetchers = fetchers;
+
+	struct sourcetable_fetch_args *a;
+
+	for (int i = 0; i < this->config->proxy_count; i++) {
+		a = &fetchers[i];
+		a->host = mystrdup(this->config->proxy[i].host);
+		a->port = this->config->proxy[i].port;
+		a->refresh_delay = this->config->proxy[i].table_refresh_delay;
+		a->caster = this;
+		a->sourcetable = NULL;
+		a->sourcetable_cb = NULL;
+		fetcher_sourcetable_get(a);
+	}
 	return 0;
 }
 
@@ -578,7 +587,7 @@ int caster_main(char *config_file) {
 	}
 #endif
 
-	caster_start_fetcher(caster);
+	caster_start_fetchers(caster);
 
 	event_base_dispatch(caster->base);
 

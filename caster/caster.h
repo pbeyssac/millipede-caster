@@ -64,7 +64,7 @@ struct caster_state {
 	/*
 	 * Sourcetable fetcher configuration.
 	 */
-	struct sourcetable_fetch_args *sourcetable_fetcher;
+	struct sourcetable_fetch_args *sourcetable_fetchers;
 };
 
 void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev);
