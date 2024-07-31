@@ -309,6 +309,12 @@ caster_reload_sourcetables(struct caster_state *caster) {
 }
 
 static void
+caster_reopen_logs(struct caster_state *this) {
+	log_reopen(&this->flog, this->config->log);
+	log_reopen(&this->alog, this->config->access_log);
+}
+
+static void
 caster_reload_auth(struct caster_state *caster) {
 	logfmt(&caster->flog, "Reloading %s and %s\n", caster->config->host_auth_filename, caster->config->source_auth_filename);
 
@@ -423,6 +429,7 @@ static void
 signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
 	printf("Caught SIGHUP\n");
+	caster_reopen_logs(caster);
 	caster_reload_sourcetables(caster);
 	caster_reload_auth(caster);
 }

@@ -19,8 +19,23 @@ int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg)
 	return this->logfile == NULL ? -1:0;
 }
 
-void log_free(struct log *this) {
+void log_reopen(struct log *this, const char *filename) {
+	FILE *newfile =	fopen(filename, "a+");
+	if (!newfile) {
+		fprintf(stderr, "Can't reopen log file %s: %s\n", filename, strerror(errno));
+		return;
+	}
+	setlinebuf(newfile);
+	P_RWLOCK_WRLOCK(&this->lock);
 	fclose(this->logfile);
+	this->logfile = newfile;
+	P_RWLOCK_UNLOCK(&this->lock);
+}
+
+void log_free(struct log *this) {
+	P_RWLOCK_WRLOCK(&this->lock);
+	fclose(this->logfile);
+	P_RWLOCK_DESTROY(&this->lock);
 }
 
 /*

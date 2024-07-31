@@ -15,6 +15,7 @@ struct log {
 };
 
 int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg);
+void log_reopen(struct log *this, const char *filename);
 void logfmt(struct log *this, const char *fmt, ...);
 void log_free(struct log *this);
 
