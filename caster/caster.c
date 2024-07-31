@@ -50,7 +50,7 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, str
 /*
  * Read user authentication file for the NTRIP server.
  */
-static struct auth_entry *parse_auth(struct caster_state *caster, const char *filename) {
+static struct auth_entry *auth_parse(struct caster_state *caster, const char *filename) {
 	struct parsed_file *p;
 	p = file_parse(filename, 3, ":");
 
@@ -71,6 +71,19 @@ static struct auth_entry *parse_auth(struct caster_state *caster, const char *fi
 	auth[n].password = NULL;
 	file_free(p);
 	return auth;
+}
+
+static void auth_free(struct auth_entry *this) {
+	struct auth_entry *p = this;
+	if (this == NULL)
+		return;
+	while (p->key || p->user || p->password) {
+		free((char *)p->key);
+		free((char *)p->user);
+		free((char *)p->password);
+		p++;
+	}
+	free(this);
 }
 
 static void
@@ -94,7 +107,7 @@ caster_log(void *arg, const char *fmt, va_list ap) {
 }
 
 static struct caster_state *
-caster_new(struct config *config) {
+caster_new(struct config *config, const char *config_file) {
 	struct caster_state *this = (struct caster_state *)calloc(1, sizeof(struct caster_state));
 	if (this == NULL)
 		return this;
@@ -301,16 +314,16 @@ caster_reload_auth(struct caster_state *caster) {
 	P_RWLOCK_WRLOCK(&caster->authlock);
 
 	if (caster->config->host_auth_filename) {
-		struct auth_entry *tmp = parse_auth(caster, caster->config->host_auth_filename);
+		struct auth_entry *tmp = auth_parse(caster, caster->config->host_auth_filename);
 		if (tmp != NULL) {
-			free(caster->host_auth);
+			auth_free(caster->host_auth);
 			caster->host_auth = tmp;
 		}
 	}
 	if (caster->config->source_auth_filename) {
-		struct auth_entry *tmp = parse_auth(caster, caster->config->source_auth_filename);
+		struct auth_entry *tmp = auth_parse(caster, caster->config->source_auth_filename);
 		if (tmp != NULL) {
-			free(caster->source_auth);
+			auth_free(caster->source_auth);
 			caster->source_auth = tmp;
 		}
 	}
