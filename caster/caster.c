@@ -199,6 +199,7 @@ void caster_free(struct caster_state *this) {
 	log_free(&this->flog);
 	log_free(&this->alog);
 	config_free(this->config);
+	free(this);
 }
 
 /*
