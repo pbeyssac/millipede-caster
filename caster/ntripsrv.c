@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -319,8 +320,15 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (!strcasecmp(value, "ntrip/2.0"))
 						st->client_version = 2;
 				} else if (!strcasecmp(key, "user-agent")) {
-					if (strcasestr(value, "ntrip"))
+					// strcasestr is not a standard C function, replacing with a tolower + strstr call
+					int valueLen = strlen(value);
+					char *valueDup = mystrdup(value);
+					for (int i = 0; i < valueLen; i++) {
+						valueDup[i] = tolower(valueDup[i]);
+					}
+					if (strstr(valueDup, "ntrip"))
 						st->user_agent_ntrip = 1;
+					strfree(valueDup);
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_DEBUG, "Header %s: *****\n", key);
