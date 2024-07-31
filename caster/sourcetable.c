@@ -27,7 +27,7 @@ struct sourcetable *sourcetable_read(const char *filename) {
 	struct sourcetable *tmp_sourcetable = sourcetable_new();
 	tmp_sourcetable->caster = "LOCAL";
 	tmp_sourcetable->local = 1;
-	tmp_sourcetable->filename = filename;
+	tmp_sourcetable->filename = mystrdup(filename);
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
 		for (; line[linelen-1] == '\n' || line[linelen-1] == '\r'; linelen--)
 			line[linelen-1] = '\0';
@@ -70,6 +70,7 @@ void sourcetable_free_unlocked(struct sourcetable *this) {
 	struct sourceline *n;
 
 	strfree(this->header);
+	strfree((char *)this->filename);
 
 	while ((n = TAILQ_FIRST(&this->sources))) {
                 TAILQ_REMOVE_HEAD(&this->sources, next);
