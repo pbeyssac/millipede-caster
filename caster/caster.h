@@ -27,6 +27,7 @@ struct caster_state {
 		int next_id;
 	} ntrips;
 	struct config *config;
+	const char *config_file;
 #ifdef THREADS
 	struct joblist *joblist;
 #endif

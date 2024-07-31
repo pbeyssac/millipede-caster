@@ -140,6 +140,7 @@ caster_new(struct config *config, const char *config_file) {
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
 	this->config = config;
+	this->config_file = config_file;
 #ifdef THREADS
 	this->joblist = joblist_new(this);
 #endif
@@ -338,6 +339,16 @@ caster_reload_auth(struct caster_state *caster) {
 	P_RWLOCK_UNLOCK(&caster->authlock);
 }
 
+static void caster_reload_config(struct caster_state *this) {
+	struct config *config;
+	if (!(config = config_parse(this->config_file))) {
+		fprintf(stderr, "Can't parse configuration from %s\n", this->config_file);
+		return;
+	}
+	config_free(this->config);
+	this->config = config;
+}
+
 void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 	if (!this->bev_freed) {
 		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p\n", bev);
@@ -429,6 +440,10 @@ static void
 signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
 	printf("Caught SIGHUP\n");
+	caster_reload_config(caster);
+	/*
+	 * TBD: listeners and proxies reload.
+	 */
 	caster_reopen_logs(caster);
 	caster_reload_sourcetables(caster);
 	caster_reload_auth(caster);
@@ -506,7 +521,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	caster = caster_new(config);
+	caster = caster_new(config, config_file);
 	if (!caster) {
 		fprintf(stderr, "Can't allocate caster\n");
 		return 1;
