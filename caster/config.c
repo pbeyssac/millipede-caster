@@ -211,9 +211,25 @@ struct config *config_parse(const char *filename) {
 	return this;
 }
 
+/*
+ * Free everthing in the config structure.
+ * Best handled "by hand" here, as advised by the libcyaml documentation.
+ *
+ * cyaml_free() crashes if we let it do the job, possibly because of structure field order.
+ */
 void config_free(struct config *this) {
-	cyaml_err_t err;
-	err = cyaml_free(&cyaml_config, &top_schema, this, 0);
-	if (err != CYAML_OK)
-		fprintf(stderr, "ERROR: %s\n", cyaml_strerror(err));
+	for (int i = 0; i < this->bind_count; i++)
+		free(this->bind[i].ip);
+	free(this->bind);
+
+	for (int i = 0; i < this->proxy_count; i++)
+		free(this->proxy[i].host);
+	free(this->proxy);
+
+	free((char *)this->host_auth_filename);
+	free((char *)this->source_auth_filename);
+	free((char *)this->sourcetable_filename);
+	free((char *)this->log);
+	free((char *)this->access_log);
+	free(this);
 }
