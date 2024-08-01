@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/cdefs.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
@@ -545,6 +546,33 @@ unsigned short sockaddr_port(struct sockaddr *sa) {
 	default:
 		return 0;
 	}
+}
+
+/*
+ * Find the first occurrence of find in s, ignore case.
+ *
+ * Stolen from the FreeBSD 14.1 source code, locale code removed.
+ *
+ * Included here to avoid portability issues.
+ */
+char *
+mystrcasestr(const char *s, const char *find)
+{
+	char c, sc;
+	size_t len;
+
+	if ((c = *find++) != 0) {
+		c = tolower((unsigned char)c);
+		len = strlen(find);
+		do {
+			do {
+				if ((sc = *s++) == 0)
+					return (NULL);
+			} while ((char)tolower((unsigned char)sc) != c);
+		} while (strncasecmp(s, find, len) != 0);
+		s--;
+	}
+	return ((char *)s);
 }
 
 #ifdef DEBUG_JEMALLOC

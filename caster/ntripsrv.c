@@ -12,6 +12,7 @@
 #include "jobs.h"
 #include "ntrip_common.h"
 #include "redistribute.h"
+#include "util.h"
 
 const char *server_headers = "Server: NTRIP " SERVER_VERSION_STRING "\r\n";
 
@@ -319,7 +320,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (!strcasecmp(value, "ntrip/2.0"))
 						st->client_version = 2;
 				} else if (!strcasecmp(key, "user-agent")) {
-					if (strcasestr(value, "ntrip"))
+					if (mystrcasestr(value, "ntrip"))
 						st->user_agent_ntrip = 1;
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {

@@ -63,6 +63,7 @@ void logdate(char *date, size_t len);
 
 char *sockaddr_ipstr(struct sockaddr *sa, char *dest, int size_dest);
 unsigned short sockaddr_port(struct sockaddr *sa);
+char *mystrcasestr(const char *s, const char *find);
 
 #if DEBUG
 extern int str_alloc;
