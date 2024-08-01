@@ -47,6 +47,13 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 	struct timeval t1;
 	struct ntrip_state *st = redis_args->requesting_st;
 	logfmt(&st->caster->flog, "switch source callback\n");
+
+	/*
+	 * We need to take an explicit lock on st since this callback be called in the
+	 * context of another ntrip_state.
+	 */
+	bufferevent_lock(st->bev);
+
 	if (success) {
 		struct livesource *livesource = livesource_find(st->caster, redis_args->mountpoint);
 		if (livesource) {
@@ -73,13 +80,13 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 		 * We should do something more clever here in the case of "virtual" bases,
 		 * since we can try another source.
 		 */
-		bufferevent_lock(st->bev);
-		P_RWLOCK_WRLOCK(&st->lock);
 		st->state = NTRIP_END;
+		bufferevent_unlock(st->bev);
 #ifndef THREADS
 		ntrip_free(st, "ntripsrv_switch_source_cb");
 #endif
-	}
+	} else
+		bufferevent_unlock(st->bev);
 }
 
 static void
@@ -262,8 +269,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	struct evkeyvalq opt_headers;
 	TAILQ_INIT(&opt_headers);
 
-	bufferevent_lock(bev);
-	P_RWLOCK_WRLOCK(&st->lock);
 
 	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb %p state %d len %d\n", st, st->state, evbuffer_get_length(input));
 
@@ -537,8 +542,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	}
 	evhttp_clear_headers(&opt_headers);
 
-	P_RWLOCK_UNLOCK(&st->lock);
-	bufferevent_unlock(bev);
 }
 
 /*
@@ -552,8 +555,6 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	struct evbuffer *output;
 
-	bufferevent_lock(bev);
-	P_RWLOCK_WRLOCK(&st->lock);
 
 	output = bufferevent_get_output(bev);
 	len = evbuffer_get_length(output);
@@ -561,7 +562,6 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 		ntrip_log(st, LOG_DEBUG, "flushed answer ntripsrv %p\n", st);
 		if (st->state == NTRIP_WAIT_CLOSE) {
 			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_free %p bev %p\n", st, bev);
-			bufferevent_unlock(bev);
 
 			my_bufferevent_free(st, bev);
 			st->state = NTRIP_END;
@@ -573,8 +573,6 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 	} else
 		ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb %p remaining len %d\n", st, len);
 
-	P_RWLOCK_UNLOCK(&st->lock);
-	bufferevent_unlock(bev);
 }
 
 void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
@@ -582,13 +580,9 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	int initial_errno = errno;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
-	bufferevent_lock(bev);
-	P_RWLOCK_WRLOCK(&st->lock);
 
 	if (events & BEV_EVENT_CONNECTED) {
 		ntrip_log(st, LOG_INFO, "Connected srv %p\n", st);
-		P_RWLOCK_UNLOCK(&st->lock);
-		bufferevent_unlock(bev);
 		return;
 	}
 
@@ -617,10 +611,8 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			st->subscription = NULL;
 		}
 	}
-	P_RWLOCK_UNLOCK(&st->lock);
 	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
 	st->state = NTRIP_END;
-	bufferevent_unlock(bev);
 	my_bufferevent_free(st, bev);
 #ifndef THREADS
 	ntrip_free(st, "ntripsrv_eventcb");

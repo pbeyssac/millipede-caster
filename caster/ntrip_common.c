@@ -29,7 +29,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 		return NULL;
 	}
 
-	P_RWLOCK_INIT(&this->lock, NULL);
 	this->caster = caster;
 	this->state = NTRIP_WAIT_HTTP_STATUS;
 	this->chunk_state = CHUNK_NONE;
@@ -99,14 +98,11 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 
-	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
 }
 
 static json_object *ntrip_json(struct ntrip_state *st, int lock) {
         bufferevent_lock(st->bev);
-	if (lock)
-		P_RWLOCK_RDLOCK(&st->lock);
 
 	char *ipstr = st->remote_addr;
 	json_object *jsonip;
@@ -118,9 +114,6 @@ static json_object *ntrip_json(struct ntrip_state *st, int lock) {
 	json_object_object_add(new_obj, "id", jsonid);
 	json_object_object_add(new_obj, "ip", jsonip);
 	json_object_object_add(new_obj, "port", jsonport);
-
-	if (lock)
-		P_RWLOCK_UNLOCK(&st->lock);
 	json_object_object_add(new_obj, "type", json_object_new_string(st->type));
 	if (!strcmp(st->type, "source") || !strcmp(st->type, "source_fetcher"))
 		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->mountpoint));

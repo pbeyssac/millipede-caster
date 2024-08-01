@@ -62,7 +62,12 @@ enum ntrip_chunk_state {
  */
 
 struct ntrip_state {
-	P_RWLOCK_T lock;
+	/*
+	 * The ntrip_state structure is locked by way of its
+	 * corresponding bufferevent (below in bev). libevent
+	 * does its own locking on it. It's a recursive mutex.
+	 */
+
 	struct caster_state *caster;
 	enum ntrip_session_state state;
 	int id;		// Unique id for external reference

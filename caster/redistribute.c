@@ -114,8 +114,10 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 	struct sourceline *s = stack_find_pullable(&st->caster->sourcetablestack, redis_args->mountpoint, &sp);
 	if (s == NULL) {
 		logfmt(&redis_args->caster->flog, "Can't find pullable mountpoint %s\n", redis_args->mountpoint);
-		P_RWLOCK_WRLOCK(&st->lock);
+		st->state = NTRIP_END;
+#ifndef THREADS
 		ntrip_free(st, "redistribute_source_stream");
+#endif
 		return;
 	}
 	st->host = sp->caster;
