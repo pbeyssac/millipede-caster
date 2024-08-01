@@ -47,6 +47,8 @@ void joblist_free(struct joblist *this) {
 			free(j);
 		}
 	}
+	if (pthread_cond_destroy(&this->condjob) < 0)
+		_log_error(this, "pthread_cond_signal");
 	P_MUTEX_DESTROY(&this->mutex);
 }
 
