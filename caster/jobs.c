@@ -173,6 +173,9 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 
 	/*
 	 * Check the last recorded callback, if any. Skip if identical to the new one.
+	 *
+	 * arg doesn't need to be checked as it's the ntrip_state, same for all jobs
+	 * in this queue.
 	 */
 	if (lastj == NULL || lastj->events != events || lastj->cb != cb  || lastj->cbe != cbe) {
 		struct job *j = (struct job *)malloc(sizeof(struct job));
@@ -207,7 +210,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		ntrip_log(st, LOG_EDEBUG, "ntrip_state %p already in job list\n", st);
 
 	/*
-	 * Signal "some" waiting workers there is a new job.
+	 * Signal waiting workers there is a new job.
 	 */
 	if (pthread_cond_signal(&this->condjob) < 0)
 		_log_error(this, "pthread_cond_signal");
