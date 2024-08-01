@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <string.h>
+
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <pthread.h>
@@ -7,6 +9,13 @@
 #include "caster.h"
 #include "jobs.h"
 #include "ntrip_common.h"
+
+
+static void _log_error(struct joblist *this, char *orig) {
+	char s[256];
+	strerror_r(errno, s, sizeof s);
+	logfmt(&this->caster->flog, "%s: %s (%d)\n", orig, s, errno);
+}
 
 /*
  * Create a job list.
@@ -18,7 +27,8 @@ struct joblist *joblist_new(struct caster_state *caster) {
 		this->caster = caster;
 		STAILQ_INIT(&this->ntrip_queue);
 		P_MUTEX_INIT(&this->mutex, NULL);
-		pthread_cond_init(&this->condjob, NULL);
+		if (pthread_cond_init(&this->condjob, NULL) < 0)
+			_log_error(this, "pthread_cond_init");
 	}
 	return this;
 }
@@ -65,7 +75,8 @@ void joblist_run(struct joblist *this) {
 			/*
 			 * Empty queue.
 			 */
-			pthread_cond_wait(&this->condjob, &this->mutex);
+			if (pthread_cond_wait(&this->condjob, &this->mutex) < 0)
+				_log_error(this, "pthread_cond_wait");
 			continue;
 		}
 
@@ -196,7 +207,8 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	/*
 	 * Signal "some" waiting workers there is a new job.
 	 */
-	pthread_cond_signal(&this->condjob);
+	if (pthread_cond_signal(&this->condjob) < 0)
+		_log_error(this, "pthread_cond_signal");
 	P_MUTEX_UNLOCK(&this->mutex);
 }
 
