@@ -1,7 +1,14 @@
 DEST_DIR	=	/usr/local/sbin/
-OPT	=	-DDEBUG_JEMALLOC
-# Note: threads code currently experimental. Enable -DTHREADS at your own risk!
+#
+# -DTHREADS: enable threads
+#	Threads code currently experimental and buggy. Enable at your own risk!
+#
+# -DDEBUG_JEMALLOC
+#	enable jemalloc statistics
+#
 #OPT	=	-DTHREADS -DDEBUG_JEMALLOC
+#OPT	=	-DDEBUG_JEMALLOC
+OPT	=
 
 CFLAGS	=	-g $(OPT) -I/usr/local/include -Wall
 LDFLAGS	=	-L/usr/local/lib -levent_core -levent_extra -levent_pthreads -lcyaml -lpthread -ljson-c -lm
@@ -25,7 +32,7 @@ clean:
 	rm -f .depend $(OBJS) $(BINS) tests.o
 
 tests:	$(TESTOBJS)
-	cc -o tests -lm $(TESTOBJS)
+	cc -o tests -lm $(TESTOBJS) $(LDFLAGS)
 
 caster:	$(OBJS)
-	cc -Wall -g $(LDFLAGS) -o caster $(OBJS)
+	cc -Wall -g -o caster $(OBJS) $(LDFLAGS)
