@@ -109,6 +109,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
 	}
+	st->bev = bev;
 	st->type = "source_fetcher";
 
 	struct sourceline *s = stack_find_pullable(&st->caster->sourcetablestack, redis_args->mountpoint, &sp);
@@ -124,7 +125,6 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 	st->port = sp->port;
 	st->redistribute = 1;
 	st->persistent = redis_args->persistent;
-	st->bev = bev;
 	redis_args->source_st = st;
 
 	logfmt(&redis_args->caster->flog, "Starting socket connect to %s:%d for /%s\n", st->host, st->port, redis_args->mountpoint);
