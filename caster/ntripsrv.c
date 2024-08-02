@@ -383,13 +383,16 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					}
 
 					char *mountpoint = st->http_args[1]+1;
-					struct sourceline *sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, mountpoint);
+					struct sourceline *sourceline = NULL;
+					if (*mountpoint)
+						sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, mountpoint);
 
 					/*
-					 * Empty mountpoint name and source not found are handled the same way:
-					 * reply with the sourcetable.
+					 * Source not found: reply with the sourcetable in NTRIP1, 404 in NTRIP2.
+					 *
+					 * Empty mountpoint name: always reply with the sourcetable.
 					 */
-					if (!sourceline && st->client_version == 1) {
+					if (*mountpoint == '\0' || (!sourceline && st->client_version == 1)) {
 						st->type = "client";
 						err = ntripsrv_send_sourcetable(st, output);
 						st->state = NTRIP_WAIT_CLOSE;
