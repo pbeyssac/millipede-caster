@@ -424,6 +424,10 @@ struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpo
 	return r;
 }
 
+/*
+ * Remove a sourcetable identified by host+port in the sourcetable stack.
+ * Insert a new one instead, if new_sourcetable is not NULL.
+ */
 void stack_replace_host(sourcetable_stack_t *stack, char *host, unsigned port, struct sourcetable *new_sourcetable) {
 	struct sourcetable *s;
 	struct sourcetable *r = NULL;
@@ -443,7 +447,8 @@ void stack_replace_host(sourcetable_stack_t *stack, char *host, unsigned port, s
 		TAILQ_REMOVE(&stack->list, r, next);
 		sourcetable_free_unlocked(r);
 	}
-	TAILQ_INSERT_TAIL(&stack->list, new_sourcetable, next);
+	if (new_sourcetable != NULL)
+		TAILQ_INSERT_TAIL(&stack->list, new_sourcetable, next);
 
 	P_RWLOCK_UNLOCK(&stack->lock);
 }

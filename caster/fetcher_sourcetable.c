@@ -8,7 +8,64 @@
 
 static void
 get_sourcetable_cb(int fd, short what, void *arg) {
-	fetcher_sourcetable_get(arg);
+	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg;
+	event_free(a->ev);
+	a->ev = NULL;
+	fetcher_sourcetable_start(arg);
+}
+
+/*
+ * Initialize, but don't start, a sourcetable fetcher.
+ */
+void fetcher_sourcetable_init(struct sourcetable_fetch_args *this,
+	struct caster_state *caster,
+	const char *host, unsigned short port, int refresh_delay) {
+	this->host = mystrdup(host);
+	this->port = port;
+	this->refresh_delay = refresh_delay;
+	this->caster = caster;
+	this->sourcetable = NULL;
+	this->sourcetable_cb = NULL;
+	this->ev = NULL;
+	this->st = NULL;
+}
+
+/*
+ * Stop fetcher.
+ */
+static void _fetcher_sourcetable_stop(struct sourcetable_fetch_args *this, int keep_sourcetable) {
+	logfmt(&this->caster->flog, "Stopping sourcetable fetch from %s:%d\n", this->host, this->port);
+	if (this->ev) {
+		event_free(this->ev);
+		this->ev = NULL;
+	}
+	if (this->st && this->st->state != NTRIP_END) {
+		this->st->state = NTRIP_END;
+		bufferevent_lock(this->st->bev);
+#ifndef THREADS
+		ntrip_free(this->st, "fetcher_sourcetable_stop");
+#else
+		ntrip_deferred_free(this->st, "fetcher_sourcetable_stop");
+#endif
+		this->st = NULL;
+	}
+	if (!keep_sourcetable)
+		stack_replace_host(&this->caster->sourcetablestack, this->host, this->port, NULL);
+}
+
+void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this) {
+	_fetcher_sourcetable_stop(this, 0);
+}
+
+/*
+ * Reload fetcher.
+ *
+ * Same as a stop/start, except we keep the sourcetable during the reload.
+ */
+void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay) {
+	_fetcher_sourcetable_stop(this, 1);
+	this->refresh_delay = refresh_delay;
+	fetcher_sourcetable_start(this);
 }
 
 static void
@@ -34,20 +91,21 @@ sourcetable_cb(int fd, short what, void *arg) {
 			a->host, a->port,
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 	}
+	a->st = NULL;
 
 	if (a->refresh_delay) {
 		struct timeval timeout_interval = { a->refresh_delay, 0 };
 		logfmt(&caster->flog, "Starting refresh callback for sourcetable %s:%d in %d seconds\n", a->host, a->port, a->refresh_delay);
-		struct event *ev = event_new(caster->base, -1, 0, get_sourcetable_cb, a);
-		event_add(ev, &timeout_interval);
+		a->ev = event_new(caster->base, -1, 0, get_sourcetable_cb, a);
+		event_add(a->ev, &timeout_interval);
 	}
 }
 
 /*
- * Initiate a sourcetable fetch
+ * Start a sourcetable fetcher.
  */
 void
-fetcher_sourcetable_get(struct sourcetable_fetch_args *arg_cb) {
+fetcher_sourcetable_start(struct sourcetable_fetch_args *arg_cb) {
 	struct bufferevent *bev;
 	arg_cb->sourcetable_cb = sourcetable_cb;
 #ifdef THREADS
@@ -61,6 +119,7 @@ fetcher_sourcetable_get(struct sourcetable_fetch_args *arg_cb) {
 	}
 	logfmt(&arg_cb->caster->flog, "Starting sourcetable fetch from %s:%d\n", arg_cb->host, arg_cb->port);
 	struct ntrip_state *st = ntrip_new(arg_cb->caster, arg_cb->host, arg_cb->port, NULL);
+	arg_cb->st = st;
 	st->sourcetable_cb_arg = arg_cb;
 	st->bev = bev;
 	st->type = "sourcetable_fetcher";

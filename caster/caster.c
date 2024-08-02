@@ -45,6 +45,9 @@
 
 static void caster_log(void *arg, const char *fmt, va_list ap);
 static void caster_alog(void *arg, const char *fmt, va_list ap);
+static int caster_start_fetchers(struct caster_state *this);
+static void caster_reload_fetchers(struct caster_state *this);
+static void caster_stop_fetchers(struct caster_state *this);
 static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *sa, int socklen, void *arg);
 
 /*
@@ -129,6 +132,7 @@ caster_new(struct config *config, const char *config_file) {
 	this->listeners = NULL;
 	this->socks = NULL;
 	this->sourcetable_fetchers = NULL;
+	this->sourcetable_fetchers_count = 0;
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
@@ -178,7 +182,8 @@ void caster_free(struct caster_state *this) {
 		evconnlistener_free(this->listeners[i]);
 	free(this->listeners);
 	free(this->socks);
-	free(this->sourcetable_fetchers);
+
+	caster_stop_fetchers(this);
 
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
@@ -444,8 +449,9 @@ signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	printf("Caught SIGHUP\n");
 	caster_reload_config(caster);
 	/*
-	 * TBD: listeners and proxies reload.
+	 * TBD: listeners reload.
 	 */
+	caster_reload_fetchers(caster);
 	caster_reopen_logs(caster);
 	caster_reload_sourcetables(caster);
 	caster_reload_auth(caster);
@@ -494,20 +500,71 @@ static int caster_start_fetchers(struct caster_state *this) {
 	struct sourcetable_fetch_args *fetchers = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args)*this->config->proxy_count);
 
 	this->sourcetable_fetchers = fetchers;
+	this->sourcetable_fetchers_count = this->config->proxy_count;
 
 	struct sourcetable_fetch_args *a;
 
-	for (int i = 0; i < this->config->proxy_count; i++) {
+	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
 		a = &fetchers[i];
-		a->host = mystrdup(this->config->proxy[i].host);
-		a->port = this->config->proxy[i].port;
-		a->refresh_delay = this->config->proxy[i].table_refresh_delay;
-		a->caster = this;
-		a->sourcetable = NULL;
-		a->sourcetable_cb = NULL;
-		fetcher_sourcetable_get(a);
+		fetcher_sourcetable_init(a, this, this->config->proxy[i].host, this->config->proxy[i].port, this->config->proxy[i].table_refresh_delay);
+		fetcher_sourcetable_start(a);
 	}
 	return 0;
+}
+
+static void caster_reload_fetchers(struct caster_state *this) {
+	if (!this->config->proxy_count) {
+		caster_stop_fetchers(this);
+		return;
+	}
+	struct sourcetable_fetch_args *new_fetchers = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args)*this->config->proxy_count);
+
+	/*
+	 * For each entry in the new config, recycle a similar entry in the old configuration.
+	 */
+	for (int i = 0; i < this->config->proxy_count; i++) {
+		struct sourcetable_fetch_args *p = NULL;
+		for (int j = 0; j < this->sourcetable_fetchers_count; j++) {
+			if (this->sourcetable_fetchers[j].port == 0)
+				/* Already cleared */
+				continue;
+			if (!strcmp(this->sourcetable_fetchers[j].host, this->config->proxy[i].host)
+			&& this->sourcetable_fetchers[j].port == this->config->proxy[i].port) {
+				p = &this->sourcetable_fetchers[j];
+				break;
+			}
+		}
+		if (!p) {
+			/* Not found, create */
+			fetcher_sourcetable_init(new_fetchers+i, this, this->config->proxy[i].host, this->config->proxy[i].port, this->config->proxy[i].table_refresh_delay);
+		} else {
+			/* Found, copy and mark as cleared in the old table */
+			memcpy(new_fetchers+i, p, sizeof(new_fetchers[i]));
+			p->port = 0;
+			fetcher_sourcetable_reload(new_fetchers+i, this->config->proxy[i].table_refresh_delay);
+		}
+	}
+	/*
+	 * Stop all remaining fetchers in the old configuration.
+	 */
+	for (int j = 0; j < this->sourcetable_fetchers_count; j++)
+		if (this->sourcetable_fetchers[j].port)
+			fetcher_sourcetable_stop(&this->sourcetable_fetchers[j]);
+	free(this->sourcetable_fetchers);
+	this->sourcetable_fetchers_count = this->config->proxy_count;
+	this->sourcetable_fetchers = new_fetchers;
+}
+
+static void caster_stop_fetchers(struct caster_state *this) {
+	struct sourcetable_fetch_args *a = this->sourcetable_fetchers;
+	if (!a)
+		return;
+	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
+		fetcher_sourcetable_stop(&a[i]);
+	}
+	free(a);
+	this->sourcetable_fetchers = NULL;
+	this->sourcetable_fetchers_count = 0;
 }
 
 int caster_main(char *config_file) {
