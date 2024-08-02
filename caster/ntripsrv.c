@@ -550,7 +550,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 /*
  * Ntrip server write loop: just wait for close.
  *
- * libvent does the job of sending queued packets without need of interference.
+ * libevent does the job of sending queued packets without need of interference.
  */
 void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 {

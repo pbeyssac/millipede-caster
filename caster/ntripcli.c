@@ -334,7 +334,6 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 			bufferevent_write(bev, s, strlen(s));
 		strfree(s);
 		st->state = NTRIP_WAIT_HTTP_STATUS;
-
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
