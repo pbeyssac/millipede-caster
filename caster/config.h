@@ -30,6 +30,13 @@ struct config_proxy {
 	 * Delay to refresh a proxied sourcetable.
 	 */
 	int table_refresh_delay;
+
+	/*
+	 * Priority when in a stack.
+	 *
+	 * Higher = better priority
+	 */
+	int priority;
 };
 
 struct config {
@@ -100,6 +107,7 @@ struct config {
 	const char *host_auth_filename;
 	const char *source_auth_filename;
 	const char *sourcetable_filename;
+	int sourcetable_priority;
 
 	int test_default;
 

@@ -298,7 +298,7 @@ caster_reload_sourcetables(struct caster_state *caster) {
 		P_RWLOCK_WRLOCK(&s->lock);
 		if (s->local && s->filename) {
 			logfmt(&caster->flog, "Reloading %s\n", s->filename);
-			snew = sourcetable_read(s->filename);
+			snew = sourcetable_read(s->filename, s->priority);
 			if (snew) {
 				TAILQ_REMOVE(&caster->sourcetablestack.list, s, next);
 				TAILQ_INSERT_TAIL(&newtables, snew, next);
@@ -506,7 +506,11 @@ static int caster_start_fetchers(struct caster_state *this) {
 
 	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
 		a = &fetchers[i];
-		fetcher_sourcetable_init(a, this, this->config->proxy[i].host, this->config->proxy[i].port, this->config->proxy[i].table_refresh_delay);
+		fetcher_sourcetable_init(a, this,
+			this->config->proxy[i].host,
+			this->config->proxy[i].port,
+			this->config->proxy[i].table_refresh_delay,
+			this->config->proxy[i].priority);
 		fetcher_sourcetable_start(a);
 	}
 	return 0;
@@ -536,12 +540,17 @@ static void caster_reload_fetchers(struct caster_state *this) {
 		}
 		if (!p) {
 			/* Not found, create */
-			fetcher_sourcetable_init(new_fetchers+i, this, this->config->proxy[i].host, this->config->proxy[i].port, this->config->proxy[i].table_refresh_delay);
+			fetcher_sourcetable_init(new_fetchers+i, this,
+				this->config->proxy[i].host, this->config->proxy[i].port,
+				this->config->proxy[i].table_refresh_delay,
+				this->config->proxy[i].priority);
 		} else {
 			/* Found, copy and mark as cleared in the old table */
 			memcpy(new_fetchers+i, p, sizeof(new_fetchers[i]));
 			p->port = 0;
-			fetcher_sourcetable_reload(new_fetchers+i, this->config->proxy[i].table_refresh_delay);
+			fetcher_sourcetable_reload(new_fetchers+i,
+				this->config->proxy[i].table_refresh_delay,
+				this->config->proxy[i].priority);
 		}
 	}
 	/*
@@ -620,7 +629,8 @@ int caster_main(char *config_file) {
 	// setsockopt(0, IPV6CTL_V6ONLY, IPV6CTL_V6ONLY, &v6only, sizeof v6only);
 #endif
 
-	struct sourcetable *local_table = sourcetable_read(caster->config->sourcetable_filename);
+	struct sourcetable *local_table
+		= sourcetable_read(caster->config->sourcetable_filename, caster->config->sourcetable_priority);
 	if (local_table == NULL) {
 		fprintf(stderr, "Can't read local sourcetable.\n");
 		return 1;

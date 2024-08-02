@@ -35,6 +35,7 @@ static struct config default_config = {
 	.source_auth_filename = "source.auth",
 	.host_auth_filename = "host.auth",
 	.sourcetable_filename = "sourcetable.dat",
+	.sourcetable_priority = 90,
 	.backlog_socket = 112*1024,
 	.backlog_evbuffer = 16*1024,
 	.sourcetable_fetch_timeout = 60,
@@ -56,7 +57,8 @@ static struct config_bind default_config_bind = {
 };
 
 static struct config_proxy default_config_proxy = {
-	.table_refresh_delay = 600
+	.table_refresh_delay = 600,
+	.priority = 20
 };
 
 /*
@@ -96,6 +98,8 @@ static const cyaml_schema_field_t proxy_fields_schema[] = {
 		"host", CYAML_FLAG_POINTER, struct config_proxy, host, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_INT(
 		"port", CYAML_FLAG_DEFAULT, struct config_proxy, port),
+	CYAML_FIELD_INT(
+		"priority", CYAML_FLAG_OPTIONAL, struct config_proxy, priority),
 	CYAML_FIELD_END
 };
 
@@ -113,13 +117,15 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 		"hysteresis_m", CYAML_FLAG_DEFAULT|CYAML_FLAG_OPTIONAL, struct config, hysteresis_m),
 	CYAML_FIELD_SEQUENCE(
 		"proxy", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
-		struct config, proxy, &proxy_schema, 0, 1),
+		struct config, proxy, &proxy_schema, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"source_auth_file", CYAML_FLAG_POINTER, struct config, source_auth_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"host_auth_file", CYAML_FLAG_POINTER, struct config, host_auth_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"sourcetable_file", CYAML_FLAG_POINTER, struct config, sourcetable_filename, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_INT(
+		"sourcetable_priority", CYAML_FLAG_OPTIONAL, struct config, sourcetable_priority),
 	CYAML_FIELD_INT(
 		"backlog_socket", CYAML_FLAG_OPTIONAL, struct config, backlog_socket),
 	CYAML_FIELD_INT(
@@ -189,6 +195,7 @@ struct config *config_parse(const char *filename) {
 	DEFAULT_ASSIGN(this, log);
 	DEFAULT_ASSIGN(this, log_level);
 	DEFAULT_ASSIGN(this, admin_user);
+	DEFAULT_ASSIGN(this, sourcetable_priority);
 
 	// Undocumented
 	DEFAULT_ASSIGN(this, disable_zero_copy);
@@ -200,6 +207,8 @@ struct config *config_parse(const char *filename) {
 			this->proxy[i].table_refresh_delay = default_config_proxy.table_refresh_delay;
 		if (this->proxy[i].port == 0)
 			this->proxy[i].port = default_config_proxy.port;
+		if (this->proxy[i].priority == 0)
+			this->proxy[i].priority = default_config_proxy.priority;
 	}
 
 	for (int i = 0; i < this->bind_count; i++) {

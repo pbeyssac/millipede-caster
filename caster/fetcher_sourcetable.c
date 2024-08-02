@@ -19,7 +19,7 @@ get_sourcetable_cb(int fd, short what, void *arg) {
  */
 void fetcher_sourcetable_init(struct sourcetable_fetch_args *this,
 	struct caster_state *caster,
-	const char *host, unsigned short port, int refresh_delay) {
+	const char *host, unsigned short port, int refresh_delay, int priority) {
 	this->host = mystrdup(host);
 	this->port = port;
 	this->refresh_delay = refresh_delay;
@@ -28,6 +28,7 @@ void fetcher_sourcetable_init(struct sourcetable_fetch_args *this,
 	this->sourcetable_cb = NULL;
 	this->ev = NULL;
 	this->st = NULL;
+	this->priority = priority;
 }
 
 /*
@@ -62,9 +63,10 @@ void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this) {
  *
  * Same as a stop/start, except we keep the sourcetable during the reload.
  */
-void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay) {
+void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay, int priority) {
 	_fetcher_sourcetable_stop(this, 1);
 	this->refresh_delay = refresh_delay;
+	this->priority = priority;
 	fetcher_sourcetable_start(this);
 }
 
@@ -83,7 +85,7 @@ sourcetable_cb(int fd, short what, void *arg) {
 			sourcetable->port,
 			sourcetable_nentries(sourcetable, 0),
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
-		sourcetable->priority = 20;
+		sourcetable->priority = a->priority;
 		stack_replace_host(&a->caster->sourcetablestack, a->host, a->port, sourcetable);
 		a->sourcetable = NULL;
 	} else {

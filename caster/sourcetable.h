@@ -63,7 +63,7 @@ struct mp_prio {
 	int priority;
 };
 
-struct sourcetable *sourcetable_read(const char *filename);
+struct sourcetable *sourcetable_read(const char *filename, int priority);
 struct sourcetable *sourcetable_new();
 void sourcetable_free_unlocked(struct sourcetable *this);
 void sourcetable_free(struct sourcetable *this);

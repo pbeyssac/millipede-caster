@@ -12,7 +12,7 @@
 /*
  * Read a sourcetable file
  */
-struct sourcetable *sourcetable_read(const char *filename) {
+struct sourcetable *sourcetable_read(const char *filename, int priority) {
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
@@ -46,7 +46,7 @@ struct sourcetable *sourcetable_read(const char *filename) {
 		}
 		nlines++;
 	}
-	tmp_sourcetable->priority = 90;
+	tmp_sourcetable->priority = priority;
 	strfree(line);
 	return tmp_sourcetable;
 }
