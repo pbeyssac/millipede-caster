@@ -143,10 +143,9 @@ void joblist_run(struct joblist *this) {
 void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	/*
-	 * Check the bufferevent has not been freed.
-	 * If it was, we shouldn't be called here.
+	 * Check the bufferevent has not been freed and ntrip_state is as it should be.
 	 */
-	assert(!st->bev_freed);
+	assert(!st->bev_freed && st->state != NTRIP_END);
 
 	P_MUTEX_LOCK(&this->mutex);
 
