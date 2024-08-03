@@ -24,6 +24,8 @@ struct caster_state {
 	struct {
 		struct general_ntripq queue;
 		P_RWLOCK_T lock;
+		struct general_ntripq free_queue;
+		P_RWLOCK_T free_lock;
 		int next_id;
 	} ntrips;
 	struct config *config;

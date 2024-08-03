@@ -82,9 +82,7 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 		 */
 		st->state = NTRIP_END;
 		bufferevent_unlock(st->bev);
-#ifndef THREADS
-		ntrip_free(st, "ntripsrv_switch_source_cb");
-#endif
+		ntrip_deferred_free(st, "ntripsrv_switch_source_cb");
 	} else
 		bufferevent_unlock(st->bev);
 }
@@ -568,9 +566,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 
 			my_bufferevent_free(st, bev);
 			st->state = NTRIP_END;
-#ifndef THREADS
-			ntrip_free(st, "ntripsrv_writecb");
-#endif
+			ntrip_deferred_free(st, "ntripsrv_writecb");
 			return;
 		}
 	} else
@@ -617,9 +613,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
 	st->state = NTRIP_END;
 	my_bufferevent_free(st, bev);
-#ifndef THREADS
-	ntrip_free(st, "ntripsrv_eventcb");
-#endif
+	ntrip_deferred_free(st, "ntripsrv_eventcb");
 }
 
 #ifdef THREADS

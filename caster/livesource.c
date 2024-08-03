@@ -65,9 +65,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 			np->ntrip_state->subscription = NULL;
 			np->ntrip_state->state = NTRIP_END;
 			bufferevent_unlock(np->ntrip_state->bev);
-#ifndef THREADS
-			ntrip_free(np->ntrip_state, "livesource_kill_subscribers_unlocked");
-#endif
+			ntrip_deferred_free(np->ntrip_state, "livesource_kill_subscribers_unlocked");
 			free(np);
 		} else
 			bufferevent_unlock(np->ntrip_state->bev);

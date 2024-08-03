@@ -62,7 +62,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
  *
  * Required lock: ntrip_state
  */
-void ntrip_free(struct ntrip_state *this, char *orig) {
+static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_DEBUG, "FREE %p %s\n", this, orig);
 
 	if (!this->bev_freed) {
@@ -94,11 +94,56 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 	if (this->tmp_sourcetable)
 		sourcetable_free(this->tmp_sourcetable);
 
+	if (unlink) {
+		P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
+		TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
+		P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
+	}
+
+	free(this);
+}
+
+void ntrip_free(struct ntrip_state *this, char *orig) {
+	_ntrip_free(this, orig, 1);
+}
+
+#ifdef THREADS
+void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
+	struct ntrip_state *st;
+	P_MUTEX_LOCK(&this->caster->joblist->mutex);
+	STAILQ_FOREACH(st, &this->caster->joblist->ntrip_queue, next) {
+		if (st == this) {
+			STAILQ_REMOVE(&this->caster->joblist->ntrip_queue, this, ntrip_state, next);
+			break;
+		}
+	}
+	P_MUTEX_UNLOCK(&this->caster->joblist->mutex);
+
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 
-	free(this);
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
+	TAILQ_INSERT_TAIL(&this->caster->ntrips.free_queue, this, nextf);
+	P_RWLOCK_UNLOCK(&this->caster->ntrips.free_lock);
+}
+#endif
+
+void ntrip_deferred_run(struct caster_state *this, char *orig) {
+	int n = 0;
+	struct ntrip_state *st;
+	P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
+	while ((st = TAILQ_FIRST(&this->ntrips.free_queue))) {
+		TAILQ_REMOVE_HEAD(&this->ntrips.free_queue, nextf);
+		//bufferevent_lock(st->bev);
+		P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
+		_ntrip_free(st, "ntrip_deferred_run", 0);
+		P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
+		n++;
+	}
+	P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
+	if (n)
+		logfmt(&this->flog, "ntrip_deferred_run did %d ntrip_free\n", n);
 }
 
 static json_object *ntrip_json(struct ntrip_state *st, int lock) {

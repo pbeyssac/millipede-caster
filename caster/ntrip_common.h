@@ -80,7 +80,24 @@ struct ntrip_state {
 	/* job list for this particular session */
 	struct jobq jobq;
 #endif
+
+	/*
+	 * ntrip_state lifecycle on the caster "ntrips" queues:
+	 *
+	 * ntrip_new() -> inserted on caster->ntrips.queue
+	 * ... useful lifecycle ...
+	 * Death: state set to NTRIP_END
+	 * - removed from caster->ntrips.queue
+	 * - if threading activated:
+	 *   - added to caster->ntrips.free_queue for deferred free
+	 *   else:
+	 *   - ntrip_free
+	 */
+
+	// Linked-list entry for the caster->ntrips.queue
 	TAILQ_ENTRY(ntrip_state) nextg;
+	// Linked-list entry for the caster->ntrips.free_queue
+	TAILQ_ENTRY(ntrip_state) nextf;
 
 	/*
 	 * State for a NTRIP client or server
@@ -169,6 +186,12 @@ struct ntrip_state {
 };
 struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned short port, char *mountpoint);
 void ntrip_free(struct ntrip_state *this, char *orig);
+#ifdef THREADS
+void ntrip_deferred_free(struct ntrip_state *this, char *orig);
+#else
+#define	ntrip_deferred_free(this,orig)	ntrip_free((this),(orig))
+#endif
+void ntrip_deferred_run(struct caster_state *this, char *orig);
 const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint);
 void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint);

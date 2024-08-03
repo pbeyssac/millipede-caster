@@ -275,9 +275,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 		}
 		st->state = NTRIP_END;
 		my_bufferevent_free(st, bev);
-#ifndef THREADS
-		ntrip_free(st, "ntripcli_readcb/sourcetable");
-#endif
+		ntrip_deferred_free(st, "ntripcli_readcb/sourcetable");
 		return;
 	}
 }
@@ -373,9 +371,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 
 	my_bufferevent_free(st, bev);
 	st->state = NTRIP_END;
-#ifndef THREADS
-	ntrip_free(st, "ntripcli_eventcb");
-#endif
+	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
 
 #ifdef THREADS

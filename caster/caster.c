@@ -136,6 +136,7 @@ caster_new(struct config *config, const char *config_file) {
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
+	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
 	this->ntrips.next_id = 1;
 
 	// Used only for access to source_auth and host_auth
@@ -169,6 +170,7 @@ caster_new(struct config *config, const char *config_file) {
 	this->dns_base = dns_base;
 	TAILQ_INIT(&this->livesources.queue);
 	TAILQ_INIT(&this->ntrips.queue);
+	TAILQ_INIT(&this->ntrips.free_queue);
 	TAILQ_INIT(&this->sourcetablestack.list);
 	return this;
 }
@@ -201,6 +203,7 @@ void caster_free(struct caster_state *this) {
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
 	P_RWLOCK_DESTROY(&this->livesources.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
+	P_RWLOCK_DESTROY(&this->ntrips.free_lock);
 	P_RWLOCK_DESTROY(&this->authlock);
 	log_free(&this->flog);
 	log_free(&this->alog);
@@ -409,9 +412,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		ntrip_log(st, LOG_CRIT, "Error constructing bufferevent!");
 		event_base_loopbreak(base);
 		st->state = NTRIP_END;
-#ifndef THREADS
-		ntrip_free(st, "listener_cb");
-#endif
+		ntrip_deferred_free(st, "listener_cb");
 		return;
 	}
 	st->bev = bev;
