@@ -285,19 +285,16 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	ntrip_log(st, LOG_DEBUG, "ntripcli_writecb\n");
 
-
 	if (!st->bev_freed) {
 		struct evbuffer *output = bufferevent_get_output(bev);
 		if (evbuffer_get_length(output) == 0) {
 			ntrip_log(st, LOG_DEBUG, "flushed answer ntripcli\n");
 		}
 	}
-
 }
 
 void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-
 
 	if (events & BEV_EVENT_CONNECTED) {
 		st->start = time(NULL);

@@ -267,7 +267,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	struct evkeyvalq opt_headers;
 	TAILQ_INIT(&opt_headers);
 
-
 	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb %p state %d len %d\n", st, st->state, evbuffer_get_length(input));
 
 	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 1) {
@@ -542,7 +541,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		st->state = NTRIP_WAIT_CLOSE;
 	}
 	evhttp_clear_headers(&opt_headers);
-
 }
 
 /*
@@ -555,7 +553,6 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 	size_t len;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	struct evbuffer *output;
-
 
 	output = bufferevent_get_output(bev);
 	len = evbuffer_get_length(output);
@@ -571,14 +568,12 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 		}
 	} else
 		ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb %p remaining len %d\n", st, len);
-
 }
 
 void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 {
 	int initial_errno = errno;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-
 
 	if (events & BEV_EVENT_CONNECTED) {
 		ntrip_log(st, LOG_INFO, "Connected srv %p\n", st);
