@@ -1,12 +1,8 @@
 DEST_DIR	=	/usr/local/sbin/
 #
-# -DTHREADS: enable threads
-#	Threads code currently experimental and buggy. Enable at your own risk!
-#
 # -DDEBUG_JEMALLOC
 #	enable jemalloc statistics
 #
-#OPT	=	-DTHREADS -DDEBUG_JEMALLOC
 #OPT	=	-DDEBUG_JEMALLOC
 OPT	=
 

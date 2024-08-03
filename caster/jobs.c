@@ -20,7 +20,6 @@ static void _log_error(struct joblist *this, char *orig) {
 /*
  * Create a job list.
  */
-#ifdef THREADS
 struct joblist *joblist_new(struct caster_state *caster) {
 	struct joblist *this = (struct joblist *)malloc(sizeof(struct joblist));
 	if (this != NULL) {
@@ -240,5 +239,3 @@ int jobs_start_threads(struct caster_state *caster, int nthreads) {
 	pthread_attr_destroy(&attr);
 	return 0;
 }
-
-#endif

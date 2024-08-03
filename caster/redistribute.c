@@ -89,11 +89,11 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 {
 	struct bufferevent *bev;
 
-#ifdef THREADS
-	bev = bufferevent_socket_new(redis_args->caster->base, -1, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
-#else
-	bev = bufferevent_socket_new(redis_args->caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
-#endif
+	if (threads)
+		bev = bufferevent_socket_new(redis_args->caster->base, -1, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+	else
+		bev = bufferevent_socket_new(redis_args->caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
+
 	if (bev == NULL) {
 		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
@@ -133,11 +133,11 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 	st->callback_subscribe = switch_source_cb;
 	st->callback_subscribe_arg = redis_args;
 
-#ifdef THREADS
-	bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
-#else
-	bufferevent_setcb(bev, ntripcli_readcb, ntripcli_writecb, ntripcli_eventcb, st);
-#endif
+	if (threads)
+		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
+	else
+		bufferevent_setcb(bev, ntripcli_readcb, ntripcli_writecb, ntripcli_eventcb, st);
+
 	bufferevent_enable(bev, EV_READ|EV_WRITE);
         struct timeval read_timeout = { st->caster->config->on_demand_source_timeout, 0 };
         struct timeval write_timeout = { st->caster->config->on_demand_source_timeout, 0 };

@@ -30,9 +30,7 @@ struct caster_state {
 	} ntrips;
 	struct config *config;
 	const char *config_file;
-#ifdef THREADS
 	struct joblist *joblist;
-#endif
 	struct event_base *base;
 	struct evdns_base *dns_base;
 

@@ -2,8 +2,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "conf.h"
 #include "caster.h"
 #include "config.h"
+
+
+int threads = 0;
+int nthreads = 0;
 
 /*
  * Default configuration file name
@@ -11,22 +16,39 @@
 static char *conf_filename = "/usr/local/etc/millipede/caster.yaml";
 
 static void usage(char **argv) {
-	fprintf(stderr, "Usage: %s [-c config file] [-d]\n", argv[0]);
+	fprintf(stderr, "Usage: %s [-c config file] [-d][-t nthreads]\n"
+		"\t-c path\t\tconfig file path\n"
+		"\t-d\t\trun as a daemon\n"
+		"\t-t nthreads\tnumber of threads (1-1024, default 1)\n", argv[0]);
 }
 
 int
 main(int argc, char **argv) {
 	char *config_file = conf_filename;
 	int start_daemon = 0;
-	int ch;
+	int ch, nt;
+	char *endarg;
 
-	while ((ch = getopt(argc, argv, "c:d")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dt:")) != -1) {
 		switch (ch) {
 		case 'c':
 			config_file = optarg;
 			break;
 		case 'd':
 			start_daemon = 1;
+			break;
+		case 't':
+			nt = strtol(optarg, &endarg, 10);
+			if (!*optarg || *endarg != '\0' || nt <= 0 || nt > 1024) {
+				usage(argv);
+				exit(1);
+			}
+			if (nt > 1) {
+				threads = 1;
+				nthreads = nt-1;
+			} else {
+				threads = 0;
+			}
 			break;
 		default:
 			usage(argv);

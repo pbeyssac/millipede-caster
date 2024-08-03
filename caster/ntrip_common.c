@@ -47,9 +47,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->password = NULL;
 	this->type = "starting";
 	this->user_agent = NULL;
-#ifdef THREADS
-	STAILQ_INIT(&this->jobq);
-#endif
+	if (threads)
+		STAILQ_INIT(&this->jobq);
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
@@ -107,8 +106,12 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 	_ntrip_free(this, orig, 1);
 }
 
-#ifdef THREADS
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
+	if (!threads) {
+		_ntrip_free(this, orig, 1);
+		return;
+	}
+
 	struct ntrip_state *st;
 	P_MUTEX_LOCK(&this->caster->joblist->mutex);
 	STAILQ_FOREACH(st, &this->caster->joblist->ntrip_queue, next) {
@@ -127,7 +130,6 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.free_queue, this, nextf);
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.free_lock);
 }
-#endif
 
 void ntrip_deferred_run(struct caster_state *this, char *orig) {
 	int n = 0;

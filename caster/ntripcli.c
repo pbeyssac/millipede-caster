@@ -374,7 +374,6 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
 
-#ifdef THREADS
 void ntripcli_workers_readcb(struct bufferevent *bev, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	joblist_append(st->caster->joblist, ntripcli_readcb, NULL, bev, arg, 0);
@@ -389,4 +388,3 @@ void ntripcli_workers_eventcb(struct bufferevent *bev, short events, void *arg) 
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	joblist_append(st->caster->joblist, NULL, ntripcli_eventcb, bev, arg, events);
 }
-#endif

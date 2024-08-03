@@ -74,12 +74,10 @@ struct ntrip_state {
 	const char *type;
 	time_t start;	// time the connection was established
 
-#ifdef THREADS
 	/* linked-list pointers for main job queue */
 	STAILQ_ENTRY(ntrip_state) next;
 	/* job list for this particular session */
 	struct jobq jobq;
-#endif
 
 	/*
 	 * ntrip_state lifecycle on the caster "ntrips" queues:
@@ -184,13 +182,10 @@ struct ntrip_state {
 	void (*callback_subscribe)(struct redistribute_cb_args *, int);
 	struct redistribute_cb_args *callback_subscribe_arg;
 };
+
 struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned short port, char *mountpoint);
 void ntrip_free(struct ntrip_state *this, char *orig);
-#ifdef THREADS
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);
-#else
-#define	ntrip_deferred_free(this,orig)	ntrip_free((this),(orig))
-#endif
 void ntrip_deferred_run(struct caster_state *this, char *orig);
 const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint);

@@ -34,11 +34,7 @@
 #include "fetcher_sourcetable.h"
 
 #if DEBUG
-  #ifdef THREADS
   const char *malloc_conf = "junk:true,retain:false";
-  #else
-  const char *malloc_conf = "junk:true,retain:false,narenas:4";
-  #endif
 #else
   const char *malloc_conf = "retain:false";
 #endif
@@ -146,20 +142,12 @@ caster_new(struct config *config, const char *config_file) {
 
 	this->config = config;
 	this->config_file = config_file;
-#ifdef THREADS
-	this->joblist = joblist_new(this);
-#endif
+	this->joblist = threads ? joblist_new(this) : NULL;
 	int r1 = log_init(&this->flog, this->config->log, &caster_log, this);
 	int r2 = log_init(&this->alog, this->config->access_log, &caster_alog, this);
 
-	if (r1 < 0 || r2 < 0
-#ifdef THREADS
-		|| this->joblist == NULL
-#endif
-	) {
-#ifdef THREADS
+	if (r1 < 0 || r2 < 0 || (threads && this->joblist == NULL)) {
 		if (this->joblist) joblist_free(this->joblist);
-#endif
 		if (r1 < 0) log_free(&this->flog);
 		if (r2 < 0) log_free(&this->alog);
 		free(this);
@@ -197,9 +185,7 @@ void caster_free(struct caster_state *this) {
 		sourcetable_free(s);
 	}
 
-#ifdef THREADS
 	if (this->joblist) joblist_free(this->joblist);
-#endif
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
 	P_RWLOCK_DESTROY(&this->livesources.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
@@ -402,11 +388,10 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	st->state = NTRIP_WAIT_HTTP_METHOD;
 
-#ifdef THREADS
-	bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
-#else
-	bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
-#endif
+	if (threads)
+		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+	else
+		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
 
 	if (bev == NULL) {
 		ntrip_log(st, LOG_CRIT, "Error constructing bufferevent!");
@@ -417,11 +402,11 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	}
 	st->bev = bev;
 	// evbuffer_defer_callbacks(bufferevent_get_output(bev), st->caster->base);
-#ifdef THREADS
-	bufferevent_setcb(bev, ntripsrv_workers_readcb, ntripsrv_workers_writecb, ntripsrv_workers_eventcb, st);
-#else
-	bufferevent_setcb(bev, ntripsrv_readcb, ntripsrv_writecb, ntripsrv_eventcb, st);
-#endif
+
+	if (threads)
+		bufferevent_setcb(bev, ntripsrv_workers_readcb, ntripsrv_workers_writecb, ntripsrv_workers_eventcb, st);
+	else
+		bufferevent_setcb(bev, ntripsrv_readcb, ntripsrv_writecb, ntripsrv_eventcb, st);
 	bufferevent_enable(bev, EV_READ|EV_WRITE);
 	struct timeval read_timeout = { st->caster->config->ntripsrv_default_read_timeout, 0 };
 	struct timeval write_timeout = { st->caster->config->ntripsrv_default_write_timeout, 0 };
@@ -585,12 +570,10 @@ int caster_main(char *config_file) {
 	event_set_log_callback(event_log_redirect);
 #endif
 
-#ifdef THREADS
-	if (evthread_use_pthreads() < 0) {
+	if (threads && evthread_use_pthreads() < 0) {
 		fprintf(stderr, "Could not initialize evthreads!\n");
 		return 1;
 	}
-#endif
 
 	struct config *config = config_parse(config_file);
 
@@ -649,13 +632,11 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-#ifdef THREADS
-	if (jobs_start_threads(caster, NTHREADS) < 0) {
+	if (threads && jobs_start_threads(caster, nthreads) < 0) {
 		caster_free(caster);
 		fprintf(stderr, "Could not create threads!\n");
 		return 1;
 	}
-#endif
 
 	caster_start_fetchers(caster);
 

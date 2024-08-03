@@ -616,7 +616,6 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	ntrip_deferred_free(st, "ntripsrv_eventcb");
 }
 
-#ifdef THREADS
 /*
  * Stub fonctions needed in threaded mode to send jobs to a worker queue,
  * as the main libevent loop can't be multithreaded.
@@ -635,4 +634,3 @@ void ntripsrv_workers_eventcb(struct bufferevent *bev, short events, void *arg) 
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	joblist_append(st->caster->joblist, NULL, ntripsrv_eventcb, bev, arg, events);
 }
-#endif
