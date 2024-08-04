@@ -277,7 +277,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb %p state %d len %d\n", st, st->state, evbuffer_get_length(input));
 
-	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 1) {
+	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 0) {
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
