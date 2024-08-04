@@ -585,25 +585,18 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			ntrip_log(st, LOG_INFO, "Connection closed (EOF) ntrip_state %p.\n", st);
 		else
 			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s\n", strerror(initial_errno));
-		if (st->registered) {
-			ntrip_unregister_livesource(st, st->mountpoint);
-			st->registered = 0;
-		} else if (st->subscription) {
-			livesource_del_subscriber(st->subscription, st->caster);
-			st->subscription = NULL;
-		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)
 			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout ntrip_state %p.\n", st);
 		if (events & BEV_EVENT_WRITING)
 			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout ntrip_state %p.\n", st);
-		if (st->registered) {
-			ntrip_unregister_livesource(st, st->mountpoint);
-			st->registered = 0;
-		} else if (st->subscription) {
-			livesource_del_subscriber(st->subscription, st->caster);
-			st->subscription = NULL;
-		}
+	}
+	if (st->registered) {
+		ntrip_unregister_livesource(st, st->mountpoint);
+		st->registered = 0;
+	} else if (st->subscription) {
+		livesource_del_subscriber(st->subscription, st->caster);
+		st->subscription = NULL;
 	}
 	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
 	st->state = NTRIP_END;
