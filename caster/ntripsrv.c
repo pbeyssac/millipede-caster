@@ -49,7 +49,7 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 	logfmt(&st->caster->flog, "switch source callback\n");
 
 	/*
-	 * We need to take an explicit lock on st since this callback be called in the
+	 * We need to take an explicit lock on st since this callback is called in the
 	 * context of another ntrip_state.
 	 */
 	bufferevent_lock(st->bev);
