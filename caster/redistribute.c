@@ -57,6 +57,13 @@ redistribute_schedule(struct ntrip_state *st, struct redistribute_cb_args *redis
 		return 0;
 	} else {
 		ntrip_log(st, LOG_CRIT, "Can't schedule retry callback for source %s in %d seconds, canceling\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
+		if (redis_args->requesting_st) {
+			struct ntrip_state *st = redis_args->requesting_st;
+			bufferevent_lock(st->bev);
+			redis_args->requesting_st->callback_subscribe_arg = NULL;
+			redis_args->requesting_st = NULL;
+			bufferevent_unlock(st->bev);
+		}
 		redistribute_args_free(redis_args);
 		return -1;
 	}

@@ -46,7 +46,14 @@ void
 ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) {
 	struct timeval t1;
 	struct ntrip_state *st = redis_args->requesting_st;
-	logfmt(&st->caster->flog, "switch source callback\n");
+
+	if (st == NULL) {
+		logfmt(&redis_args->caster->flog, "switch source callback: requester went away\n");
+		redistribute_args_free(redis_args);
+		return;
+	}
+
+	logfmt(&redis_args->caster->flog, "switch source callback\n");
 
 	/*
 	 * We need to take an explicit lock on st since this callback is called in the
@@ -242,6 +249,7 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 					ntrip_log(st, LOG_INFO, "Trying to switch virtual source from %s to %s\n", st->virtual_mountpoint, m);
 					struct redistribute_cb_args *redis_args = redistribute_args_new(st, m, &s->dist_array[0].pos, st->caster->config->reconnect_delay, 0);
 					if (redis_args != NULL) {
+						st->callback_subscribe_arg = redis_args;
 						redistribute_source_stream(redis_args, ntripsrv_switch_source_cb);
 					}
 				}

@@ -42,6 +42,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->server_version = 1;
 	this->client_version = 1;
 	this->callback_subscribe = NULL;
+	this->callback_subscribe_arg = NULL;
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
@@ -107,6 +108,20 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 }
 
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
+	/*
+	 * Unregister all we can right now.
+	 *
+	 * TBD: might move some relevant things from _ntrip_free() down here.
+	 */
+
+	if (this->callback_subscribe_arg) {
+		this->callback_subscribe_arg->requesting_st = NULL;
+		this->callback_subscribe_arg = NULL;
+	}
+
+	/*
+	 * In unthreaded mode, no locking issue: do the rest at once.
+	 */
 	if (!threads) {
 		_ntrip_free(this, orig, 1);
 		return;
