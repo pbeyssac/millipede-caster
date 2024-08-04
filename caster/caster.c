@@ -432,7 +432,7 @@ signalpipe_cb(evutil_socket_t sig, short events, void *user_data) {
 static void
 signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
-	printf("Caught SIGHUP\n");
+	printf("Reloading configuration\n");
 	caster_reload_config(caster);
 	/*
 	 * TBD: listeners reload.
