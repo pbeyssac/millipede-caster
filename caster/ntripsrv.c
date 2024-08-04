@@ -47,6 +47,8 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 	struct timeval t1;
 	struct ntrip_state *st = redis_args->requesting_st;
 
+	redis_args->source_st->callback_subscribe_arg = NULL;
+
 	if (st == NULL) {
 		logfmt(&redis_args->caster->flog, "switch source callback: requester went away\n");
 		redistribute_args_free(redis_args);
@@ -427,6 +429,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 								err = 503;
 								break;
 							}
+							st->callback_subscribe_arg = redis_args;
 							redistribute_source_stream(redis_args, ntripsrv_switch_source_cb);
 							ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
 							st->state = NTRIP_WAIT_CLIENT_INPUT;

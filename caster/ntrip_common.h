@@ -180,6 +180,8 @@ struct ntrip_state {
 
 	/* Callback and argugments for source switching on a virtual or on-demand source */
 	void (*callback_subscribe)(struct redistribute_cb_args *, int);
+
+	/* Pointer to callback arguments, used both by the requesting connection and the source stream */
 	struct redistribute_cb_args *callback_subscribe_arg;
 };
 

@@ -114,7 +114,8 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	 * TBD: might move some relevant things from _ntrip_free() down here.
 	 */
 
-	if (this->callback_subscribe_arg) {
+	if (this->callback_subscribe_arg && this->callback_subscribe_arg->requesting_st == this) {
+		ntrip_log(this, LOG_EDEBUG, "removing callback reference as requesting_st %p\n", this);
 		this->callback_subscribe_arg->requesting_st = NULL;
 		this->callback_subscribe_arg = NULL;
 	}
