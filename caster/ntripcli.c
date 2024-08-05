@@ -273,8 +273,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			sourcetable_free(st->tmp_sourcetable);
 			st->tmp_sourcetable = NULL;
 		}
-		st->state = NTRIP_END;
-		my_bufferevent_free(st, bev);
 		ntrip_deferred_free(st, "ntripcli_readcb/sourcetable");
 		return;
 	}
@@ -311,8 +309,8 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		ntrip_log(st, LOG_INFO, "Connected to %s:%d for /%s\n", st->host, st->port, st->mountpoint);
 		char *uri = (char *)strmalloc(strlen(st->mountpoint) + 3);
 		if (uri == NULL) {
-			my_bufferevent_free(st, bev);
 			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d\n", st->host, st->port);
+			ntrip_deferred_free(st, "ntripcli_eventcb");
 
 			return;
 		}
@@ -320,8 +318,8 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, uri, 2, NULL);
 		strfree(uri);
 		if (s == NULL) {
-			my_bufferevent_free(st, bev);
 			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d\n", st->host, st->port);
+			ntrip_deferred_free(st, "ntripcli_eventcb");
 
 			return;
 		}
@@ -366,8 +364,6 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		ntrip_log(st, LOG_NOTICE, "Connection closed, bufferevent already freed.\n");
 	}
 
-	my_bufferevent_free(st, bev);
-	st->state = NTRIP_END;
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
 

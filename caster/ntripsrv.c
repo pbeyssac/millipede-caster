@@ -89,7 +89,6 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 		 * We should do something more clever here in the case of "virtual" bases,
 		 * since we can try another source.
 		 */
-		st->state = NTRIP_END;
 		bufferevent_unlock(st->bev);
 		ntrip_deferred_free(st, "ntripsrv_switch_source_cb");
 	} else
@@ -572,8 +571,6 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 		if (st->state == NTRIP_WAIT_CLOSE) {
 			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_free %p bev %p\n", st, bev);
 
-			my_bufferevent_free(st, bev);
-			st->state = NTRIP_END;
 			ntrip_deferred_free(st, "ntripsrv_writecb");
 			return;
 		}
@@ -610,8 +607,6 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 		st->subscription = NULL;
 	}
 	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
-	st->state = NTRIP_END;
-	my_bufferevent_free(st, bev);
 	ntrip_deferred_free(st, "ntripsrv_eventcb");
 }
 

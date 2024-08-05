@@ -142,10 +142,15 @@ void joblist_run(struct joblist *this) {
  */
 void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
+
 	/*
-	 * Check the bufferevent has not been freed and ntrip_state is as it should be.
+	 * Check the bufferevent has not been freed
 	 */
-	assert(!st->bev_freed && st->state != NTRIP_END);
+	assert(!st->bev_freed);
+
+	/* Drop callback if ntrip_state is waiting for deletion */
+	if (st->state == NTRIP_END)
+		return;
 
 	P_MUTEX_LOCK(&this->mutex);
 

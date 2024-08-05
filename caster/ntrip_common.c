@@ -65,10 +65,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_DEBUG, "FREE %p %s\n", this, orig);
 
-	if (!this->bev_freed) {
-		ntrip_log(this, LOG_EDEBUG, "force-freeing bev %p for %p\n", this->bev, this);
-		my_bufferevent_free(this, this->bev);
-	}
+
 	if (this->mountpoint)
 		strfree(this->mountpoint);
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
@@ -100,6 +97,15 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 		P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 	}
 
+	/*
+	 * This will prevent any further locking on the ntrip_state, so we do
+	 * it only once it is removed from ntrips.queue.
+	 */
+	if (!this->bev_freed) {
+		ntrip_log(this, LOG_EDEBUG, "freeing bev %p for %p\n", this->bev, this);
+		my_bufferevent_free(this, this->bev);
+	}
+
 	free(this);
 }
 
@@ -108,6 +114,9 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 }
 
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
+
+	this->state = NTRIP_END;
+
 	/*
 	 * Unregister all we can right now.
 	 *
@@ -119,6 +128,9 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 		this->callback_subscribe_arg->requesting_st = NULL;
 		this->callback_subscribe_arg = NULL;
 	}
+	bufferevent_disable(this->bev, EV_READ|EV_WRITE);
+	bufferevent_set_timeouts(this->bev, NULL, NULL);
+	bufferevent_setcb(this->bev, NULL, NULL, NULL, NULL);
 
 	/*
 	 * In unthreaded mode, no locking issue: do the rest at once.
@@ -153,7 +165,6 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 	P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
 	while ((st = TAILQ_FIRST(&this->ntrips.free_queue))) {
 		TAILQ_REMOVE_HEAD(&this->ntrips.free_queue, nextf);
-		//bufferevent_lock(st->bev);
 		P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
 		_ntrip_free(st, "ntrip_deferred_run", 0);
 		P_RWLOCK_WRLOCK(&this->ntrips.free_lock);

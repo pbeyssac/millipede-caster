@@ -41,7 +41,6 @@ static void _fetcher_sourcetable_stop(struct sourcetable_fetch_args *this, int k
 		this->ev = NULL;
 	}
 	if (this->st && this->st->state != NTRIP_END) {
-		this->st->state = NTRIP_END;
 		bufferevent_lock(this->st->bev);
 		ntrip_deferred_free(this->st, "fetcher_sourcetable_stop");
 		this->st = NULL;
