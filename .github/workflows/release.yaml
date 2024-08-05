@@ -1,0 +1,32 @@
+name: simple build and test
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install cmake libcyaml-dev libjson-c-dev libevent-dev -y
+
+      - name: Create makefile
+        run: |
+          cmake -S . -B $(pwd)/cmake-build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build $(pwd)/cmake-build --config Release
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv $(pwd)/cmake-build/caster $(pwd)/cmake-build/caster-linux-x64
+          gh release upload ${{github.event.release.tag_name}} $(pwd)/cmake-build/caster-linux-x64        
+

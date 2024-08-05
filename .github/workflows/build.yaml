@@ -1,0 +1,42 @@
+name: simple build and test
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install cmake libcyaml-dev libjson-c-dev libevent-dev lcov -y
+
+      - name: Create makefile
+        run: |
+          cmake -S . -B $(pwd)/cmake-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="--coverage" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build
+        run: |
+          cmake --build $(pwd)/cmake-build --config Release
+
+      #- name: Run tests
+      #  run: |
+      #    exec test
+      #
+
+      #- name: Generate coverage report
+      #  run: |
+      #    cd $(pwd)/cmake-build
+      #    lcov --capture --directory . --output-file coverage.info
+      #    lcov --remove coverage.info '/usr/*' --output-file coverage.info
+      #    lcov --list coverage.info
