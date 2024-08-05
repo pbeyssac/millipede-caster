@@ -48,6 +48,8 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 	struct ntrip_state *st = redis_args->requesting_st;
 
 	redis_args->source_st->callback_subscribe_arg = NULL;
+	if (redis_args->requesting_st)
+		redis_args->requesting_st->callback_subscribe_arg = NULL;
 
 	if (st == NULL) {
 		logfmt(&redis_args->caster->flog, "switch source callback: requester went away\n");
