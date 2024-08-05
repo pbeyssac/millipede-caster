@@ -157,7 +157,15 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	 *	!jobq_was_empty <=> ntrip_state is in the main job queue
 	 */
 	int jobq_was_empty = STAILQ_EMPTY(&st->jobq);
+
+	/*
+	 * Deactivate callback deduplication for systems lacking STAILQ_LAST.
+	 */
+#ifdef STAILQ_LAST
 	struct job *lastj = STAILQ_LAST(&st->jobq, job, next);
+#else
+	struct job *lastj = NULL;
+#endif
 
 	/*
 	 * Check the last recorded callback, if any. Skip if identical to the new one.
