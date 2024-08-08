@@ -140,15 +140,6 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 		return;
 	}
 
-	struct ntrip_state *st;
-	P_MUTEX_LOCK(&this->caster->joblist->mutex);
-	STAILQ_FOREACH(st, &this->caster->joblist->ntrip_queue, next) {
-		if (st == this) {
-			STAILQ_REMOVE(&this->caster->joblist->ntrip_queue, this, ntrip_state, next);
-			break;
-		}
-	}
-	P_MUTEX_UNLOCK(&this->caster->joblist->mutex);
 
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
@@ -166,7 +157,13 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 	while ((st = TAILQ_FIRST(&this->ntrips.free_queue))) {
 		TAILQ_REMOVE_HEAD(&this->ntrips.free_queue, nextf);
 		P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
+
+		/* Keep a copy of the pointer because it will be lost */
+		struct bufferevent *bev = st->bev;
+		bufferevent_lock(bev);
 		_ntrip_free(st, "ntrip_deferred_run", 0);
+		bufferevent_unlock(bev);
+
 		P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
 		n++;
 	}

@@ -43,8 +43,10 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 	struct subscriber *np, *tnp;
 	int killed = 0;
 	TAILQ_FOREACH_SAFE(np, &this->subscribers, next, tnp) {
+		/* Keep a pointer because it will be possibly destroyed by ntrip_deferred_free() */
+		struct bufferevent *bev = np->ntrip_state->bev;
 
-		bufferevent_lock(np->ntrip_state->bev);
+		bufferevent_lock(bev);
 
 		if (kill_backlogged ? np->backlogged : !np->virtual) {
 			ntrip_log(np->ntrip_state, LOG_NOTICE, "dropping %p due to %s\n", np->ntrip_state, kill_backlogged?"backlog":"closed source");
@@ -60,11 +62,11 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 			TAILQ_REMOVE(&this->subscribers, np, next);
 			this->nsubs--;
 			np->ntrip_state->subscription = NULL;
-			bufferevent_unlock(np->ntrip_state->bev);
 			ntrip_deferred_free(np->ntrip_state, "livesource_kill_subscribers_unlocked");
+			bufferevent_unlock(bev);
 			free(np);
 		} else
-			bufferevent_unlock(np->ntrip_state->bev);
+			bufferevent_unlock(bev);
 	}
 	return killed;
 }

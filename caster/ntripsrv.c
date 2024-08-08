@@ -59,15 +59,13 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 
 	logfmt(&redis_args->caster->flog, "switch source callback\n");
 
-	/*
-	 * We need to take an explicit lock on st since this callback is called in the
-	 * context of another ntrip_state.
-	 */
-	bufferevent_lock(st->bev);
 
 	if (success) {
 		struct livesource *livesource = livesource_find(st->caster, redis_args->mountpoint);
 		if (livesource) {
+			/*
+			 * ntripsrv_switch_source will lock st in the right order
+			 */
 			ntripsrv_switch_source(st, redis_args->mountpoint, &redis_args->mountpoint_pos, livesource);
 			gettimeofday(&t1, NULL);
 			timersub(&t1, &redis_args->t0, &t1);
@@ -81,6 +79,12 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 			ntrip_log(st, LOG_INFO, "callback called but no on-demand source ready %p\n", st);
 	}
 
+	/*
+	 * We need to take an explicit lock on st since this callback is called in the
+	 * context of another ntrip_state.
+	 */
+	struct bufferevent *bev = st->bev;
+	bufferevent_lock(bev);
 	redistribute_args_free(redis_args);
 
 	if (!success) {
@@ -91,10 +95,9 @@ ntripsrv_switch_source_cb(struct redistribute_cb_args *redis_args, int success) 
 		 * We should do something more clever here in the case of "virtual" bases,
 		 * since we can try another source.
 		 */
-		bufferevent_unlock(st->bev);
 		ntrip_deferred_free(st, "ntripsrv_switch_source_cb");
-	} else
-		bufferevent_unlock(st->bev);
+	}
+	bufferevent_unlock(bev);
 }
 
 static void

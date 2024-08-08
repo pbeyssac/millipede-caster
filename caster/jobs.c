@@ -124,11 +124,6 @@ void joblist_run(struct joblist *this) {
 
 		bufferevent_unlock(bev);
 
-		/*
-		 * Unreference the buffervent
-		 */
-		bufferevent_decref(bev);
-
 		ntrip_deferred_run(this->caster, "joblist_run");
 		/*
 		 * Lock the list again for the next job.
@@ -202,11 +197,6 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		 */
 		ntrip_log(st, LOG_EDEBUG, "inserting in joblist ntrip_queue %p\n", st);
 		STAILQ_INSERT_TAIL(&this->ntrip_queue, st, next);
-		/*
-		 * Make sure the bufferevent is not freed in our back
-		 * before we have a chance to use it.
-		 */
-		bufferevent_incref(bev);
 	} else
 		ntrip_log(st, LOG_EDEBUG, "ntrip_state %p already in job list\n", st);
 
