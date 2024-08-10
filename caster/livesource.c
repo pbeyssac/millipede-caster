@@ -108,15 +108,19 @@ struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntr
  *
  * Remove a subscriber from a live source.
  *
- * Required lock: ntrip_state
  */
-void livesource_del_subscriber(struct subscriber *sub, struct caster_state *caster) {
-
+void livesource_del_subscriber(struct subscriber *sub, struct ntrip_state *st) {
+	/*
+	 * Lock order is mandatory to avoid deadlocks with livesource_send_subscribers
+	 */
 	P_RWLOCK_WRLOCK(&sub->livesource->lock);
+	bufferevent_lock(st->bev);
 
 	TAILQ_REMOVE(&sub->livesource->subscribers, sub, next);
 	sub->livesource->nsubs--;
+	st->subscription = NULL;
 
+	bufferevent_unlock(st->bev);
 	P_RWLOCK_UNLOCK(&sub->livesource->lock);
 
 	free(sub);
@@ -154,10 +158,12 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	int nbacklogged = 0;
 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
-		if (np->ntrip_state->state == NTRIP_END || np->ntrip_state->bev_freed) {
+		bufferevent_lock(np->ntrip_state->bev);
+		if (np->ntrip_state->state == NTRIP_END) {
 			/* Subscriber currently closing, skip */
-			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: skipping %p pending close state=%d bev_freed=%d\n", np->ntrip_state, np->ntrip_state->state, np->ntrip_state->bev_freed);
-			n++;
+			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping %p state=%d bev_freed=%d\n", np->ntrip_state, np->ntrip_state->state, np->ntrip_state->bev_freed);
+			bufferevent_unlock(np->ntrip_state->bev);
+			ns++;
 			continue;
 		}
 		if (packet->caster->config->zero_copy) {
@@ -176,6 +182,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			np->backlogged = 1;
 			nbacklogged++;
 		}
+		bufferevent_unlock(np->ntrip_state->bev);
 		n++;
 	}
 

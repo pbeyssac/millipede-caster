@@ -27,7 +27,7 @@ int ntripsrv_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t
 	if (new_mountpoint == NULL)
 		return -1;
 	if (this->subscription) {
-		livesource_del_subscriber(this->subscription, this->caster);
+		livesource_del_subscriber(this->subscription, this);
 	}
 	this->subscription = livesource_add_subscriber(livesource, this);
 	this->subscription->virtual = 1;
@@ -607,9 +607,6 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	if (st->registered) {
 		ntrip_unregister_livesource(st, st->mountpoint);
 		st->registered = 0;
-	} else if (st->subscription) {
-		livesource_del_subscriber(st->subscription, st->caster);
-		st->subscription = NULL;
 	}
 	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
 	ntrip_deferred_free(st, "ntripsrv_eventcb");

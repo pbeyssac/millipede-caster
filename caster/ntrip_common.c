@@ -86,7 +86,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 		evbuffer_free(this->chunk_buf);
 
 	if (this->subscription)
-		livesource_del_subscriber(this->subscription, this->caster);
+		livesource_del_subscriber(this->subscription, this);
 
 	if (this->tmp_sourcetable)
 		sourcetable_free(this->tmp_sourcetable);
@@ -157,6 +157,12 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 	while ((st = TAILQ_FIRST(&this->ntrips.free_queue))) {
 		TAILQ_REMOVE_HEAD(&this->ntrips.free_queue, nextf);
 		P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
+
+		if (st->subscription) {
+			bufferevent_unlock(st->bev);
+			livesource_del_subscriber(st->subscription, st);
+			bufferevent_lock(st->bev);
+		}
 
 		/* Keep a copy of the pointer because it will be lost */
 		struct bufferevent *bev = st->bev;
