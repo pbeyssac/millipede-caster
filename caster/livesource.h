@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <sys/queue.h>
 
-#include "caster.h"
 #include "packet.h"
 
 /*

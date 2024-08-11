@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "caster.h"
 #include "livesource.h"
+#include "ntrip_common.h"
 #include "sourcetable.h"
 
 /*

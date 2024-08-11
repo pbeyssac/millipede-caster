@@ -4,7 +4,6 @@
 #include <stdio.h>
 
 #include "conf.h"
-#include "caster.h"
 
 /*
  * A raw packet.

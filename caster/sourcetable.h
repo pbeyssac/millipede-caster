@@ -3,7 +3,6 @@
 
 #include "conf.h"
 
-#include "ntrip_common.h"
 #include "queue.h"
 #include "sourceline.h"
 

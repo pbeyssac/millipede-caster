@@ -8,6 +8,28 @@
 #include "ntripsrv.h"
 
 /*
+ * Required lock: ntrip_state
+ *
+ * Switch client from a given source to another.
+ */
+int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource) {
+	ntrip_log(this, LOG_INFO, "Switching virtual source from %s to %s\n", this->virtual_mountpoint, new_mountpoint);
+	new_mountpoint = mystrdup(new_mountpoint);
+	if (new_mountpoint == NULL)
+		return -1;
+	if (this->subscription) {
+		livesource_del_subscriber(this->subscription, this);
+	}
+	this->subscription = livesource_add_subscriber(livesource, this);
+	this->subscription->virtual = 1;
+	if (this->virtual_mountpoint)
+		strfree(this->virtual_mountpoint);
+	this->virtual_mountpoint = new_mountpoint;
+	this->mountpoint_pos = *mountpoint_pos;
+	return 0;
+}
+
+/*
  * Redistribute source stream.
  * Step 1 -- prepare argument structure.
  */
@@ -150,4 +172,66 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
         bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 	gettimeofday(&redis_args->t0, NULL);
 	bufferevent_socket_connect_hostname(bev, redis_args->caster->dns_base, AF_UNSPEC, sp->caster, sp->port);
+}
+
+/*
+ * Redistribute source stream.
+ * Last step (optional): switch the requester to the source.
+ */
+void
+redistribute_switch_source_cb(struct redistribute_cb_args *redis_args, int success) {
+	struct timeval t1;
+	struct ntrip_state *st = redis_args->requesting_st;
+
+	redis_args->source_st->callback_subscribe_arg = NULL;
+	if (redis_args->requesting_st)
+		redis_args->requesting_st->callback_subscribe_arg = NULL;
+
+	if (st == NULL) {
+		logfmt(&redis_args->caster->flog, "switch source callback: requester went away\n");
+		redistribute_args_free(redis_args);
+		return;
+	}
+
+	logfmt(&redis_args->caster->flog, "switch source callback\n");
+
+
+	if (success) {
+		struct livesource *livesource = livesource_find(st->caster, redis_args->mountpoint);
+		if (livesource) {
+			/*
+			 * redistribute_switch_source will lock st in the right order
+			 */
+			redistribute_switch_source(st, redis_args->mountpoint, &redis_args->mountpoint_pos, livesource);
+			gettimeofday(&t1, NULL);
+			timersub(&t1, &redis_args->t0, &t1);
+
+			ntrip_log(st, LOG_INFO, "On-demand source subscribed from %s:%d/%s, %.3f ms\n",
+				redis_args->source_st->host,
+				redis_args->source_st->port,
+				redis_args->mountpoint,
+				t1.tv_sec*1000 + t1.tv_usec/1000.);
+		} else
+			ntrip_log(st, LOG_INFO, "callback called but no on-demand source ready %p\n", st);
+	}
+
+	/*
+	 * We need to take an explicit lock on st since this callback is called in the
+	 * context of another ntrip_state.
+	 */
+	struct bufferevent *bev = st->bev;
+	bufferevent_lock(bev);
+	redistribute_args_free(redis_args);
+
+	if (!success) {
+		/*
+		 * Failed to get the requested source.
+		 *
+		 * Close the requesting connection.
+		 * We should do something more clever here in the case of "virtual" bases,
+		 * since we can try another source.
+		 */
+		ntrip_deferred_free(st, "redistribute_switch_source_cb");
+	}
+	bufferevent_unlock(bev);
 }

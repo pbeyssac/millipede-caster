@@ -1,6 +1,7 @@
 #ifndef __CASTER_H__
 #define __CASTER_H__
 
+#include <netinet/in.h>
 #include <sys/types.h>
 
 #include "conf.h"
