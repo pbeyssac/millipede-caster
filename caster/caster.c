@@ -343,15 +343,6 @@ static void caster_reload_config(struct caster_state *this) {
 	this->config = config;
 }
 
-void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
-	if (!this->bev_freed) {
-		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p for %p\n", bev, this);
-		bufferevent_free(bev);
-		this->bev_freed = 1;
-	} else
-		ntrip_log(this, LOG_DEBUG, "double free for bufferevent %p\n", bev);
-}
-
 static void
 listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
     struct sockaddr *sa, int socklen, void *arg)

@@ -68,7 +68,6 @@ struct caster_state {
 	int sourcetable_fetchers_count;
 };
 
-void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev);
 void caster_del_livesource(struct caster_state *this, struct livesource *livesource);
 int caster_main(char *config_file);
 void free_callback(const void *data, size_t datalen, void *extra);
