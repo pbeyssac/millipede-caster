@@ -158,11 +158,12 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	int nbacklogged = 0;
 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
-		bufferevent_lock(np->ntrip_state->bev);
+		struct bufferevent *bev = np->ntrip_state->bev;
+		bufferevent_lock(bev);
 		if (np->ntrip_state->state == NTRIP_END) {
 			/* Subscriber currently closing, skip */
 			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping %p state=%d bev_freed=%d\n", np->ntrip_state, np->ntrip_state->state, np->ntrip_state->bev_freed);
-			bufferevent_unlock(np->ntrip_state->bev);
+			bufferevent_unlock(bev);
 			ns++;
 			continue;
 		}
@@ -182,7 +183,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			np->backlogged = 1;
 			nbacklogged++;
 		}
-		bufferevent_unlock(np->ntrip_state->bev);
+		bufferevent_unlock(bev);
 		n++;
 	}
 

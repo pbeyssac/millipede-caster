@@ -171,7 +171,7 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 			bufferevent_lock(st->bev);
 		}
 
-		/* Keep a copy of the pointer because it will be lost */
+		/* Keep a copy of the pointer because it will be lost after _ntrip_free */
 		struct bufferevent *bev = st->bev;
 		bufferevent_lock(bev);
 		_ntrip_free(st, "ntrip_deferred_run", 0);
