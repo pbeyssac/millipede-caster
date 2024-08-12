@@ -336,12 +336,13 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (!st->source_virtual) {
 						struct livesource *l = livesource_find(st->caster, mountpoint);
 						if (l) {
-							st->subscription = livesource_add_subscriber(l, st);
+							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d\n", mountpoint, st->source_on_demand);
 							ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
 							st->state = NTRIP_WAIT_CLIENT_INPUT;
 
 							/* Regular NTRIP stream client: disable read and write timeouts */
 							bufferevent_set_timeouts(bev, NULL, NULL);
+							livesource_add_subscriber(l, st);
 						} else if (st->source_on_demand) {
 							ntrip_log(st, LOG_INFO, "Trying to subcribe to on-demand source %s\n", mountpoint);
 							struct redistribute_cb_args *redis_args = redistribute_args_new(st, mountpoint, &sourceline->pos, st->caster->config->reconnect_delay, 0);

@@ -11,6 +11,8 @@
 #include "packet.h"
 #include "queue.h"
 
+static void _livesource_del_subscriber_unlocked(struct subscriber *sub, struct ntrip_state *st);
+
 struct livesource *livesource_new(char *mountpoint) {
 	struct livesource *this = (struct livesource *)malloc(sizeof(struct livesource));
 	if (this == NULL)
@@ -59,14 +61,11 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 		}
 
 		if (kill_backlogged == 0 || np->backlogged) {
-			TAILQ_REMOVE(&this->subscribers, np, next);
-			this->nsubs--;
-			np->ntrip_state->subscription = NULL;
-			ntrip_deferred_free(np->ntrip_state, "livesource_kill_subscribers_unlocked");
-			bufferevent_unlock(bev);
-			free(np);
-		} else
-			bufferevent_unlock(bev);
+			struct ntrip_state *st = np->ntrip_state;
+			_livesource_del_subscriber_unlocked(np, st);
+			ntrip_deferred_free(st, "livesource_kill_subscribers_unlocked");
+		}
+		bufferevent_unlock(bev);
 	}
 	return killed;
 }
@@ -93,10 +92,9 @@ struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntr
 		sub->virtual = 0;
 
 		P_RWLOCK_WRLOCK(&this->lock);
-
 		TAILQ_INSERT_TAIL(&this->subscribers, sub, next);
 		this->nsubs++;
-
+		st->subscription = sub;
 		P_RWLOCK_UNLOCK(&this->lock);
 
 		ntrip_log(st, LOG_INFO, "subscription done to %s\n", this->mountpoint);
@@ -105,25 +103,29 @@ struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntr
 }
 
 /*
- *
  * Remove a subscriber from a live source.
- *
  */
+static void _livesource_del_subscriber_unlocked(struct subscriber *sub, struct ntrip_state *st) {
+	if (st->subscription) {
+		TAILQ_REMOVE(&sub->livesource->subscribers, sub, next);
+		sub->livesource->nsubs--;
+		sub->ntrip_state->subscription = NULL;
+		free(sub);
+	}
+}
+
 void livesource_del_subscriber(struct subscriber *sub, struct ntrip_state *st) {
 	/*
 	 * Lock order is mandatory to avoid deadlocks with livesource_send_subscribers
 	 */
-	P_RWLOCK_WRLOCK(&sub->livesource->lock);
+	struct livesource *livesource = sub->livesource;
+	P_RWLOCK_WRLOCK(&livesource->lock);
 	bufferevent_lock(st->bev);
 
-	TAILQ_REMOVE(&sub->livesource->subscribers, sub, next);
-	sub->livesource->nsubs--;
-	st->subscription = NULL;
+	_livesource_del_subscriber_unlocked(sub, st);
 
 	bufferevent_unlock(st->bev);
-	P_RWLOCK_UNLOCK(&sub->livesource->lock);
-
-	free(sub);
+	P_RWLOCK_UNLOCK(&livesource->lock);
 }
 
 /*

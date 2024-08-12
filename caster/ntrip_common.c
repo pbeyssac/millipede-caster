@@ -169,12 +169,13 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 		struct bufferevent *bev = st->bev;
 
 		bufferevent_lock(bev);
-		if (st->subscription) {
+		struct subscriber *sub = st->subscription;
+		if (sub) {
 			/*
 			 * Done here instead of _ntrip_free() to avoid lock ordering problems.
 			 */
 			bufferevent_unlock(bev);
-			livesource_del_subscriber(st->subscription, st);
+			livesource_del_subscriber(sub, st);
 			bufferevent_lock(bev);
 		}
 
