@@ -316,6 +316,7 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
 			dist_array[i].dist = distance(&np->pos, pos);
 			dist_array[i].pos = np->pos;
 			dist_array[i].mountpoint = np->key;
+			dist_array[i].on_demand = np->on_demand;
 			i++;
 		}
 	}
@@ -505,7 +506,7 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 			/*
 			 * If the mountpoint is from our local table, skip if not live.
 			 */
-			if (local_table && (!np->virtual && !livesource_find(caster, np->key)))
+			if (local_table && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
 				continue;
 
 			for (i = 0; i < n_prio; i++) {

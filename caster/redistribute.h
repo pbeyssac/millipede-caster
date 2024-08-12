@@ -5,6 +5,7 @@
 #include <event2/event.h>
 
 #include "livesource.h"
+#include "sourceline.h"
 #include "util.h"
 
 struct redistribute_cb_args {
@@ -19,7 +20,7 @@ struct redistribute_cb_args {
 };
 
 int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource);
-struct redistribute_cb_args *redistribute_args_new(struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent);
+struct redistribute_cb_args *redistribute_args_new(struct ntrip_state *st, struct livesource *livesource, char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent);
 void redistribute_args_free(struct redistribute_cb_args *this);
 int redistribute_schedule(struct ntrip_state *st, struct redistribute_cb_args *redis_args);
 void redistribute_cb(evutil_socket_t fd, short what, void *cbarg);

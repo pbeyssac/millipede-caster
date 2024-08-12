@@ -34,13 +34,18 @@ int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, p
  * Step 1 -- prepare argument structure.
  */
 struct redistribute_cb_args *
-redistribute_args_new(struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent) {
+redistribute_args_new(struct ntrip_state *st, struct livesource *livesource, char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent) {
 	struct redistribute_cb_args *redis_args;
 	redis_args = (struct redistribute_cb_args *)malloc(sizeof(struct redistribute_cb_args));
 	char *dup_mountpoint = mystrdup(mountpoint);
 	if (redis_args != NULL && dup_mountpoint != NULL) {
 		redis_args->mountpoint = dup_mountpoint;
-		redis_args->mountpoint_pos = *mountpoint_pos;
+		if (mountpoint_pos)
+			redis_args->mountpoint_pos = *mountpoint_pos;
+		else {
+			redis_args->mountpoint_pos.lat = 0.;
+			redis_args->mountpoint_pos.lon = 0.;
+		}
 		redis_args->caster = st->caster;
 		redis_args->requesting_st = st;
 		redis_args->source_st = NULL;
@@ -197,7 +202,7 @@ redistribute_switch_source_cb(struct redistribute_cb_args *redis_args, int succe
 
 
 	if (success) {
-		struct livesource *livesource = livesource_find(st->caster, redis_args->mountpoint);
+		struct livesource *livesource = livesource_find(st->caster, st, redis_args->mountpoint, &redis_args->mountpoint_pos);
 		if (livesource) {
 			/*
 			 * redistribute_switch_source will lock st in the right order

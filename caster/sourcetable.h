@@ -42,6 +42,7 @@ struct spos {
 	float dist;
 	char *mountpoint;
 	pos_t pos;
+	int on_demand;
 };
 
 /*

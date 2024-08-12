@@ -163,17 +163,11 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 			if (current_dist < s->dist_array[0].dist) {
 				ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis\n", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
 			} else {
-				struct livesource *l = livesource_find(st->caster, m);
-				if (l) {
+				enum livesource_state source_state;
+				struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, s->dist_array[0].on_demand, &source_state);
+				if (l && (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING))){
 					if (redistribute_switch_source(st, m, &s->dist_array[0].pos, l) < 0)
 						r = -1;
-				} else {
-					ntrip_log(st, LOG_INFO, "Trying to switch virtual source from %s to %s\n", st->virtual_mountpoint, m);
-					struct redistribute_cb_args *redis_args = redistribute_args_new(st, m, &s->dist_array[0].pos, st->caster->config->reconnect_delay, 0);
-					if (redis_args != NULL) {
-						st->callback_subscribe_arg = redis_args;
-						redistribute_source_stream(redis_args, redistribute_switch_source_cb);
-					}
 				}
 			}
 		}
@@ -334,7 +328,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 					st->type = "client";
 					if (!st->source_virtual) {
-						struct livesource *l = livesource_find(st->caster, mountpoint);
+						struct livesource *l = livesource_find_on_demand(st->caster, st, mountpoint, &sourceline->pos, st->source_on_demand, NULL);
 						if (l) {
 							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d\n", mountpoint, st->source_on_demand);
 							ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
@@ -343,20 +337,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							/* Regular NTRIP stream client: disable read and write timeouts */
 							bufferevent_set_timeouts(bev, NULL, NULL);
 							livesource_add_subscriber(l, st);
-						} else if (st->source_on_demand) {
-							ntrip_log(st, LOG_INFO, "Trying to subcribe to on-demand source %s\n", mountpoint);
-							struct redistribute_cb_args *redis_args = redistribute_args_new(st, mountpoint, &sourceline->pos, st->caster->config->reconnect_delay, 0);
-							if (redis_args == NULL) {
-								err = 503;
-								break;
-							}
-							st->callback_subscribe_arg = redis_args;
-							redistribute_source_stream(redis_args, redistribute_switch_source_cb);
-							ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
-							st->state = NTRIP_WAIT_CLIENT_INPUT;
-
-							/* Regular NTRIP stream client: disable read and write timeouts */
-							bufferevent_set_timeouts(bev, NULL, NULL);
 						} else {
 							err = ntripsrv_send_sourcetable(st, output);
 							st->state = NTRIP_WAIT_CLOSE;
@@ -380,7 +360,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					st->type = "source";
-					if (livesource_find(st->caster, st->http_args[2])) {
+					if (livesource_find(st->caster, st, st->http_args[2], &sourceline->pos)) {
 						err = 409;
 						break;
 					}
@@ -389,7 +369,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					st->mountpoint = mystrdup(mountpoint);
-					if ((st->own_livesource = ntrip_add_livesource(st, st->mountpoint)) == NULL) {
+					if ((st->own_livesource = ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 0)) == NULL) {
 						err = 503;
 						break;
 					};
@@ -400,7 +380,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				} else if (!strcmp(st->http_args[0], "SOURCE")) {
 					struct sourceline *sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, st->http_args[2]);
-					if (!sourceline || livesource_find(st->caster, st->http_args[2])) {
+					if (!sourceline || livesource_find(st->caster, st, st->http_args[2], &sourceline->pos)) {
 						evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
 						err = 1;
 						break;
@@ -417,7 +397,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 503;
 						break;
 					}
-					if ((st->own_livesource = ntrip_add_livesource(st, st->http_args[2])) == NULL) {
+					if ((st->own_livesource = ntrip_add_livesource(st, st->http_args[2], &sourceline->pos, 0)) == NULL) {
 						err = 503;
 						break;
 					};

@@ -13,7 +13,7 @@
 
 static void _livesource_del_subscriber_unlocked(struct subscriber *sub, struct ntrip_state *st);
 
-struct livesource *livesource_new(char *mountpoint) {
+struct livesource *livesource_new(char *mountpoint, enum livesource_state state) {
 	struct livesource *this = (struct livesource *)malloc(sizeof(struct livesource));
 	if (this == NULL)
 		return NULL;
@@ -25,6 +25,7 @@ struct livesource *livesource_new(char *mountpoint) {
 	TAILQ_INIT(&this->subscribers);
 	this->nsubs = 0;
 	this->npackets = 0;
+	this->state = state;
 
 	P_RWLOCK_INIT(&this->lock, NULL);
 	return this;
@@ -250,15 +251,33 @@ static void livesource_list(struct caster_state *caster) {
  *
  * Required lock (read): livesource list.
  */
-struct livesource *livesource_find_unlocked(struct caster_state *this, char *mountpoint) {
+struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state) {
 	struct livesource *np;
 	struct livesource *result = NULL;
 	TAILQ_FOREACH(np, &this->livesources.queue, next) {
-		if (!strcmp(np->mountpoint, mountpoint)) {
+		if (!strcmp(np->mountpoint, mountpoint)
+			&& (np->state == LIVESOURCE_RUNNING
+			    || (on_demand && np->state == LIVESOURCE_FETCH_PENDING))) {
 			result = np;
 			break;
 		}
 	}
+
+	if (result == NULL && on_demand) {
+		struct livesource *np = livesource_new(mountpoint, LIVESOURCE_FETCH_PENDING);
+		if (np == NULL) {
+			return NULL;
+		}
+		TAILQ_INSERT_TAIL(&this->livesources.queue, np, next);
+		ntrip_log(st, LOG_INFO, "%p Trying to subscribe to on-demand source %s\n", st, mountpoint);
+		struct redistribute_cb_args *redis_args = redistribute_args_new(st, np, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
+		redistribute_source_stream(redis_args, NULL);
+		result = np;
+	}
+
+	/* Copy current state while we are locked */
+	if (new_state && result)
+		*new_state = result->state;
 	return result;
 }
 
@@ -266,9 +285,13 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, char *mou
  * Find a livesource by mountpoint name.
  * Warning: O(n) complexity.
  */
-struct livesource *livesource_find(struct caster_state *this, char *mountpoint) {
+struct livesource *livesource_find_on_demand(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state) {
 	P_RWLOCK_RDLOCK(&this->livesources.lock);
-	struct livesource *result = livesource_find_unlocked(this, mountpoint);
+	struct livesource *result = livesource_find_unlocked(this, st, mountpoint, mountpoint_pos, on_demand, new_state);
 	P_RWLOCK_UNLOCK(&this->livesources.lock);
 	return result;
+}
+
+struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos) {
+	return livesource_find_on_demand(this, st, mountpoint, mountpoint_pos, 0, NULL);
 }

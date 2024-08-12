@@ -190,7 +190,7 @@ void ntrip_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this, char *orig);
 const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st);
-struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint);
+struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, pos_t *mountpoint_pos, int on_demand);
 void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint);
 char *ntrip_peer_ipstr(struct ntrip_state *this);
 unsigned short ntrip_peer_port(struct ntrip_state *this);

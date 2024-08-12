@@ -245,15 +245,27 @@ const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st)
 	return s;
 }
 
-struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint) {
-	ntrip_log(this, LOG_INFO, "Registering livesource %s\n", mountpoint);
+struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, pos_t *mountpoint_pos, int on_demand) {
+	struct livesource *existing_livesource;
+	enum livesource_state existing_state;
 
 	P_RWLOCK_WRLOCK(&this->caster->livesources.lock);
-	if (livesource_find_unlocked(this->caster, mountpoint)) {
+	existing_livesource = livesource_find_unlocked(this->caster, this, mountpoint, mountpoint_pos, on_demand, &existing_state);
+	if (existing_livesource) {
 		P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
-		return NULL;
+		if (on_demand && existing_state == LIVESOURCE_FETCH_PENDING) {
+			ntrip_log(this, LOG_INFO, "%p livesource %s PENDING -> RUNNING\n", this, mountpoint);
+			P_RWLOCK_WRLOCK(&existing_livesource->lock);
+			existing_livesource->state = LIVESOURCE_RUNNING;
+			P_RWLOCK_UNLOCK(&existing_livesource->lock);
+			this->registered = 1;
+		} else if (existing_state == LIVESOURCE_RUNNING)
+			ntrip_log(this, LOG_INFO, "%p livesource %s already RUNNING\n", this, mountpoint);
+		else
+			existing_livesource = NULL;
+		return existing_livesource;
 	}
-	struct livesource *np = livesource_new(mountpoint);
+	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_RUNNING);
 	if (np == NULL) {
 		P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
 		return NULL;
@@ -261,12 +273,13 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 	TAILQ_INSERT_TAIL(&this->caster->livesources.queue, np, next);
 	this->registered = 1;
 	P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
+	ntrip_log(this, LOG_INFO, "%p livesource %s created RUNNING\n", this, mountpoint);
 	return np;
 }
 
 void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint) {
 	ntrip_log(this, LOG_INFO, "Unregister livesource %s\n", mountpoint);
-	struct livesource *l = livesource_find(this->caster, mountpoint);
+	struct livesource *l = livesource_find(this->caster, this, mountpoint, NULL);
 	if (l)
 		caster_del_livesource(this->caster, l);
 }
@@ -496,7 +509,6 @@ static int ntrip_handle_rtcm(struct ntrip_state *st, struct bufferevent *bev) {
 		ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x\n", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
 	}
 
-	//struct livesource *l = livesource_find(st->caster, st->mountpoint);
 	if (livesource_send_subscribers(st->own_livesource, rtcmp, st->caster))
 		st->last_send = time(NULL);
 	packet_free(rtcmp);
