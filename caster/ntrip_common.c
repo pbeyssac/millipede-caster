@@ -165,15 +165,19 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 		TAILQ_REMOVE_HEAD(&this->ntrips.free_queue, nextf);
 		P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
 
-		if (st->subscription) {
-			bufferevent_unlock(st->bev);
-			livesource_del_subscriber(st->subscription, st);
-			bufferevent_lock(st->bev);
-		}
-
 		/* Keep a copy of the pointer because it will be lost after _ntrip_free */
 		struct bufferevent *bev = st->bev;
+
 		bufferevent_lock(bev);
+		if (st->subscription) {
+			/*
+			 * Done here instead of _ntrip_free() to avoid lock ordering problems.
+			 */
+			bufferevent_unlock(bev);
+			livesource_del_subscriber(st->subscription, st);
+			bufferevent_lock(bev);
+		}
+
 		_ntrip_free(st, "ntrip_deferred_run", 0);
 		bufferevent_unlock(bev);
 
