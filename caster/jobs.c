@@ -25,7 +25,9 @@ struct joblist *joblist_new(struct caster_state *caster) {
 	if (this != NULL) {
 		this->caster = caster;
 		STAILQ_INIT(&this->ntrip_queue);
+		STAILQ_INIT(&this->append_queue);
 		P_MUTEX_INIT(&this->mutex, NULL);
+		P_MUTEX_INIT(&this->append_mutex, NULL);
 		if (pthread_cond_init(&this->condjob, NULL) < 0)
 			_log_error(this, "pthread_cond_init");
 	}
@@ -72,13 +74,26 @@ void joblist_run(struct joblist *this) {
 		int nst;
 		st = STAILQ_FIRST(&this->ntrip_queue);
 		if (st == NULL) {
-
 			/*
-			 * Empty queue.
+			 * Work queue is empty, check the append queue for a refill.
 			 */
-			if (pthread_cond_wait(&this->condjob, &this->mutex) < 0)
-				_log_error(this, "pthread_cond_wait");
-			continue;
+			P_MUTEX_LOCK(&this->append_mutex);
+			st = STAILQ_FIRST(&this->append_queue);
+			if (st == NULL) {
+				P_MUTEX_UNLOCK(&this->append_mutex);
+				/*
+				 * Both queues empty => wait.
+				 */
+				if (pthread_cond_wait(&this->condjob, &this->mutex) < 0)
+					_log_error(this, "pthread_cond_wait");
+				continue;
+			}
+			/*
+			 * Fill the work queue, empty the append queue.
+			 */
+			STAILQ_SWAP(&this->ntrip_queue, &this->append_queue, ntrip_state);
+			pthread_cond_broadcast(&this->condjob);
+			P_MUTEX_UNLOCK(&this->append_mutex);
 		}
 
 		/*
@@ -88,6 +103,12 @@ void joblist_run(struct joblist *this) {
 
 		STAILQ_REMOVE_HEAD(&this->ntrip_queue, next);
 
+		struct bufferevent *bev = st->bev;
+
+		/*
+		 * Get a lock on bev before unlocking the queue, to avoid having st freed in our back.
+		 */
+		bufferevent_lock(bev);
 		P_MUTEX_UNLOCK(&this->mutex);
 
 		/*
@@ -95,10 +116,8 @@ void joblist_run(struct joblist *this) {
 		 * so in the following callbacks we need to get our own locks beginning
 		 * with bufferevent to avoid deadlocks due to lock order reversal.
                  *
-                 * The buffervent is associated with the ntrip_state, it's the same for all jobs in the queue.
+                 * The bufferevent is associated with the ntrip_state, it's the same for all jobs in the queue.
 		 */
-		struct bufferevent *bev = st->bev;
-		bufferevent_lock(bev);
 
 		/*
 		 * Run the jobs.
@@ -134,6 +153,8 @@ void joblist_run(struct joblist *this) {
 
 /*
  * Add a new job at the end of the list.
+ *
+ * The bufferevent is already locked by libevent.
  */
 void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
@@ -143,11 +164,14 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	 */
 	assert(!st->bev_freed);
 
-	/* Drop callback if ntrip_state is waiting for deletion */
-	if (st->state == NTRIP_END)
-		return;
+	P_MUTEX_LOCK(&this->append_mutex);
 
-	P_MUTEX_LOCK(&this->mutex);
+	/* Drop callback if ntrip_state is waiting for deletion */
+	if (st->state == NTRIP_END) {
+		P_MUTEX_UNLOCK(&this->append_mutex);
+		return;
+	}
+
 
 	/*
 	 * Check whether the ntrip_state queue is empty.
@@ -177,7 +201,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		struct job *j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
 			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
-			P_MUTEX_UNLOCK(&this->mutex);
+			P_MUTEX_UNLOCK(&this->append_mutex);
 			return;
 		}
 
@@ -195,8 +219,8 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		/*
 		 * Insertion needed in the main job queue.
 		 */
-		ntrip_log(st, LOG_EDEBUG, "inserting in joblist ntrip_queue %p\n", st);
-		STAILQ_INSERT_TAIL(&this->ntrip_queue, st, next);
+		ntrip_log(st, LOG_EDEBUG, "inserting in joblist append_queue %p\n", st);
+		STAILQ_INSERT_TAIL(&this->append_queue, st, next);
 	} else
 		ntrip_log(st, LOG_EDEBUG, "ntrip_state %p already in job list\n", st);
 
@@ -205,7 +229,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	 */
 	if (pthread_cond_signal(&this->condjob) < 0)
 		_log_error(this, "pthread_cond_signal");
-	P_MUTEX_UNLOCK(&this->mutex);
+	P_MUTEX_UNLOCK(&this->append_mutex);
 }
 
 void *jobs_start_routine(void *arg) {

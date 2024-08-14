@@ -31,13 +31,19 @@ TAILQ_HEAD (general_ntripq, ntrip_state);
  *  FIFO list for worker threads to get new jobs.
  */
 struct joblist {
-	/* The queue itself */
+	/* The work queue itself */
 	struct ntripq ntrip_queue;
+	/* Append-only queue, separated to simplify locking */
+	struct ntripq append_queue;
 
-	/* Protect access to the queue */
+	/* Mutexes protecting access to the queues */
 	P_MUTEX_T mutex;
+	P_MUTEX_T append_mutex;
 
-	/* Used to signal workers a new job has been appended */
+	/*
+	 * Used to signal workers a new job has been appended
+	 * or the work queue has been refilled.
+	 */
 	pthread_cond_t condjob;
 
 	/* The associated caster */
