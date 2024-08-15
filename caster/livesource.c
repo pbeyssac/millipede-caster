@@ -165,7 +165,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		bufferevent_lock(bev);
 		if (np->ntrip_state->state == NTRIP_END) {
 			/* Subscriber currently closing, skip */
-			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping %p state=%d bev_freed=%d\n", np->ntrip_state, np->ntrip_state->state, np->ntrip_state->bev_freed);
+			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping %p state=%d\n", np->ntrip_state, np->ntrip_state->state);
 			bufferevent_unlock(bev);
 			ns++;
 			continue;

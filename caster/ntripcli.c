@@ -105,7 +105,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	struct evbuffer *input = bufferevent_get_input(bev);
 
 	//ntrip_log(st, LOG_DEBUG, "readcb %zd bytes\n", evbuffer_get_length(input));
-	while (!end && !st->bev_freed && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 5) {
+	while (!end && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 5) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
@@ -283,11 +283,9 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	ntrip_log(st, LOG_DEBUG, "ntripcli_writecb\n");
 
-	if (!st->bev_freed) {
-		struct evbuffer *output = bufferevent_get_output(bev);
-		if (evbuffer_get_length(output) == 0) {
-			ntrip_log(st, LOG_DEBUG, "flushed answer ntripcli\n");
-		}
+	struct evbuffer *output = bufferevent_get_output(bev);
+	if (evbuffer_get_length(output) == 0) {
+		ntrip_log(st, LOG_EDEBUG, "flushed answer ntripcli\n");
 	}
 }
 
@@ -323,8 +321,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 
 			return;
 		}
-		if (!st->bev_freed)
-			bufferevent_write(bev, s, strlen(s));
+		bufferevent_write(bev, s, strlen(s));
 		strfree(s);
 		st->state = NTRIP_WAIT_HTTP_STATUS;
 		return;
@@ -357,12 +354,9 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		st->sourcetable_cb_arg->sourcetable_cb(-1, 0, st->sourcetable_cb_arg);
 		st->sourcetable_cb_arg = NULL;
 	}
-	if (!st->bev_freed) {
-		struct evbuffer *input = bufferevent_get_input(bev);
-		ntrip_log(st, LOG_INFO, "Connection closed, %zu bytes left.\n", evbuffer_get_length(input));
-	} else {
-		ntrip_log(st, LOG_NOTICE, "Connection closed, bufferevent already freed.\n");
-	}
+	struct evbuffer *input = bufferevent_get_input(bev);
+	int bytes_left = evbuffer_get_length(input);
+	ntrip_log(st, bytes_left ? LOG_NOTICE:LOG_INFO, "Connection closed, %zu bytes left.\n", evbuffer_get_length(input));
 
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
