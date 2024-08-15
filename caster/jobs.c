@@ -196,8 +196,9 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	 * arg doesn't need to be checked as it's the ntrip_state, same for all jobs
 	 * in this queue.
 	 */
+	struct job *j = NULL;
 	if (lastj == NULL || lastj->events != events || lastj->cb != cb  || lastj->cbe != cbe) {
-		struct job *j = (struct job *)malloc(sizeof(struct job));
+		j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
 			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
 			P_MUTEX_UNLOCK(&this->append_mutex);
@@ -212,6 +213,10 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		j->arg = arg;
 		j->events = events;
 		STAILQ_INSERT_TAIL(&st->jobq, j, next);
+	}
+	if (j == NULL) {
+		P_MUTEX_UNLOCK(&this->append_mutex);
+		return;
 	}
 
 	if (jobq_was_empty) {
