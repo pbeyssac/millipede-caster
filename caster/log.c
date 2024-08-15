@@ -52,6 +52,8 @@ void
 logfmt(struct log *this, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
+	P_RWLOCK_WRLOCK(&this->lock);
 	this->log_cb(this->state, fmt, ap);
+	P_RWLOCK_UNLOCK(&this->lock);
 	va_end(ap);
 }
