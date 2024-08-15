@@ -466,8 +466,6 @@ static int caster_set_signals(struct caster_state *this) {
 
 /*
  * Start sourcetable fetchers (proxy)
- *
- * Currently only available for proxy_count <= 1, enforced by the configuration reader.
  */
 static int caster_start_fetchers(struct caster_state *this) {
 	if (!this->config->proxy_count)
