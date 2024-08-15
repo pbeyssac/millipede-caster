@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <string.h>
 
 #include <event2/buffer.h>
@@ -168,6 +169,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping %p state=%d\n", np->ntrip_state, np->ntrip_state->state);
 			bufferevent_unlock(bev);
 			ns++;
+			n++;
 			continue;
 		}
 		if (packet->caster->config->zero_copy) {
@@ -190,8 +192,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		n++;
 	}
 
-	if (n != this->nsubs)
-		logfmt(&caster->flog, "assertion failed: nsubs != n (%d vs %d)\n", this->nsubs, n);
+	assert(n == this->nsubs);
 
 	/*
 	 * Adjust reference count to account for failed calls
@@ -199,11 +200,10 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	if (packet->caster->config->zero_copy && ns) {
 		/* Don't need to free the packet as it will be done by the caller, the refcnt should never be 0 here */
 		P_MUTEX_LOCK(&packet->mutex);
-		if (!packet->refcnt)
-			logfmt(&caster->flog, "assertion failed: packet refcnt != 0 (%d instead)\n", packet->refcnt);
 		packet->refcnt -= ns;
 		P_MUTEX_UNLOCK(&packet->mutex);
 	}
+	assert(packet->refcnt > 0);
 
 	/*
 	 * Get rid of backlogged connections
