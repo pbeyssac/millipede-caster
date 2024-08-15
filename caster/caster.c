@@ -387,7 +387,6 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	if (bev == NULL) {
 		ntrip_log(st, LOG_CRIT, "Error constructing bufferevent!");
 		event_base_loopbreak(base);
-		st->state = NTRIP_END;
 		ntrip_deferred_free(st, "listener_cb");
 		return;
 	}

@@ -121,6 +121,10 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 }
 
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
+	if (this->state == NTRIP_END) {
+		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free %p from %s\n", this, orig);
+		return;
+	}
 
 	this->state = NTRIP_END;
 
