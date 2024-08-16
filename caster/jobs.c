@@ -195,11 +195,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	/*
 	 * Deactivate callback deduplication for systems lacking STAILQ_LAST.
 	 */
-#ifdef STAILQ_LAST
 	struct job *lastj = STAILQ_LAST(&st->jobq, job, next);
-#else
-	struct job *lastj = NULL;
-#endif
 
 	if (jobq_was_empty)
 		assert(!st->njobs && !st->newjobs);

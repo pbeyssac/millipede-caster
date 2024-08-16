@@ -25,6 +25,14 @@
 #define	QUEUE_TYPEOF(type) struct type
 #endif
 
+#ifndef STAILQ_LAST
+#define	STAILQ_LAST(head, type, field)					\
+	(STAILQ_EMPTY((head)) ?						\
+		NULL :							\
+	        ((struct type *)(void *)				\
+		((char *)((head)->stqh_last) - offsetof(struct type, field))))
+#endif
+
 #ifndef STAILQ_SWAP
 #define STAILQ_SWAP(head1, head2, type) do {				\
 	QUEUE_TYPEOF(type) *swap_first = STAILQ_FIRST(head1);		\
