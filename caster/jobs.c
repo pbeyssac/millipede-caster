@@ -216,7 +216,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	if (lastj == NULL || lastj->events != events || lastj->cb != cb  || lastj->cbe != cbe) {
 		j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
-			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
+			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.\n");
 			P_MUTEX_UNLOCK(&this->append_mutex);
 			return;
 		}

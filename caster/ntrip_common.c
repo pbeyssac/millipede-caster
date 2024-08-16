@@ -77,7 +77,6 @@ static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *be
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_DEBUG, "FREE %p %s\n", this, orig);
 
-
 	if (this->mountpoint)
 		strfree(this->mountpoint);
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
@@ -115,7 +114,6 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	 */
 	ntrip_log(this, LOG_EDEBUG, "freeing bev %p for %p\n", this->bev, this);
 	my_bufferevent_free(this, this->bev);
-
 	free(this);
 }
 
@@ -171,6 +169,7 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 	int n = 0;
 	struct ntrip_state *st;
 	P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
+
 	while ((st = TAILQ_FIRST(&this->ntrips.free_queue))) {
 		TAILQ_REMOVE_HEAD(&this->ntrips.free_queue, nextf);
 		P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
