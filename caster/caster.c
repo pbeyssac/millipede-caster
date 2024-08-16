@@ -352,9 +352,6 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct event_base *base = caster->base;
 	struct bufferevent *bev;
 
-	int sndbuf;
-	socklen_t size_sndbuf = sizeof(sndbuf);
-
 	struct ntrip_state *st = ntrip_new(caster, NULL, 0, NULL);
 	if (st == NULL) {
 		logfmt(&caster->flog, "Error constructing ntrip_state for a new connection!");
@@ -367,16 +364,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	st->remote = 1;
 	sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);
 
-	sndbuf = caster->config->backlog_socket;
-	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, size_sndbuf) < 0)
-		ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
-
-	if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, &size_sndbuf) >= 0) {
-		ntrip_log(st, LOG_INFO, "New connection, ntrip_state=%p sndbuf=%d\n", st, sndbuf);
-	} else {
-		size_sndbuf = -1;
-		ntrip_log(st, LOG_INFO, "New connection, ntrip_state=%p\n", st);
-	}
+	ntrip_log(st, LOG_INFO, "New connection, ntrip_state=%p\n", st);
 
 	st->state = NTRIP_WAIT_HTTP_METHOD;
 

@@ -340,6 +340,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						} else {
 							err = ntripsrv_send_sourcetable(st, output);
 							st->state = NTRIP_WAIT_CLOSE;
+							break;
 						}
 					} else {
 						ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
@@ -348,6 +349,13 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						/* Regular NTRIP stream client: disable read and write timeouts */
 						bufferevent_set_timeouts(bev, NULL, NULL);
 					}
+
+					/*
+					 * We only limit the send buffer on NTRIP clients, except for the sourcetable.
+					 */
+					int sndbuf = st->caster->config->backlog_socket;
+					if (setsockopt(bufferevent_getfd(bev), SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof sndbuf) < 0)
+						ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
 				} else if (!strcmp(st->http_args[0], "POST")) {
 					if (st->http_args[1] == NULL || st->http_args[1][0] != '/') {
 						err = 400;
