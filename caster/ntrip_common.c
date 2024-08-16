@@ -343,9 +343,6 @@ _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list a
 	P_RWLOCK_WRLOCK(&log->lock);
 	fputs(date, log->logfile);
 
-	if (threads)
-		fprintf(log->logfile, "[%lu] ", (long)pthread_getspecific(this->caster->thread_id));
-
 	if (this->remote) {
 		unsigned port = ntrip_peer_port(this);
 		struct sockaddr *sa = &this->peeraddr.generic;
@@ -360,6 +357,10 @@ _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list a
 			fprintf(log->logfile, "[???] ");
 		}
 	}
+
+	if (threads)
+		fprintf(log->logfile, "[%lu] ", (long)pthread_getspecific(this->caster->thread_id));
+
 	vfprintf(log->logfile, fmt, ap);
 	P_RWLOCK_UNLOCK(&log->lock);
 }
