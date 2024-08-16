@@ -286,16 +286,12 @@ int jobs_start_threads(struct caster_state *caster, int nthreads) {
 		return -1;
 	}
 
+	// Set stack size to the configured value
+	size_t stacksize = caster->config->threads[0].stacksize;
 	pthread_attr_t attr;
-	size_t stacksize;
 	pthread_attr_init(&attr);
-
-	// Get stack size
-	pthread_attr_getstacksize(&attr, &stacksize);
-	printf("Default stack size: %zu bytes\n", stacksize);
-
-	// Set stack size to 500k
-	pthread_attr_setstacksize(&attr, 500*1024);
+	pthread_attr_setstacksize(&attr, stacksize);
+	printf("Setting thread stack size to %zu bytes\n", stacksize);
 
 	for (int i = 0; i < nthreads; i++) {
 		int r = pthread_create(&p[i], &attr, jobs_start_routine, caster);

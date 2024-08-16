@@ -39,6 +39,11 @@ struct config_proxy {
 	int priority;
 };
 
+struct config_threads {
+	/* Thread stack size */
+	size_t	stacksize;
+};
+
 struct config {
 	/*
 	 * Hysteresis distance in meters for virtual source switch.
@@ -79,6 +84,12 @@ struct config {
 	 */
 	struct config_bind	*bind;
 	int 			bind_count;
+
+	/*
+	 * Threads configuration
+	 */
+	struct config_threads	*threads;
+	int			threads_count;
 
 	/*
 	 * Delay in seconds to close a source without a subscriber.

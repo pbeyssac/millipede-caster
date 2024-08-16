@@ -61,6 +61,10 @@ static struct config_proxy default_config_proxy = {
 	.priority = 20
 };
 
+static struct config_threads default_config_threads = {
+	.stacksize = 500*1024
+};
+
 /*
  * YAML mapping from log level to integer values
  */
@@ -108,6 +112,17 @@ static const cyaml_schema_value_t proxy_schema = {
 		struct config_proxy, proxy_fields_schema),
 };
 
+static const cyaml_schema_field_t threads_fields_schema[] = {
+	CYAML_FIELD_INT(
+		"stacksize", CYAML_FLAG_OPTIONAL, struct config_threads, stacksize),
+	CYAML_FIELD_END
+};
+
+static const cyaml_schema_value_t threads_schema = {
+	CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT,
+		struct config_threads, threads_fields_schema),
+};
+
 /* CYAML mapping schema fields array for the top level mapping. */
 static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
@@ -150,6 +165,9 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 			CYAML_ARRAY_LEN(log_level_strings)),
 	CYAML_FIELD_STRING_PTR(
 		"admin_user", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config, admin_user, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_SEQUENCE(
+		"threads", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
+		struct config, threads, &threads_schema, 0, 1),
 	CYAML_FIELD_END
 };
 
@@ -217,6 +235,20 @@ struct config *config_parse(const char *filename) {
 		if (this->bind[i].queue_size == 0)
 			this->bind[i].queue_size = default_config_bind.queue_size;
 	}
+
+	if (this->threads_count == 0) {
+		this->threads = (struct config_threads *)malloc(sizeof(struct config_threads));
+		if (this->threads == NULL) {
+			config_free(this);
+			return NULL;
+		}
+		this->threads[0] = default_config_threads;
+		this->threads_count = 1;
+	}
+	for (int i = 0; i < this->threads_count; i++) {
+		if (this->threads[i].stacksize == 0)
+			this->threads[i].stacksize = default_config_threads.stacksize;
+	}
 	return this;
 }
 
@@ -234,6 +266,7 @@ void config_free(struct config *this) {
 	for (int i = 0; i < this->proxy_count; i++)
 		free(this->proxy[i].host);
 	free(this->proxy);
+	free(this->threads);
 
 	free((char *)this->host_auth_filename);
 	free((char *)this->source_auth_filename);
