@@ -4,6 +4,11 @@
 #include <event2/bufferevent.h>
 #include "queue.h"
 
+enum job_type {
+	JOB_LIBEVENT_RW,
+	JOB_LIBEVENT_EVENT
+};
+
 /*
  * Job entry for the FIFO list, to dispatch tasks to workers.
  * Only used when threads are activated.
@@ -11,18 +16,23 @@
 struct job {
 	STAILQ_ENTRY(job) next;
 
-	/* If not NULL, this is a read or write callback job */
-	void (*cb)(struct bufferevent *bev, void *arg);
+	enum job_type type;
 
-	/* If not NULL, this is an event callback job */
-	void (*cbe)(struct bufferevent *bev, short events, void *arg);
+	union {
+		/* type == JOB_LIBEVENT_RW: read or write callback job */
+		struct {
+			void (*cb)(struct bufferevent *bev, void *arg);
+		} rw;
 
-	/* Parameter for all jobs */
-	void *arg;
-
-	/* Event flags for event jobs only */
-	short events;
+		/* type == JOB_LIBEVENT_EVENT: event callback job */
+		struct {
+			void (*cb)(struct bufferevent *bev, short events, void *arg);
+			/* Event flags */
+			short events;
+		} event;
+	};
 };
+
 STAILQ_HEAD (jobq, job);
 STAILQ_HEAD (ntripq, ntrip_state);
 TAILQ_HEAD (general_ntripq, ntrip_state);

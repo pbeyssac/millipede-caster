@@ -138,10 +138,13 @@ void joblist_run(struct joblist *this) {
 			if (st->newjobs > 0)
 				st->newjobs--;
 			if (st->state != NTRIP_END) {
-				if (j->cb) {
-					j->cb(bev, j->arg);
-				} else {
-					j->cbe(bev, j->events, j->arg);
+				switch (j->type) {
+				case JOB_LIBEVENT_RW:
+					j->rw.cb(bev, (void *)st);
+					break;
+				case JOB_LIBEVENT_EVENT:
+					j->event.cb(bev, j->event.events, (void *)st);
+					break;
 				}
 			}
 			nst++;
@@ -160,14 +163,17 @@ void joblist_run(struct joblist *this) {
 	}
 }
 
-/*
- * Add a new job at the end of the list.
- *
- * The bufferevent is already locked by libevent.
- */
-void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events) {
-	struct ntrip_state *st = (struct ntrip_state *)arg;
+static int job_equal(struct job *j1, struct job *j2) {
+	if (j1->type != j2->type)
+		return 0;
+	if (j1->type == JOB_LIBEVENT_RW)
+		return j1->rw.cb == j2->rw.cb;
+	if (j1->type == JOB_LIBEVENT_EVENT)
+		return j1->event.events == j2->event.events && j1->event.cb == j2->event.cb;
+	return 0;
+}
 
+static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st, struct job *tmpj) {
 	/*
 	 * Check the bufferevent has not been freed
 	 */
@@ -204,12 +210,9 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 
 	/*
 	 * Check the last recorded callback, if any. Skip if identical to the new one.
-	 *
-	 * arg doesn't need to be checked as it's the ntrip_state, same for all jobs
-	 * in this queue.
 	 */
 	struct job *j = NULL;
-	if (lastj == NULL || lastj->events != events || lastj->cb != cb  || lastj->cbe != cbe) {
+	if (lastj == NULL || !job_equal(lastj, tmpj)) {
 		j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
 			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.\n");
@@ -220,10 +223,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		/*
 		 * Create and insert a new job record in the queue for this ntrip_state.
 		 */
-		j->cb = cb;
-		j->cbe = cbe;
-		j->arg = arg;
-		j->events = events;
+		*j = *tmpj;
 		STAILQ_INSERT_TAIL(&st->jobq, j, next);
 		st->njobs++;
 		if (st->newjobs >= 0)
@@ -254,6 +254,24 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	if (pthread_cond_signal(&this->condjob) < 0)
 		_log_error(this, "pthread_cond_signal");
 	P_MUTEX_UNLOCK(&this->append_mutex);
+}
+
+/*
+ * Add a new job at the end of the list.
+ *
+ * The bufferevent is already locked by libevent.
+ */
+void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events) {
+	struct job tmpj;
+	if (cb) {
+		tmpj.type = JOB_LIBEVENT_RW;
+		tmpj.rw.cb = cb;
+	} else {
+		tmpj.type = JOB_LIBEVENT_EVENT;
+		tmpj.event.cb = cbe;
+		tmpj.event.events = events;
+	}
+	_joblist_append_generic(this, (struct ntrip_state *)arg, &tmpj);
 }
 
 /*
