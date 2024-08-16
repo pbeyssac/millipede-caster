@@ -78,6 +78,13 @@ struct ntrip_state {
 	STAILQ_ENTRY(ntrip_state) next;
 	/* job list for this particular session */
 	struct jobq jobq;
+	/* number of jobs in the queue */
+	int njobs;
+	/*
+	 * Number of jobs added after the ntrip_state was removed from the main job queue
+	 * or -1 if the ntrip_state is in the main job queue.
+	 */
+	int newjobs;
 
 	/*
 	 * ntrip_state lifecycle on the caster "ntrips" queues:

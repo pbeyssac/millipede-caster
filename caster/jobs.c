@@ -38,19 +38,23 @@ struct joblist *joblist_new(struct caster_state *caster) {
  * Free a job list.
  */
 void joblist_free(struct joblist *this) {
-	struct job *j;
 	struct ntrip_state *st;
 	P_MUTEX_LOCK(&this->mutex);
 	while ((st = STAILQ_FIRST(&this->ntrip_queue))) {
 		STAILQ_REMOVE_HEAD(&this->ntrip_queue, next);
-		while ((j = STAILQ_FIRST(&st->jobq))) {
-			STAILQ_REMOVE_HEAD(&st->jobq, next);
-			free(j);
-		}
+		joblist_drain(st);
 	}
+	P_MUTEX_UNLOCK(&this->mutex);
+	P_MUTEX_LOCK(&this->append_mutex);
+	while ((st = STAILQ_FIRST(&this->append_queue))) {
+		STAILQ_REMOVE_HEAD(&this->append_queue, next);
+		joblist_drain(st);
+	}
+	P_MUTEX_UNLOCK(&this->append_mutex);
+	P_MUTEX_DESTROY(&this->mutex);
+	P_MUTEX_DESTROY(&this->append_mutex);
 	if (pthread_cond_destroy(&this->condjob) < 0)
 		_log_error(this, "pthread_cond_signal");
-	P_MUTEX_DESTROY(&this->mutex);
 }
 
 /*
@@ -116,6 +120,8 @@ void joblist_run(struct joblist *this) {
 		 * so we only need to lock it once.
 		 */
 		bufferevent_lock(bev);
+		st->newjobs = 0;
+
 		P_MUTEX_UNLOCK(&this->mutex);
 
 		/*
@@ -124,8 +130,13 @@ void joblist_run(struct joblist *this) {
 
 		nst = 0;
 
+		ntrip_log(st, LOG_EDEBUG, "starting jobs for ntrip state %p\n", st);
+
 		while ((j = STAILQ_FIRST(&st->jobq))) {
 			STAILQ_REMOVE_HEAD(&st->jobq, next);
+			st->njobs--;
+			if (st->newjobs > 0)
+				st->newjobs--;
 			if (st->state != NTRIP_END) {
 				if (j->cb) {
 					j->cb(bev, j->arg);
@@ -133,12 +144,11 @@ void joblist_run(struct joblist *this) {
 					j->cbe(bev, j->events, j->arg);
 				}
 			}
-
 			nst++;
 			free(j);
 		}
 
-		ntrip_log(st, LOG_EDEBUG, "thread %p ran %d jobs for ntrip state %p\n", pthread_self(), nst, st);
+		ntrip_log(st, LOG_EDEBUG, "ran %d jobs for ntrip state %p\n", nst, st);
 
 		bufferevent_unlock(bev);
 
@@ -171,6 +181,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		return;
 	}
 
+	ntrip_log(st, LOG_EDEBUG, "appending job for %p njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
 
 	/*
 	 * Check whether the ntrip_state queue is empty.
@@ -189,6 +200,11 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 #else
 	struct job *lastj = NULL;
 #endif
+
+	if (jobq_was_empty)
+		assert(!st->njobs && !st->newjobs);
+	else
+		assert(st->njobs && st->newjobs == -1);
 
 	/*
 	 * Check the last recorded callback, if any. Skip if identical to the new one.
@@ -213,20 +229,28 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		j->arg = arg;
 		j->events = events;
 		STAILQ_INSERT_TAIL(&st->jobq, j, next);
+		st->njobs++;
+		if (st->newjobs >= 0)
+			st->newjobs++;
 	}
 	if (j == NULL) {
 		P_MUTEX_UNLOCK(&this->append_mutex);
 		return;
 	}
 
-	if (jobq_was_empty) {
+	assert(jobq_was_empty ? st->newjobs == 1 : st->newjobs == -1);
+	if (st->newjobs == 1) {
 		/*
 		 * Insertion needed in the main job queue.
 		 */
-		ntrip_log(st, LOG_EDEBUG, "inserting in joblist append_queue %p\n", st);
+		assert(st->newjobs != -1);
+		ntrip_log(st, LOG_EDEBUG, "inserting in joblist ntrip_queue %p njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
 		STAILQ_INSERT_TAIL(&this->append_queue, st, next);
-	} else
-		ntrip_log(st, LOG_EDEBUG, "ntrip_state %p already in job list\n", st);
+		st->newjobs = -1;
+	} else {
+		assert(st->newjobs == -1);
+		ntrip_log(st, LOG_EDEBUG, "ntrip_state %p already in job list, njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
+	}
 
 	/*
 	 * Signal waiting workers there is a new job.
@@ -234,6 +258,19 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 	if (pthread_cond_signal(&this->condjob) < 0)
 		_log_error(this, "pthread_cond_signal");
 	P_MUTEX_UNLOCK(&this->append_mutex);
+}
+
+/*
+ * Drain the job queue for a ntrip_state
+ */
+void joblist_drain(struct ntrip_state *st) {
+	struct job *j;
+	while ((j = STAILQ_FIRST(&st->jobq))) {
+		STAILQ_REMOVE_HEAD(&st->jobq, next);
+		st->njobs--;
+		if (st->newjobs > 0) st->newjobs--;
+		free(j);
+	}
 }
 
 void *jobs_start_routine(void *arg) {

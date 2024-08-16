@@ -54,6 +54,7 @@ struct joblist *joblist_new(struct caster_state *caster);
 void joblist_free(struct joblist *this);
 void joblist_run(struct joblist *this);
 void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events);
+void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);
 int jobs_start_threads(struct caster_state *caster, int nthreads);
 

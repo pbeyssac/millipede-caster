@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <string.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -50,6 +51,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->user_agent = NULL;
 	if (threads)
 		STAILQ_INIT(&this->jobq);
+	this->njobs = 0;
+	this->newjobs = 0;
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
@@ -143,6 +146,8 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	bufferevent_set_timeouts(this->bev, NULL, NULL);
 	bufferevent_setcb(this->bev, NULL, NULL, NULL, NULL);
 
+	joblist_drain(this);
+
 	/*
 	 * In unthreaded mode, no locking issue: do the rest at once.
 	 */
@@ -151,6 +156,7 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 		return;
 	}
 
+	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free %p njobs %d newjobs %d\n", this, this->njobs, this->newjobs);
 
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
@@ -173,6 +179,29 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 		struct bufferevent *bev = st->bev;
 
 		bufferevent_lock(bev);
+
+		assert(STAILQ_EMPTY(&st->jobq));
+
+		if (st->newjobs == -1) {
+			/*
+			 * Still in one of the main job queues.
+			 *
+			 * Since removing the ntrip_state from the job queue would be expensive,
+			 * just give up for the moment.
+			 */
+			P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
+			ntrip_log(st, LOG_DEBUG, "ntrip_deferred_run %p njobs %d newjobs %d, deferring more\n", st, st->njobs, st->newjobs);
+			TAILQ_INSERT_TAIL(&this->ntrips.free_queue, st, nextf);
+			bufferevent_unlock(bev);
+			/* Exit the loop to avoid an infinite loop */
+			break;
+		}
+
+		assert(st->newjobs != -1);
+		ntrip_log(st, LOG_EDEBUG, "ntrip_deferred_run %p njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
+
+		assert(st->njobs == 0);
+
 		struct subscriber *sub = st->subscription;
 		if (sub) {
 			/*
