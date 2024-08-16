@@ -273,9 +273,21 @@ void joblist_drain(struct ntrip_state *st) {
 	}
 }
 
+/*
+ * Temporary structure to provide threads with the id
+ * we have assigned them.
+ */
+struct thread_start_args {
+	long thread_id;
+	struct caster_state *caster;
+};
+
 void *jobs_start_routine(void *arg) {
-	struct caster_state *caster = (struct caster_state *)arg;
-	printf("started thread %p\n", pthread_self());
+	struct thread_start_args *start_args = (struct thread_start_args *)arg;
+	struct caster_state *caster = start_args->caster;
+	pthread_setspecific(caster->thread_id, (void *)(start_args->thread_id));
+	printf("started thread %lu\n", start_args->thread_id);
+	free(start_args);
 	joblist_run(caster->joblist);
 	return NULL;
 }
@@ -286,6 +298,9 @@ int jobs_start_threads(struct caster_state *caster, int nthreads) {
 		return -1;
 	}
 
+	pthread_key_create(&caster->thread_id, NULL);
+	pthread_setspecific(caster->thread_id, 0);
+
 	// Set stack size to the configured value
 	size_t stacksize = caster->config->threads[0].stacksize;
 	pthread_attr_t attr;
@@ -294,7 +309,10 @@ int jobs_start_threads(struct caster_state *caster, int nthreads) {
 	printf("Setting thread stack size to %zu bytes\n", stacksize);
 
 	for (int i = 0; i < nthreads; i++) {
-		int r = pthread_create(&p[i], &attr, jobs_start_routine, caster);
+		struct thread_start_args *args = (struct thread_start_args *)malloc(sizeof(struct thread_start_args));
+		args->thread_id = i+1;
+		args->caster = caster;
+		int r = pthread_create(&p[i], &attr, jobs_start_routine, args);
 		if (r < 0) {
 			return -1;
 		}

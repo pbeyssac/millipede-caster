@@ -3,6 +3,7 @@
 
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <pthread.h>
 
 #include "conf.h"
 #include "config.h"
@@ -56,6 +57,9 @@ struct caster_state {
 
 	/* Logs */
 	struct log flog, alog;
+
+	/* Thread id (thread-specific variable) for logs */
+	pthread_key_t thread_id;
 
 	/* Signal handling */
 	struct event *signalint_event;
