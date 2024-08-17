@@ -148,6 +148,10 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	int n = 0;
 	int ns = 0;
 
+	if (this == NULL)
+		/* Dead livesource */
+		return 0;
+
 	P_RWLOCK_WRLOCK(&this->lock);
 
 	this->npackets++;

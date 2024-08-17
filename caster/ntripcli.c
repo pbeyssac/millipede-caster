@@ -223,7 +223,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 		} else if (st->state == NTRIP_REGISTER_SOURCE) {
 			if (st->redistribute) {
 				struct sourceline *sourceline = stack_find_pullable(&st->caster->sourcetablestack, st->mountpoint, NULL);
-				if ((st->own_livesource = ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 1)) == NULL) {
+				if (sourceline == NULL || ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 1) == NULL) {
 					end = 1;
 					ntrip_log(st, LOG_NOTICE, "%p Can't register live source for %s\n", st, st->mountpoint);
 					if (st->callback_subscribe) {
@@ -253,10 +253,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			int idle_time = time(NULL) - st->last_send;
 			if (idle_time > st->caster->config->idle_max_delay) {
 				ntrip_log(st, LOG_NOTICE, "last_send %s: %d seconds ago, dropping\n", st->mountpoint, idle_time);
-				if (st->registered) {
-					ntrip_unregister_livesource(st, st->mountpoint);
-					st->registered = 0;
-				}
 				end = 1;
 			}
 		}
@@ -339,9 +335,8 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	}
 
 	/* Unregister live source, if any */
-	if (st->registered) {
-		ntrip_unregister_livesource(st, st->mountpoint);
-		st->registered = 0;
+	if (st->own_livesource) {
+		ntrip_unregister_livesource(st);
 		if (st->redistribute) {
 			struct redistribute_cb_args *redis_args = redistribute_args_new(st, NULL, st->mountpoint, &st->mountpoint_pos, st->caster->config->reconnect_delay, 0);
 			if (redis_args)

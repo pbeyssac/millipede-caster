@@ -377,7 +377,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					st->mountpoint = mystrdup(mountpoint);
-					if ((st->own_livesource = ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 0)) == NULL) {
+					if (ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 0) == NULL) {
 						err = 503;
 						break;
 					};
@@ -405,7 +405,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 503;
 						break;
 					}
-					if ((st->own_livesource = ntrip_add_livesource(st, st->http_args[2], &sourceline->pos, 0)) == NULL) {
+					if (ntrip_add_livesource(st, st->http_args[2], &sourceline->pos, 0) == NULL) {
 						err = 503;
 						break;
 					};
@@ -511,10 +511,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 		if (events & BEV_EVENT_WRITING)
 			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout ntrip_state %p.\n", st);
 	}
-	if (st->registered) {
-		ntrip_unregister_livesource(st, st->mountpoint);
-		st->registered = 0;
-	}
+
 	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
 	ntrip_deferred_free(st, "ntripsrv_eventcb");
 }

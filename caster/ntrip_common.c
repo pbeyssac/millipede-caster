@@ -49,6 +49,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->password = NULL;
 	this->type = "starting";
 	this->user_agent = NULL;
+	this->own_livesource = NULL;
 	if (threads)
 		STAILQ_INIT(&this->jobq);
 	this->njobs = 0;
@@ -140,6 +141,10 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 		this->callback_subscribe_arg->requesting_st = NULL;
 		this->callback_subscribe_arg = NULL;
 	}
+
+	if (this->own_livesource)
+		ntrip_unregister_livesource(this);
+
 	bufferevent_disable(this->bev, EV_READ|EV_WRITE);
 	bufferevent_set_timeouts(this->bev, NULL, NULL);
 	bufferevent_setcb(this->bev, NULL, NULL, NULL, NULL);
@@ -290,30 +295,32 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 			P_RWLOCK_WRLOCK(&existing_livesource->lock);
 			existing_livesource->state = LIVESOURCE_RUNNING;
 			P_RWLOCK_UNLOCK(&existing_livesource->lock);
-			this->registered = 1;
 		} else if (existing_state == LIVESOURCE_RUNNING)
 			ntrip_log(this, LOG_INFO, "%p livesource %s already RUNNING\n", this, mountpoint);
 		else
 			existing_livesource = NULL;
+		this->own_livesource = existing_livesource;
 		return existing_livesource;
 	}
 	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_RUNNING);
 	if (np == NULL) {
 		P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
+		this->own_livesource = NULL;
 		return NULL;
 	}
 	TAILQ_INSERT_TAIL(&this->caster->livesources.queue, np, next);
-	this->registered = 1;
+	this->own_livesource = np;
 	P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
 	ntrip_log(this, LOG_INFO, "%p livesource %s created RUNNING\n", this, mountpoint);
 	return np;
 }
 
-void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint) {
-	ntrip_log(this, LOG_INFO, "Unregister livesource %s\n", mountpoint);
-	struct livesource *l = livesource_find(this->caster, this, mountpoint, NULL);
-	if (l)
-		caster_del_livesource(this->caster, l);
+void ntrip_unregister_livesource(struct ntrip_state *this) {
+	if (!this->own_livesource)
+		return;
+	ntrip_log(this, LOG_INFO, "Unregister livesource %s\n", this->mountpoint);
+	caster_del_livesource(this->caster, this->own_livesource);
+	this->own_livesource = NULL;
 }
 
 char *ntrip_peer_ipstr(struct ntrip_state *this) {

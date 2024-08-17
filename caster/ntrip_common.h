@@ -134,7 +134,6 @@ struct ntrip_state {
 	/* packet feed (RTCM or other) redistribution */
 	time_t last_send;			// last time a packet was resent to someone
 	char redistribute;			// Flag: register as a live source
-	char registered;			// Flag: registered as a live source
 	char persistent;			// Flag: don't unregister & close even after idle_max_delay
 
 	/*
@@ -198,7 +197,7 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this, char *orig);
 const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, pos_t *mountpoint_pos, int on_demand);
-void ntrip_unregister_livesource(struct ntrip_state *this, char *mountpoint);
+void ntrip_unregister_livesource(struct ntrip_state *this);
 char *ntrip_peer_ipstr(struct ntrip_state *this);
 unsigned short ntrip_peer_port(struct ntrip_state *this);
 void ntrip_alog(void *arg, const char *fmt, ...);
