@@ -501,8 +501,10 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_EOF)
 			ntrip_log(st, LOG_INFO, "Connection closed (EOF) ntrip_state %p.\n", st);
-		else
-			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s\n", strerror(initial_errno));
+		else {
+			char err[256];
+			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s\n", strerror_r(initial_errno, err, sizeof err));
+		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)
 			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout ntrip_state %p.\n", st);
