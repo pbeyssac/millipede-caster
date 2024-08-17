@@ -491,7 +491,7 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 
 		if (!strcmp(s->caster, "LOCAL")) {
 			char *header_tmp = mystrdup(s->header);
-			if (header == NULL) {
+			if (header_tmp == NULL) {
 				P_RWLOCK_UNLOCK(&s->lock);
 				P_RWLOCK_UNLOCK(&this->lock);
 				goto cancel;
