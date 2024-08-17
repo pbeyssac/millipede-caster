@@ -507,6 +507,7 @@ void file_free(struct parsed_file *p) {
 			strfree(p->pls[line][field]);
 		strfree(p->pls[line]);
 	}
+	strfree(p->filename);
 	free(p->pls);
 	free(p);
 }
