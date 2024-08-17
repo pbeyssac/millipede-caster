@@ -149,9 +149,9 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 		char *value = mystrdup(sourcetable_entry);
 		char *valueparse = mystrdup(sourcetable_entry);
 		if (host == NULL || value == NULL || valueparse == NULL) {
-			if (host) free(host);
-			if (value) free(value);
-			if (valueparse) free(valueparse);
+			if (host) strfree(host);
+			if (value) strfree(value);
+			if (valueparse) strfree(valueparse);
 			free(n1);
 			return -1;
 		}
@@ -218,7 +218,7 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 			TAILQ_INSERT_TAIL(&this->sources, n1, next);
 			P_RWLOCK_UNLOCK(&this->lock);
 		}
-		free(valueparse);
+		strfree(valueparse);
 	} else {
 		P_RWLOCK_WRLOCK(&this->lock);
 		int new_len = strlen(this->header) + strlen(sourcetable_entry) + 3;

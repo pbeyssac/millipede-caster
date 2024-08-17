@@ -14,6 +14,7 @@
 #include <malloc_np.h>
 #endif
 
+#include "conf.h"
 #include "util.h"
 
 /*
@@ -356,20 +357,34 @@ parse_header(char *line, char **key, char **val) {
 #if DEBUG
 int str_alloc = 0;
 
+static P_MUTEX_T strmutex = PTHREAD_MUTEX_INITIALIZER;
+
 char *mystrdup(const char *str) {
+	P_MUTEX_LOCK(&strmutex);
 	str_alloc++;
+	P_MUTEX_UNLOCK(&strmutex);
 	return strdup(str);
 }
 void *strmalloc(size_t len) {
+	P_MUTEX_LOCK(&strmutex);
 	str_alloc++;
+	P_MUTEX_UNLOCK(&strmutex);
 	return malloc(len);
 }
 void *strrealloc(void *p, size_t len) {
-	if (p == NULL) str_alloc++;
+	if (p == NULL) {
+		P_MUTEX_LOCK(&strmutex);
+		str_alloc++;
+		P_MUTEX_UNLOCK(&strmutex);
+	}
 	return realloc(p, len);
 }
 void strfree(void *str) {
-	if (str) str_alloc--;
+	if (str) {
+		P_MUTEX_LOCK(&strmutex);
+		str_alloc--;
+		P_MUTEX_UNLOCK(&strmutex);
+	}
 	free(str);
 }
 #endif
@@ -378,6 +393,13 @@ void strfree(void *str) {
  * Callback to free regular malloc'd data
  */
 void free_callback(const void *data, size_t datalen, void *extra) {
+	free((void *)data);
+}
+
+/*
+ * Callback to free strmalloc'd data
+ */
+void strfree_callback(const void *data, size_t datalen, void *extra) {
 	strfree((void *)data);
 }
 
@@ -456,7 +478,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 
 	struct parsed_file *pf = (struct parsed_file *)malloc(sizeof(struct parsed_file));
 	pf->pls = NULL;
-	pf->filename = strdup(filename);
+	pf->filename = mystrdup(filename);
 	if (pf->filename == NULL) {
 		fclose(fp);
 		fprintf(stderr, "Can't read %s\n", filename);
@@ -505,7 +527,7 @@ void file_free(struct parsed_file *p) {
 	for (int line = 0; line < p->nlines; line++) {
 		for (int field = 0; field < p->nfields; field++)
 			strfree(p->pls[line][field]);
-		strfree(p->pls[line]);
+		free(p->pls[line]);
 	}
 	strfree(p->filename);
 	free(p->pls);

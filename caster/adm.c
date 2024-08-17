@@ -39,7 +39,7 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 		char *r = malloc_stats_dump(json);
 		if (r) {
 			ntripsrv_send_result_ok(st, output, "text/plain", NULL);
-			if (evbuffer_add_reference(output, r, strlen(r), free_callback, NULL) < 0)
+			if (evbuffer_add_reference(output, r, strlen(r), strfree_callback, NULL) < 0)
 				strfree(r);
 		} else {
 			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory\n");
@@ -52,7 +52,7 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 	} else if (!strcmp(uri, "/net")) {
 		const char *r = ntrip_list_json(st->caster, st);
 		ntripsrv_send_result_ok(st, output, "application/json", NULL);
-		if (evbuffer_add_reference(output, r, strlen(r), free_callback, NULL) < 0)
+		if (evbuffer_add_reference(output, r, strlen(r), strfree_callback, NULL) < 0)
 			strfree((void *)r);
 		st->state = NTRIP_WAIT_CLOSE;
 		return 0;

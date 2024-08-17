@@ -65,7 +65,7 @@ void
 redistribute_args_free(struct redistribute_cb_args *this) {
 	if (this->ev)
 		event_del(this->ev);
-	free(this->mountpoint);
+	strfree(this->mountpoint);
 	free(this);
 }
 

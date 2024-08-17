@@ -52,7 +52,7 @@ static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *
 	send_server_reply(this, output, 200, "OK", &headers, "SOURCETABLE");
 	evhttp_clear_headers(&headers);
 	//logfmt(this->&caster->flog, "\"%s\"\n", s);
-	if (evbuffer_add_reference(output, s, strlen(s), free_callback, NULL) < 0) {
+	if (evbuffer_add_reference(output, s, strlen(s), strfree_callback, NULL) < 0) {
 		// the call failed so we need to free s instead of letting the callback do it.
 		strfree(s);
 	}
@@ -435,12 +435,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		}
 
 		if (line) {
-			strfree(line);
+			free(line);
 			line = NULL;
 		}
 	}
 	if (line)
-		strfree(line);
+		free(line);
 
 	if (err) {
 		if (err == 400)

@@ -45,6 +45,7 @@ struct auth_entry {
 #endif
 
 void free_callback(const void *data, size_t datalen, void *extra);
+void strfree_callback(const void *data, size_t datalen, void *extra);
 
 float distance(pos_t *p1, pos_t *p2);
 char *b64encode(const char *str, size_t len, int add_nul);

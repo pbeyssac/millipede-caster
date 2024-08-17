@@ -125,13 +125,13 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				}
 			}
 			if (end) {
-				strfree(line);
+				free(line);
 				break;
 			}
 
 			if (!strcmp(st->http_args[0], "ERROR")) {
 				ntrip_log(st, LOG_NOTICE, "NTRIP1 error reply: %s\n", line);
-				strfree(line);
+				free(line);
 				end = 1;
 				break;
 			}
@@ -197,7 +197,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					}
 				}
 			}
-			strfree(line);
+			free(line);
 		} else if (st->state == NTRIP_WAIT_SOURCETABLE_LINE) {
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
@@ -219,7 +219,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					end = 1;
 				}
 			}
-			strfree(line);
+			free(line);
 		} else if (st->state == NTRIP_REGISTER_SOURCE) {
 			if (st->redistribute) {
 				struct sourceline *sourceline = stack_find_pullable(&st->caster->sourcetablestack, st->mountpoint, NULL);

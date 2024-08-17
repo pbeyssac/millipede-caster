@@ -77,9 +77,9 @@ static void auth_free(struct auth_entry *this) {
 	if (this == NULL)
 		return;
 	while (p->key || p->user || p->password) {
-		free((char *)p->key);
-		free((char *)p->user);
-		free((char *)p->password);
+		strfree((char *)p->key);
+		strfree((char *)p->user);
+		strfree((char *)p->password);
 		p++;
 	}
 	free(this);
