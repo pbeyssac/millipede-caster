@@ -198,9 +198,6 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	 */
 	int jobq_was_empty = STAILQ_EMPTY(&st->jobq);
 
-	/*
-	 * Deactivate callback deduplication for systems lacking STAILQ_LAST.
-	 */
 	struct job *lastj = STAILQ_LAST(&st->jobq, job, next);
 
 	if (jobq_was_empty)
