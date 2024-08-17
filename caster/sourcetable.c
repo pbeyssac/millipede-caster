@@ -557,6 +557,7 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 	struct sourcetable *r = sourcetable_new();
 	if (r == NULL)
 		goto cancel;
+	strfree(r->header);
 	r->header = header;
 
 	/* Sort by mountpoint name */
