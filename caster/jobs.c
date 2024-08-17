@@ -11,12 +11,6 @@
 #include "ntrip_common.h"
 
 
-static void _log_error(struct joblist *this, char *orig) {
-	char s[256];
-	strerror_r(errno, s, sizeof s);
-	logfmt(&this->caster->flog, "%s: %s (%d)\n", orig, s, errno);
-}
-
 /*
  * Create a job list.
  */
@@ -29,7 +23,7 @@ struct joblist *joblist_new(struct caster_state *caster) {
 		P_MUTEX_INIT(&this->mutex, NULL);
 		P_MUTEX_INIT(&this->append_mutex, NULL);
 		if (pthread_cond_init(&this->condjob, NULL) < 0)
-			_log_error(this, "pthread_cond_init");
+			caster_log_error(this->caster, "pthread_cond_init");
 	}
 	return this;
 }
@@ -54,7 +48,7 @@ void joblist_free(struct joblist *this) {
 	P_MUTEX_DESTROY(&this->mutex);
 	P_MUTEX_DESTROY(&this->append_mutex);
 	if (pthread_cond_destroy(&this->condjob) < 0)
-		_log_error(this, "pthread_cond_signal");
+		caster_log_error(this->caster, "pthread_cond_signal");
 }
 
 /*
@@ -89,7 +83,7 @@ void joblist_run(struct joblist *this) {
 				 * Both queues empty => wait.
 				 */
 				if (pthread_cond_wait(&this->condjob, &this->mutex) < 0)
-					_log_error(this, "pthread_cond_wait");
+					caster_log_error(this->caster, "pthread_cond_wait");
 				continue;
 			}
 			/*
@@ -249,7 +243,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	 * Signal waiting workers there is a new job.
 	 */
 	if (pthread_cond_signal(&this->condjob) < 0)
-		_log_error(this, "pthread_cond_signal");
+		caster_log_error(this->caster, "pthread_cond_signal");
 	P_MUTEX_UNLOCK(&this->append_mutex);
 }
 

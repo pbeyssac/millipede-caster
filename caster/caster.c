@@ -85,6 +85,12 @@ static void auth_free(struct auth_entry *this) {
 	free(this);
 }
 
+void caster_log_error(struct caster_state *this, char *orig) {
+	char s[256];
+	strerror_r(errno, s, sizeof s);
+	logfmt(&this->flog, "%s: %s (%d)\n", orig, s, errno);
+}
+
 static void
 _caster_log(FILE *log, const char *fmt, va_list ap) {
 	char date[36];
