@@ -144,8 +144,6 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	bufferevent_set_timeouts(this->bev, NULL, NULL);
 	bufferevent_setcb(this->bev, NULL, NULL, NULL, NULL);
 
-	joblist_drain(this);
-
 	/*
 	 * In unthreaded mode, no locking issue: do the rest at once.
 	 */
@@ -153,6 +151,8 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 		_ntrip_free(this, orig, 1);
 		return;
 	}
+
+	joblist_drain(this);
 
 	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free %p njobs %d newjobs %d\n", this, this->njobs, this->newjobs);
 
