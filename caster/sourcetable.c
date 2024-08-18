@@ -143,7 +143,7 @@ void sourcetable_del_mountpoint(struct sourcetable *this, char *mountpoint) {
 	P_RWLOCK_UNLOCK(&this->lock);
 }
 
-void _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
+static void _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
 	P_RWLOCK_WRLOCK(&this->lock);
 	TAILQ_INSERT_TAIL(&this->sources, s, next);
 	P_RWLOCK_UNLOCK(&this->lock);
