@@ -80,6 +80,9 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 
 	if (this->mountpoint)
 		strfree(this->mountpoint);
+	if (this->virtual_mountpoint)
+		strfree(this->virtual_mountpoint);
+
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
 		if (this->http_args[i])
 			strfree(this->http_args[i]);
