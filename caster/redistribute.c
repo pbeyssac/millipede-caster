@@ -135,25 +135,22 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 
 	struct sourcetable *sp = NULL;
 
+	struct sourceline *s = stack_find_pullable(&redis_args->caster->sourcetablestack, redis_args->mountpoint, &sp);
+	if (s == NULL) {
+		logfmt(&redis_args->caster->flog, "Can't find pullable mountpoint %s\n", redis_args->mountpoint);
+		return;
+	}
+
 	/*
 	 * Create new client state.
 	 */
-	struct ntrip_state *st = ntrip_new(redis_args->caster, NULL, 0, redis_args->mountpoint);
+	struct ntrip_state *st = ntrip_new(redis_args->caster, sp->caster, sp->port, redis_args->mountpoint);
 	if (st == NULL) {
 		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
 	}
 	st->bev = bev;
 	st->type = "source_fetcher";
-
-	struct sourceline *s = stack_find_pullable(&st->caster->sourcetablestack, redis_args->mountpoint, &sp);
-	if (s == NULL) {
-		logfmt(&redis_args->caster->flog, "Can't find pullable mountpoint %s\n", redis_args->mountpoint);
-		ntrip_deferred_free(st, "redistribute_source_stream");
-		return;
-	}
-	st->host = sp->caster;
-	st->port = sp->port;
 	st->redistribute = 1;
 	st->persistent = redis_args->persistent;
 	redis_args->source_st = st;
@@ -176,7 +173,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
         struct timeval write_timeout = { st->caster->config->on_demand_source_timeout, 0 };
         bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 	gettimeofday(&redis_args->t0, NULL);
-	bufferevent_socket_connect_hostname(bev, redis_args->caster->dns_base, AF_UNSPEC, sp->caster, sp->port);
+	bufferevent_socket_connect_hostname(bev, redis_args->caster->dns_base, AF_UNSPEC, st->host, st->port);
 }
 
 /*

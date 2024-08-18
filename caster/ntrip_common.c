@@ -29,12 +29,16 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 		strfree(this);
 		return NULL;
 	}
+	if (host && (this->host = mystrdup(host)) == NULL) {
+		strfree(this->mountpoint);
+		strfree(this);
+		return NULL;
+	}
 
 	this->caster = caster;
 	this->state = NTRIP_WAIT_HTTP_STATUS;
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
-	this->host = host;
 	this->port = port;
 	this->remote_addr[0] = '\0';
 	this->start = 0;
@@ -78,10 +82,9 @@ static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *be
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_DEBUG, "FREE %p %s\n", this, orig);
 
-	if (this->mountpoint)
-		strfree(this->mountpoint);
-	if (this->virtual_mountpoint)
-		strfree(this->virtual_mountpoint);
+	strfree(this->mountpoint);
+	strfree(this->virtual_mountpoint);
+	strfree(this->host);
 
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
 		if (this->http_args[i])
