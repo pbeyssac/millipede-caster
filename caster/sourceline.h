@@ -20,7 +20,7 @@ struct sourceline {
 };
 TAILQ_HEAD (sourcelineq, sourceline);
 
-struct sourceline *sourceline_new();
+struct sourceline *sourceline_new(const char *host, unsigned short port, const char *key, const char *value);
 struct sourceline *sourceline_copy(struct sourceline *orig);
 void sourceline_free(struct sourceline *this);
 

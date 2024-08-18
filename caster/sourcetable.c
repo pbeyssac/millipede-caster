@@ -141,50 +141,35 @@ void _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
 
 int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand) {
 	if (!strncmp(sourcetable_entry, "STR;", 4)) {
-		struct sourceline *n1 = sourceline_new();
-		if (n1 == NULL) {
-			return -1;
-		}
-		char *host = mystrdup(this->caster);
-		char *value = mystrdup(sourcetable_entry);
 		char *valueparse = mystrdup(sourcetable_entry);
-		if (host == NULL || value == NULL || valueparse == NULL) {
-			if (host) strfree(host);
-			if (value) strfree(value);
-			if (valueparse) strfree(valueparse);
-			free(n1);
+		if (valueparse == NULL)
 			return -1;
-		}
 		char *p1 = valueparse + 4;
 		char *p2 = p1;
 		char *token;
-		n1->virtual = 0;
-		n1->on_demand = on_demand;
-		n1->host = host;
-		n1->port = this->port;
 
 		while (*p2 && *p2 != ';') p2++;
 		if (!*p2) {
 			fprintf(stderr, "unable to parse %s\n", sourcetable_entry);
-			strfree(host);
-			strfree(value);
 			strfree(valueparse);
-			free(n1);
 			return -1;
 		}
 
 		char *key = (char *)strmalloc(p2 - p1 + 1);
 		if (key == NULL) {
-			strfree(host);
-			strfree(value);
 			strfree(valueparse);
-			free(n1);
 			return -1;
 		}
 		key[p2-p1] = '\0';
 		memcpy(key, p1, p2-p1);
-		n1->key = key;
-		n1->value = value;
+		struct sourceline *n1 = sourceline_new(this->caster, this->port, key, sourcetable_entry);
+		strfree(key);
+		if (n1 == NULL) {
+			strfree(valueparse);
+			return -1;
+		}
+		n1->virtual = 0;
+		n1->on_demand = on_demand;
 		int err = 0, n = 0;
 		pos_t pos;
 		char *septmp = valueparse;
