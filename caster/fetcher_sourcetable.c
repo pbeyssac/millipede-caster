@@ -17,10 +17,16 @@ get_sourcetable_cb(int fd, short what, void *arg) {
 /*
  * Initialize, but don't start, a sourcetable fetcher.
  */
-void fetcher_sourcetable_init(struct sourcetable_fetch_args *this,
-	struct caster_state *caster,
+struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *caster,
 	const char *host, unsigned short port, int refresh_delay, int priority) {
+	struct sourcetable_fetch_args *this = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args));
+	if (this == NULL)
+		return NULL;
 	this->host = mystrdup(host);
+	if (this->host == NULL) {
+		free(this);
+		return NULL;
+	}
 	this->port = port;
 	this->refresh_delay = refresh_delay;
 	this->caster = caster;
@@ -29,6 +35,7 @@ void fetcher_sourcetable_init(struct sourcetable_fetch_args *this,
 	this->ev = NULL;
 	this->st = NULL;
 	this->priority = priority;
+	return this;
 }
 
 /*
@@ -47,6 +54,12 @@ static void _fetcher_sourcetable_stop(struct sourcetable_fetch_args *this, int k
 	}
 	if (!keep_sourcetable)
 		stack_replace_host(&this->caster->sourcetablestack, this->host, this->port, NULL);
+}
+
+void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
+	_fetcher_sourcetable_stop(this, 0);
+	strfree(this->host);
+	free(this);
 }
 
 void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this) {

@@ -17,9 +17,9 @@ struct sourcetable_fetch_args {
 	struct ntrip_state *st;
 };
 
-void fetcher_sourcetable_init(struct sourcetable_fetch_args *this,
-        struct caster_state *caster,
+struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *caster,
         const char *host, unsigned short port, int refresh_delay, int priority);
+void fetcher_sourcetable_free(struct sourcetable_fetch_args *this);
 void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this);
 void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay, int priority);
 void fetcher_sourcetable_start(struct sourcetable_fetch_args *arg_cb);

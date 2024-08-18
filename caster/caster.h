@@ -69,7 +69,7 @@ struct caster_state {
 	/*
 	 * Sourcetable fetcher configuration.
 	 */
-	struct sourcetable_fetch_args *sourcetable_fetchers;
+	struct sourcetable_fetch_args **sourcetable_fetchers;
 	int sourcetable_fetchers_count;
 };
 

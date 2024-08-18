@@ -43,7 +43,7 @@ static void caster_log(void *arg, const char *fmt, va_list ap);
 static void caster_alog(void *arg, const char *fmt, va_list ap);
 static int caster_start_fetchers(struct caster_state *this);
 static void caster_reload_fetchers(struct caster_state *this);
-static void caster_stop_fetchers(struct caster_state *this);
+static void caster_free_fetchers(struct caster_state *this);
 static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *sa, int socklen, void *arg);
 
 /*
@@ -179,7 +179,7 @@ void caster_free(struct caster_state *this) {
 	free(this->listeners);
 	free(this->socks);
 
-	caster_stop_fetchers(this);
+	caster_free_fetchers(this);
 
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
@@ -466,31 +466,30 @@ static int caster_start_fetchers(struct caster_state *this) {
 	if (!this->config->proxy_count)
 		return 0;
 
-	struct sourcetable_fetch_args *fetchers = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args)*this->config->proxy_count);
+	struct sourcetable_fetch_args **fetchers = (struct sourcetable_fetch_args **)malloc(sizeof(struct sourcetable_fetch_args *)*this->config->proxy_count);
 
 	this->sourcetable_fetchers = fetchers;
 	this->sourcetable_fetchers_count = this->config->proxy_count;
 
-	struct sourcetable_fetch_args *a;
-
 	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
-		a = &fetchers[i];
-		fetcher_sourcetable_init(a, this,
+		fetchers[i] = fetcher_sourcetable_new(this,
 			this->config->proxy[i].host,
 			this->config->proxy[i].port,
 			this->config->proxy[i].table_refresh_delay,
 			this->config->proxy[i].priority);
-		fetcher_sourcetable_start(a);
+		if (fetchers[i])
+			fetcher_sourcetable_start(fetchers[i]);
 	}
+
 	return 0;
 }
 
 static void caster_reload_fetchers(struct caster_state *this) {
 	if (!this->config->proxy_count) {
-		caster_stop_fetchers(this);
+		caster_free_fetchers(this);
 		return;
 	}
-	struct sourcetable_fetch_args *new_fetchers = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args)*this->config->proxy_count);
+	struct sourcetable_fetch_args **new_fetchers = (struct sourcetable_fetch_args **)malloc(sizeof(struct sourcetable_fetch_args *)*this->config->proxy_count);
 
 	/*
 	 * For each entry in the new config, recycle a similar entry in the old configuration.
@@ -498,47 +497,52 @@ static void caster_reload_fetchers(struct caster_state *this) {
 	for (int i = 0; i < this->config->proxy_count; i++) {
 		struct sourcetable_fetch_args *p = NULL;
 		for (int j = 0; j < this->sourcetable_fetchers_count; j++) {
-			if (this->sourcetable_fetchers[j].port == 0)
+			if (this->sourcetable_fetchers[j] == NULL)
 				/* Already cleared */
 				continue;
-			if (!strcmp(this->sourcetable_fetchers[j].host, this->config->proxy[i].host)
-			&& this->sourcetable_fetchers[j].port == this->config->proxy[i].port) {
-				p = &this->sourcetable_fetchers[j];
+			if (!strcmp(this->sourcetable_fetchers[j]->host, this->config->proxy[i].host)
+			&& this->sourcetable_fetchers[j]->port == this->config->proxy[i].port) {
+				p = this->sourcetable_fetchers[j];
+				/* Found, clear in the old table */
+				this->sourcetable_fetchers[j] = NULL;
 				break;
 			}
 		}
 		if (!p) {
 			/* Not found, create */
-			fetcher_sourcetable_init(new_fetchers+i, this,
+			p = fetcher_sourcetable_new(this,
 				this->config->proxy[i].host, this->config->proxy[i].port,
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
+			fprintf(stderr, "New fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
 		} else {
-			/* Found, copy and mark as cleared in the old table */
-			memcpy(new_fetchers+i, p, sizeof(new_fetchers[i]));
-			p->port = 0;
-			fetcher_sourcetable_reload(new_fetchers+i,
+			fetcher_sourcetable_reload(p,
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
+			fprintf(stderr, "Reusing fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
 		}
+		new_fetchers[i] = p;
 	}
 	/*
-	 * Stop all remaining fetchers in the old configuration.
+	 * Stop and free all remaining fetchers in the old configuration.
 	 */
 	for (int j = 0; j < this->sourcetable_fetchers_count; j++)
-		if (this->sourcetable_fetchers[j].port)
-			fetcher_sourcetable_stop(&this->sourcetable_fetchers[j]);
+		if (this->sourcetable_fetchers[j]) {
+			fprintf(stderr, "Stopping fetcher %s:%d\n", this->sourcetable_fetchers[j]->host, this->sourcetable_fetchers[j]->port);
+			fetcher_sourcetable_free(this->sourcetable_fetchers[j]);
+		}
 	free(this->sourcetable_fetchers);
 	this->sourcetable_fetchers_count = this->config->proxy_count;
 	this->sourcetable_fetchers = new_fetchers;
 }
 
-static void caster_stop_fetchers(struct caster_state *this) {
-	struct sourcetable_fetch_args *a = this->sourcetable_fetchers;
+static void caster_free_fetchers(struct caster_state *this) {
+	struct sourcetable_fetch_args **a = this->sourcetable_fetchers;
 	if (!a)
 		return;
 	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
-		fetcher_sourcetable_stop(&a[i]);
+		if (a[i])
+			fetcher_sourcetable_free(a[i]);
 	}
 	free(a);
 	this->sourcetable_fetchers = NULL;
