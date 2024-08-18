@@ -7,9 +7,6 @@
 #include "config.h"
 
 
-int threads = 0;
-int nthreads = 0;
-
 /*
  * Default configuration file name
  */

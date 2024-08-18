@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "conf.h"
 #include "util.h"
 
 static void b64_test() {
