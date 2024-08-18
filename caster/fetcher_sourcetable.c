@@ -76,8 +76,8 @@ sourcetable_cb(int fd, short what, void *arg) {
 
 	if (sourcetable != NULL) {
 		logfmt(&caster->flog, "sourcetable loaded from %s:%d, %d entries, %.3f ms\n",
-			sourcetable->caster,
-			sourcetable->port,
+			a->host,
+			a->port,
 			sourcetable_nentries(sourcetable, 0),
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 		sourcetable->priority = a->priority;

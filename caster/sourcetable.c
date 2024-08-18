@@ -24,8 +24,7 @@ struct sourcetable *sourcetable_read(const char *filename, int priority) {
 		return NULL;
 	}
 
-	struct sourcetable *tmp_sourcetable = sourcetable_new();
-	tmp_sourcetable->caster = "LOCAL";
+	struct sourcetable *tmp_sourcetable = sourcetable_new("LOCAL", 0);
 	tmp_sourcetable->local = 1;
 	tmp_sourcetable->filename = mystrdup(filename);
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
@@ -51,18 +50,28 @@ struct sourcetable *sourcetable_read(const char *filename, int priority) {
 	return tmp_sourcetable;
 }
 
-struct sourcetable *sourcetable_new() {
-	struct sourcetable *this = (struct sourcetable *)calloc(1, sizeof(struct sourcetable));
-	if (this != NULL) {
-		TAILQ_INIT(&this->sources);
-		this->header = mystrdup("");
-		this->pullable = 0;
-		if (this->header == NULL) {
-			free(this);
-			return NULL;
-		}
+struct sourcetable *sourcetable_new(char *host, unsigned short port) {
+	struct sourcetable *this = (struct sourcetable *)malloc(sizeof(struct sourcetable));
+	char *duphost = (host == NULL) ? NULL : mystrdup(host);
+	char *header = mystrdup("");
+	if ((host != NULL && duphost == NULL) || header == NULL || this == NULL) {
+		strfree(duphost);
+		strfree(header);
+		free(this);
+		return NULL;
 	}
+
+	TAILQ_INIT(&this->sources);
 	P_RWLOCK_INIT(&this->lock, NULL);
+	this->caster = duphost;
+	this->port = port;
+	this->filename = NULL;
+	this->header = header;
+	this->pullable = 0;
+	this->local = 0;
+	this->priority = 0;
+	struct timeval t = { 0, 0 };
+	this->fetch_time = t;
 	return this;
 }
 
@@ -70,6 +79,7 @@ void sourcetable_free_unlocked(struct sourcetable *this) {
 	struct sourceline *n;
 
 	strfree(this->header);
+	strfree(this->caster);
 	strfree((char *)this->filename);
 
 	while ((n = TAILQ_FIRST(&this->sources))) {
@@ -539,7 +549,7 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 	 * Now the interim table is ready, build the real sourcetable from it.
 	 */
 
-	struct sourcetable *r = sourcetable_new();
+	struct sourcetable *r = sourcetable_new(NULL, 0);
 	if (r == NULL)
 		goto cancel;
 	strfree(r->header);

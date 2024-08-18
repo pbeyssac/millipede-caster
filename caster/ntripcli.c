@@ -167,13 +167,11 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				} else {
-					st->tmp_sourcetable = sourcetable_new();
+					st->tmp_sourcetable = sourcetable_new(st->host, st->port);
 					if (st->tmp_sourcetable == NULL) {
 						end =1;
 						ntrip_log(st, LOG_CRIT, "Out of memory when allocating sourcetable\n");
 					} else {
-						st->tmp_sourcetable->caster = st->host;
-						st->tmp_sourcetable->port = st->port;
 						st->state = NTRIP_WAIT_SOURCETABLE_LINE;
 					}
 				}
