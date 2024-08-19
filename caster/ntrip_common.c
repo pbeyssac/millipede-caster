@@ -26,12 +26,12 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	}
 	this->mountpoint = mystrdup(mountpoint?mountpoint:"");
 	if (this->mountpoint == NULL) {
-		strfree(this);
+		free(this);
 		return NULL;
 	}
 	if (host && (this->host = mystrdup(host)) == NULL) {
 		strfree(this->mountpoint);
-		strfree(this);
+		free(this);
 		return NULL;
 	}
 
