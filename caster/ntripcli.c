@@ -135,6 +135,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				end = 1;
 				break;
 			}
+			free(line);
 			unsigned int status_code;
 			status = st->http_args[1];
 			if (!status || strlen(status) != 3 || sscanf(status, "%3u", &status_code) != 1) {
