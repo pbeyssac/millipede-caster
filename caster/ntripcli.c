@@ -179,6 +179,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			} else {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
+					free(line);
 					ntrip_log(st, LOG_DEBUG, "parse_header failed\n");
 					end = 1;
 					break;
@@ -190,6 +191,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 						if (st->chunk_buf == NULL)
 							st->chunk_buf = evbuffer_new();
 						if (st->chunk_buf == NULL) {
+							free(line);
 							end = 1;
 							break;
 						}
