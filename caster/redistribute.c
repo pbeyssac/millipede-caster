@@ -51,6 +51,7 @@ redistribute_args_new(struct ntrip_state *st, struct livesource *livesource, cha
 		redis_args->source_st = NULL;
 		redis_args->ev = NULL;
 		redis_args->persistent = persistent;
+		redis_args->livesource = livesource;
 		return redis_args;
 	} else {
 		if (redis_args)
@@ -81,6 +82,7 @@ redistribute_schedule(struct ntrip_state *st, struct redistribute_cb_args *redis
 		ntrip_log(st, LOG_INFO, "Scheduling retry callback for source %s in %d seconds\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
 		redis_args->ev = ev;
 		event_add(ev, &timeout_interval);
+		livesource_set_state(redis_args->livesource, LIVESOURCE_FETCH_PENDING);
 		return 0;
 	} else {
 		ntrip_log(st, LOG_CRIT, "Can't schedule retry callback for source %s in %d seconds, canceling\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
@@ -149,6 +151,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
 	}
+	st->own_livesource = redis_args->livesource;
 	st->bev = bev;
 	st->type = "source_fetcher";
 	st->redistribute = 1;
@@ -197,43 +200,16 @@ redistribute_switch_source_cb(struct redistribute_cb_args *redis_args, int succe
 
 	logfmt(&redis_args->caster->flog, "switch source callback\n");
 
-
 	if (success) {
-		struct livesource *livesource = livesource_find(st->caster, st, redis_args->mountpoint, &redis_args->mountpoint_pos);
-		if (livesource) {
-			/*
-			 * redistribute_switch_source will lock st in the right order
-			 */
-			redistribute_switch_source(st, redis_args->mountpoint, &redis_args->mountpoint_pos, livesource);
-			gettimeofday(&t1, NULL);
-			timersub(&t1, &redis_args->t0, &t1);
+		gettimeofday(&t1, NULL);
+		timersub(&t1, &redis_args->t0, &t1);
 
-			ntrip_log(st, LOG_INFO, "On-demand source subscribed from %s:%d/%s, %.3f ms\n",
-				redis_args->source_st->host,
-				redis_args->source_st->port,
-				redis_args->mountpoint,
-				t1.tv_sec*1000 + t1.tv_usec/1000.);
-		} else
-			ntrip_log(st, LOG_INFO, "callback called but no on-demand source ready %p\n", st);
+		ntrip_log(redis_args->source_st, LOG_INFO, "On-demand source subscribed from %s:%d/%s, %.3f ms\n",
+			redis_args->source_st->host,
+			redis_args->source_st->port,
+			redis_args->mountpoint,
+			t1.tv_sec*1000 + t1.tv_usec/1000.);
 	}
 
-	/*
-	 * We need to take an explicit lock on st since this callback is called in the
-	 * context of another ntrip_state.
-	 */
-	struct bufferevent *bev = st->bev;
-	bufferevent_lock(bev);
 	redistribute_args_free(redis_args);
-
-	if (!success) {
-		/*
-		 * Failed to get the requested source.
-		 *
-		 * Close the requesting connection.
-		 * We should do something more clever here in the case of "virtual" bases,
-		 * since we can try another source.
-		 */
-		ntrip_deferred_free(st, "redistribute_switch_source_cb");
-	}
-	bufferevent_unlock(bev);
 }

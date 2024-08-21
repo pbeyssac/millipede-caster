@@ -80,6 +80,12 @@ void livesource_free(struct livesource *this) {
 	free(this);
 }
 
+void livesource_set_state(struct livesource *this, enum livesource_state state) {
+	P_RWLOCK_WRLOCK(&this->lock);
+	this->state = state;
+	P_RWLOCK_UNLOCK(&this->lock);
+}
+
 /*
  * Add a subscriber to a live source.
  *

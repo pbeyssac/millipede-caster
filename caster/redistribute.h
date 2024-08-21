@@ -17,6 +17,7 @@ struct redistribute_cb_args {
 	pos_t mountpoint_pos;
 	char persistent;
 	struct event *ev;
+	struct livesource *livesource;
 };
 
 int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource);

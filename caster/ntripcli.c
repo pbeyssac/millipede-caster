@@ -220,27 +220,9 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 			free(line);
 		} else if (st->state == NTRIP_REGISTER_SOURCE) {
-			if (st->redistribute) {
-				struct sourceline *sourceline = stack_find_pullable(&st->caster->sourcetablestack, st->mountpoint, NULL);
-				if (sourceline == NULL || ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 1) == NULL) {
-					end = 1;
-					ntrip_log(st, LOG_NOTICE, "%p Can't register live source for %s\n", st, st->mountpoint);
-					if (st->callback_subscribe) {
-						st->callback_subscribe(st->callback_subscribe_arg, 0);
-						st->callback_subscribe = NULL;
-					}
-					break;
-				}
-				if (sourceline) {
-					ntrip_log(st, LOG_INFO, "starting redistribute for %s\n", st->mountpoint);
-					if (st->callback_subscribe) {
-						st->callback_subscribe(st->callback_subscribe_arg, 1);
-						st->callback_subscribe = NULL;
-					}
-				} else if (st->callback_subscribe) {
-					st->callback_subscribe(st->callback_subscribe_arg, 0);
-					st->callback_subscribe = NULL;
-				}
+			if (st->own_livesource) {
+				livesource_set_state(st->own_livesource, LIVESOURCE_RUNNING);
+				ntrip_log(st, LOG_INFO, "starting redistribute for %s\n", st->mountpoint);
 			}
 			st->state = NTRIP_WAIT_STREAM_GET;
 		} else if (st->state == NTRIP_WAIT_STREAM_GET) {
@@ -336,7 +318,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	/* Unregister live source, if any */
 	if (st->own_livesource) {
 		ntrip_unregister_livesource(st);
-		if (st->redistribute) {
+		if (st->redistribute && st->persistent) {
 			struct redistribute_cb_args *redis_args = redistribute_args_new(st, NULL, st->mountpoint, &st->mountpoint_pos, st->caster->config->reconnect_delay, 0);
 			if (redis_args)
 				redistribute_schedule(st, redis_args);
