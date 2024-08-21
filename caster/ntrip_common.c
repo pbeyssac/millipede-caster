@@ -437,9 +437,11 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 			if (sscanf(line, "%zx", &chunk_len) == 1) {
 				// ntrip_log(st, LOG_DEBUG, "ok chunk_len: \"%s\" (%zu)\n", line, chunk_len);
 			} else {
+				free(line);
 				ntrip_log(st, LOG_INFO, "failed chunk_len: \"%s\"\n", line);
 				return 0;
 			}
+			free(line);
 			st->chunk_state = CHUNK_IN_PROGRESS;
 			st->chunk_len = chunk_len;
 		} else if (st->chunk_state == CHUNK_IN_PROGRESS) {
