@@ -34,7 +34,7 @@ int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, p
  * Step 1 -- prepare argument structure.
  */
 struct redistribute_cb_args *
-redistribute_args_new(struct ntrip_state *st, struct livesource *livesource, char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent) {
+redistribute_args_new(struct caster_state *caster, struct livesource *livesource, char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent) {
 	struct redistribute_cb_args *redis_args;
 	redis_args = (struct redistribute_cb_args *)malloc(sizeof(struct redistribute_cb_args));
 	char *dup_mountpoint = mystrdup(mountpoint);
@@ -46,8 +46,7 @@ redistribute_args_new(struct ntrip_state *st, struct livesource *livesource, cha
 			redis_args->mountpoint_pos.lat = 0.;
 			redis_args->mountpoint_pos.lon = 0.;
 		}
-		redis_args->caster = st->caster;
-		redis_args->requesting_st = st;
+		redis_args->caster = caster;
 		redis_args->source_st = NULL;
 		redis_args->ev = NULL;
 		redis_args->persistent = persistent;
@@ -75,24 +74,17 @@ redistribute_args_free(struct redistribute_cb_args *this) {
  * Step 2 (optional) -- schedule for later
  */
 int
-redistribute_schedule(struct ntrip_state *st, struct redistribute_cb_args *redis_args) {
-	struct timeval timeout_interval = { st->caster->config->reconnect_delay, 0 };
-	struct event *ev = event_new(st->caster->base, -1, 0, redistribute_cb, redis_args);
+redistribute_schedule(struct caster_state *caster, struct ntrip_state *st, struct redistribute_cb_args *redis_args) {
+	struct timeval timeout_interval = { caster->config->reconnect_delay, 0 };
+	struct event *ev = event_new(caster->base, -1, 0, redistribute_cb, redis_args);
 	if (ev != NULL) {
-		ntrip_log(st, LOG_INFO, "Scheduling retry callback for source %s in %d seconds\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
+		ntrip_log(st, LOG_INFO, "Scheduling retry callback for source %s in %d seconds\n", redis_args->mountpoint, caster->config->reconnect_delay);
 		redis_args->ev = ev;
 		event_add(ev, &timeout_interval);
 		livesource_set_state(redis_args->livesource, LIVESOURCE_FETCH_PENDING);
 		return 0;
 	} else {
-		ntrip_log(st, LOG_CRIT, "Can't schedule retry callback for source %s in %d seconds, canceling\n", redis_args->mountpoint, st->caster->config->reconnect_delay);
-		if (redis_args->requesting_st) {
-			struct ntrip_state *st = redis_args->requesting_st;
-			bufferevent_lock(st->bev);
-			redis_args->requesting_st->callback_subscribe_arg = NULL;
-			redis_args->requesting_st = NULL;
-			bufferevent_unlock(st->bev);
-		}
+		ntrip_log(st, LOG_CRIT, "Can't schedule retry callback for source %s in %d seconds, canceling\n", redis_args->mountpoint, caster->config->reconnect_delay);
 		redistribute_args_free(redis_args);
 		return -1;
 	}
@@ -110,7 +102,7 @@ redistribute_cb(evutil_socket_t fd, short what, void *cbarg) {
 	logfmt(&caster->flog, "Trying to restart source %s\n", redis_args->mountpoint);
 	event_del(redis_args->ev);
 	redis_args->ev = NULL;
-	redistribute_source_stream(redis_args, NULL);
+	redistribute_source_stream(redis_args);
 }
 
 /*
@@ -120,9 +112,7 @@ redistribute_cb(evutil_socket_t fd, short what, void *cbarg) {
  * Required lock: ntrip_state
  */
 void
-redistribute_source_stream(struct redistribute_cb_args *redis_args,
-	void (*switch_source_cb)(struct redistribute_cb_args *redis_args, int success))
-{
+redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 	struct bufferevent *bev;
 
 	if (threads)
@@ -160,12 +150,6 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
 
 	logfmt(&redis_args->caster->flog, "Starting socket connect to %s:%d for /%s\n", st->host, st->port, redis_args->mountpoint);
 
-	/*
-	 * Set-up the callback for when our task completes.
-	 */
-	st->callback_subscribe = switch_source_cb;
-	st->callback_subscribe_arg = redis_args;
-
 	if (threads)
 		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
 	else
@@ -175,41 +159,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args,
         struct timeval read_timeout = { st->caster->config->on_demand_source_timeout, 0 };
         struct timeval write_timeout = { st->caster->config->on_demand_source_timeout, 0 };
         bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
-	gettimeofday(&redis_args->t0, NULL);
 	bufferevent_socket_connect_hostname(bev, redis_args->caster->dns_base, AF_UNSPEC, st->host, st->port);
-}
-
-/*
- * Redistribute source stream.
- * Last step (optional): switch the requester to the source.
- */
-void
-redistribute_switch_source_cb(struct redistribute_cb_args *redis_args, int success) {
-	struct timeval t1;
-	struct ntrip_state *st = redis_args->requesting_st;
-
-	redis_args->source_st->callback_subscribe_arg = NULL;
-	if (redis_args->requesting_st)
-		redis_args->requesting_st->callback_subscribe_arg = NULL;
-
-	if (st == NULL) {
-		logfmt(&redis_args->caster->flog, "switch source callback: requester went away\n");
-		redistribute_args_free(redis_args);
-		return;
-	}
-
-	logfmt(&redis_args->caster->flog, "switch source callback\n");
-
-	if (success) {
-		gettimeofday(&t1, NULL);
-		timersub(&t1, &redis_args->t0, &t1);
-
-		ntrip_log(redis_args->source_st, LOG_INFO, "On-demand source subscribed from %s:%d/%s, %.3f ms\n",
-			redis_args->source_st->host,
-			redis_args->source_st->port,
-			redis_args->mountpoint,
-			t1.tv_sec*1000 + t1.tv_usec/1000.);
-	}
 
 	redistribute_args_free(redis_args);
 }

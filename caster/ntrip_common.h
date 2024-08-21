@@ -183,12 +183,6 @@ struct ntrip_state {
 	 * Virtual mountpoint handling
 	 */
 	char *virtual_mountpoint;
-
-	/* Callback and argugments for source switching on a virtual or on-demand source */
-	void (*callback_subscribe)(struct redistribute_cb_args *, int);
-
-	/* Pointer to callback arguments, used both by the requesting connection and the source stream */
-	struct redistribute_cb_args *callback_subscribe_arg;
 };
 
 struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned short port, char *mountpoint);

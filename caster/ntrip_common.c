@@ -46,8 +46,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 	this->subscription = NULL;
 	this->server_version = 1;
 	this->client_version = 1;
-	this->callback_subscribe = NULL;
-	this->callback_subscribe_arg = NULL;
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
@@ -141,12 +139,6 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	 *
 	 * TBD: might move some relevant things from _ntrip_free() down here.
 	 */
-
-	if (this->callback_subscribe_arg && this->callback_subscribe_arg->requesting_st == this) {
-		ntrip_log(this, LOG_EDEBUG, "removing callback reference as requesting_st %p\n", this);
-		this->callback_subscribe_arg->requesting_st = NULL;
-		this->callback_subscribe_arg = NULL;
-	}
 
 	if (this->own_livesource)
 		ntrip_unregister_livesource(this);
@@ -297,10 +289,9 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 	if (existing_livesource) {
 		P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
 		if (on_demand && existing_state == LIVESOURCE_FETCH_PENDING) {
-			ntrip_log(this, LOG_INFO, "%p livesource %s PENDING -> RUNNING\n", this, mountpoint);
-			P_RWLOCK_WRLOCK(&existing_livesource->lock);
-			existing_livesource->state = LIVESOURCE_RUNNING;
-			P_RWLOCK_UNLOCK(&existing_livesource->lock);
+			ntrip_log(this, LOG_INFO, "%p livesource %s %s -> RUNNING\n",
+				this, mountpoint, existing_state == LIVESOURCE_FETCH_PENDING ? "PENDING":"WAITING_RESTART");
+			livesource_set_state(existing_livesource, LIVESOURCE_RUNNING);
 		} else if (existing_state == LIVESOURCE_RUNNING)
 			ntrip_log(this, LOG_INFO, "%p livesource %s already RUNNING\n", this, mountpoint);
 		else

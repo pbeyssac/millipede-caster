@@ -315,14 +315,14 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 			ntrip_log(st, LOG_NOTICE, "ntripcli write timeout ntrip_state %p.\n", st);
 	}
 
-	/* Unregister live source, if any */
 	if (st->own_livesource) {
-		ntrip_unregister_livesource(st);
 		if (st->redistribute && st->persistent) {
-			struct redistribute_cb_args *redis_args = redistribute_args_new(st, NULL, st->mountpoint, &st->mountpoint_pos, st->caster->config->reconnect_delay, 0);
+			struct redistribute_cb_args *redis_args;
+			redis_args = redistribute_args_new(st->caster, st->own_livesource, st->mountpoint, &st->mountpoint_pos, st->caster->config->reconnect_delay, 0);
 			if (redis_args)
-				redistribute_schedule(st, redis_args);
-		}
+				redistribute_schedule(st->caster, st, redis_args);
+		} else
+			ntrip_unregister_livesource(st);
 	}
 	if (st->sourcetable_cb_arg != NULL) {
 		/* Notify the callback the transfer is over, and failed. */
