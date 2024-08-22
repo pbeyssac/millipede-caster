@@ -15,7 +15,6 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 	if (!st->user || !check_password(st, st->caster->config->admin_user, st->user, st->password)) {
 		int www_auth_value_len = strlen(root_uri) + 15;
 		char *www_auth_value = (char *)strmalloc(www_auth_value_len);
-		snprintf(www_auth_value, www_auth_value_len, "Basic realm=\"%s\"", root_uri);
 
 		if (!www_auth_value) {
 			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory\n");
@@ -24,8 +23,9 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 			return -1;
 		}
 
+		snprintf(www_auth_value, www_auth_value_len, "Basic realm=\"%s\"", root_uri);
 		*err = 401;
-		evhttp_add_header(headers, "WWW-Authenticate", "Basic realm=\"/adm\"");
+		evhttp_add_header(headers, "WWW-Authenticate", www_auth_value);
 		strfree(www_auth_value);
 		return 0;
 	}
