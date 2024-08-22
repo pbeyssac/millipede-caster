@@ -7,6 +7,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -148,14 +149,32 @@ caster_new(struct config *config, const char *config_file) {
 
 	this->config = config;
 	this->config_file = config_file;
+
+	char *last_slash = strrchr(config_file, '/');
+	if (last_slash) {
+		this->config_dir = (char *)strmalloc(last_slash - config_file + 1);
+		if (this->config_dir) {
+			memcpy(this->config_dir, config_file, last_slash - config_file);
+			this->config_dir[last_slash - config_file] = '\0';
+		}
+	} else
+		this->config_dir = mystrdup(".");
+
+	int current_dir = open(".", O_DIRECTORY);
+	if (this->config_dir) chdir(this->config_dir);
+
 	this->joblist = threads ? joblist_new(this) : NULL;
 	int r1 = log_init(&this->flog, this->config->log, &caster_log, this);
 	int r2 = log_init(&this->alog, this->config->access_log, &caster_alog, this);
 
-	if (r1 < 0 || r2 < 0 || (threads && this->joblist == NULL)) {
+	fchdir(current_dir);
+	close(current_dir);
+
+	if (r1 < 0 || r2 < 0 || !this->config_dir || (threads && this->joblist == NULL)) {
 		if (this->joblist) joblist_free(this->joblist);
 		if (r1 < 0) log_free(&this->flog);
 		if (r2 < 0) log_free(&this->alog);
+		strfree(this->config_dir);
 		free(this);
 		return NULL;
 	}
@@ -199,6 +218,7 @@ void caster_free(struct caster_state *this) {
 	P_RWLOCK_DESTROY(&this->authlock);
 	log_free(&this->flog);
 	log_free(&this->alog);
+	strfree(this->config_dir);
 	config_free(this->config);
 	libevent_global_shutdown();
 	free(this);
@@ -282,30 +302,26 @@ static void
 caster_reload_sourcetables(struct caster_state *caster) {
 	struct sourcetable *s;
 	struct sourcetable *stmp;
-	struct sourcetable *snew;
 
-	struct sourcetableq newtables;
-
-	TAILQ_INIT(&newtables);
+	struct sourcetable *local_table
+		= sourcetable_read(caster->config->sourcetable_filename, caster->config->sourcetable_priority);
 
 	P_RWLOCK_WRLOCK(&caster->sourcetablestack.lock);
 
 	TAILQ_FOREACH_SAFE(s, &caster->sourcetablestack.list, next, stmp) {
 		P_RWLOCK_WRLOCK(&s->lock);
 		if (s->local && s->filename) {
-			logfmt(&caster->flog, "Reloading %s\n", s->filename);
-			snew = sourcetable_read(s->filename, s->priority);
-			if (snew) {
-				TAILQ_REMOVE(&caster->sourcetablestack.list, s, next);
-				TAILQ_INSERT_TAIL(&newtables, snew, next);
-				sourcetable_free_unlocked(s);
-				/* Skip the unlock below! */
-				continue;
-			}
+			logfmt(&caster->flog, "Removing %s\n", s->filename);
+			TAILQ_REMOVE(&caster->sourcetablestack.list, s, next);
+			sourcetable_free_unlocked(s);
+			/* Skip the unlock below! */
+			continue;
 		}
 		P_RWLOCK_UNLOCK(&s->lock);
 	}
-	TAILQ_CONCAT(&caster->sourcetablestack.list, &newtables, next);
+
+	logfmt(&caster->flog, "Reloading %s\n", caster->config->sourcetable_filename);
+	TAILQ_INSERT_TAIL(&caster->sourcetablestack.list, local_table, next);
 
 	P_RWLOCK_UNLOCK(&caster->sourcetablestack.lock);
 }
@@ -348,6 +364,20 @@ static void caster_reload_config(struct caster_state *this) {
 	}
 	config_free(this->config);
 	this->config = config;
+}
+
+/*
+ * reload with chdir to allow relative paths in the configuration.
+ */
+static void caster_chdir_reload(struct caster_state *this, int reopen_logs) {
+	int current_dir = open(".", O_DIRECTORY);
+	chdir(this->config_dir);
+	if (reopen_logs)
+		caster_reopen_logs(this);
+	caster_reload_sourcetables(this);
+	caster_reload_auth(this);
+	fchdir(current_dir);
+	close(current_dir);
 }
 
 static void
@@ -423,9 +453,7 @@ signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	 * TBD: listeners reload.
 	 */
 	caster_reload_fetchers(caster);
-	caster_reopen_logs(caster);
-	caster_reload_sourcetables(caster);
-	caster_reload_auth(caster);
+	caster_chdir_reload(caster, 1);
 }
 
 static struct caster_state *caster = NULL;
@@ -575,7 +603,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	caster_reload_auth(caster);
+	caster_chdir_reload(caster, 0);
 
 #if 0
 	/*** v4+v6 SOCKET NOT USED AT THIS TIME ***/
@@ -600,14 +628,6 @@ int caster_main(char *config_file) {
 	// setsockopt(0, IPV6CTL_V6ONLY, IPV6CTL_V6ONLY, &v6only, sizeof v6only);
 #endif
 
-	struct sourcetable *local_table
-		= sourcetable_read(caster->config->sourcetable_filename, caster->config->sourcetable_priority);
-	if (local_table == NULL) {
-		fprintf(stderr, "Can't read local sourcetable.\n");
-		return 1;
-	}
-
-	TAILQ_INSERT_TAIL(&caster->sourcetablestack.list, local_table, next);
 
 	if (caster_listen(caster) < 0) {
 		caster_free(caster);
