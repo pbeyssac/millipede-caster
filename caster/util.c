@@ -643,7 +643,7 @@ char *malloc_stats_dump(int json) {
 #else
 
 char *malloc_stats_dump(int json) {
-	return mystrdup("[no malloc stats available]\n");
+	return mystrdup("{\"err\": \""no malloc stats available\""}");
 }
 
 #endif
