@@ -11,7 +11,7 @@
 
 int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
-#if DEBUG
+
 	if (!st->user || !check_password(st, st->caster->config->admin_user, st->user, st->password)) {
 		int www_auth_value_len = strlen(root_uri) + 15;
 		char *www_auth_value = (char *)strmalloc(www_auth_value_len);
@@ -29,7 +29,7 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 		strfree(www_auth_value);
 		return 0;
 	}
-#endif
+
 	st->client_version = 2;
 
 	if (!strcmp(uri, "/mem") || !strcmp(uri, "/mem.json")) {
