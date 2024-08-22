@@ -275,11 +275,15 @@ const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st)
 		json_object_object_add(new_list, idstr, nj);
 	}
 	P_RWLOCK_UNLOCK(&caster->ntrips.lock);
+
 	s = mystrdup(json_object_to_json_string(new_list));
 	json_object_put(new_list);
 	return s;
 }
 
+/*
+ * Required lock: ntrip_state
+ */
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, pos_t *mountpoint_pos, int on_demand) {
 	struct livesource *existing_livesource;
 	enum livesource_state existing_state;
@@ -312,6 +316,9 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 	return np;
 }
 
+/*
+ * Required lock: ntrip_state
+ */
 void ntrip_unregister_livesource(struct ntrip_state *this) {
 	if (!this->own_livesource)
 		return;

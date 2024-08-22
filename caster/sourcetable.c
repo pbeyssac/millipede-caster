@@ -83,7 +83,7 @@ void sourcetable_free_unlocked(struct sourcetable *this) {
 	strfree((char *)this->filename);
 
 	while ((n = TAILQ_FIRST(&this->sources))) {
-                TAILQ_REMOVE_HEAD(&this->sources, next);
+		TAILQ_REMOVE_HEAD(&this->sources, next);
 		sourceline_free(n);
 	}
 

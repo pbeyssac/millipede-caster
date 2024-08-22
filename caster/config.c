@@ -253,7 +253,7 @@ struct config *config_parse(const char *filename) {
 }
 
 /*
- * Free everthing in the config structure.
+ * Free everything in the config structure.
  * Best handled "by hand" here, as advised by the libcyaml documentation.
  *
  * cyaml_free() crashes if we let it do the job, possibly because of structure field order.
