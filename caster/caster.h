@@ -32,6 +32,7 @@ struct caster_state {
 	} ntrips;
 	struct config *config;
 	const char *config_file;
+	char *config_dir;
 	struct joblist *joblist;
 	struct event_base *base;
 	struct evdns_base *dns_base;
