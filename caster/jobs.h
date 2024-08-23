@@ -10,7 +10,7 @@ enum job_type {
 };
 
 /*
- * Job entry for the FIFO list, to dispatch tasks to workers.
+ * Job entry for FIFO lists, to dispatch tasks to workers.
  * Only used when threads are activated.
  */
 struct job {
@@ -19,12 +19,12 @@ struct job {
 	enum job_type type;
 
 	union {
-		/* type == JOB_LIBEVENT_RW: read or write callback job */
+		/* type == JOB_LIBEVENT_RW: libevent read or write callback job */
 		struct {
 			void (*cb)(struct bufferevent *bev, void *arg);
 		} rw;
 
-		/* type == JOB_LIBEVENT_EVENT: event callback job */
+		/* type == JOB_LIBEVENT_EVENT: libevent callback job */
 		struct {
 			void (*cb)(struct bufferevent *bev, short events, void *arg);
 			/* Event flags */
@@ -38,17 +38,30 @@ STAILQ_HEAD (ntripq, ntrip_state);
 TAILQ_HEAD (general_ntripq, ntrip_state);
 
 /*
- *  FIFO list for worker threads to get new jobs.
+ *  FIFO lists for worker threads to get new jobs.
  */
 struct joblist {
-	/* The work queue itself */
+	/* The work queue for ntrip_states with a lock */
 	struct ntripq ntrip_queue;
-	/* Append-only queue, separated to simplify locking */
+	/* Main work queue for jobs without a lock */
+	struct jobq jobq;
+
+	/* Number of jobs in ntrip_queue and jobq */
+	int ntrip_njobs, njobs;
+
+	/* Append-only queues, separated to simplify locking */
+
+	/* Append work queue for ntrip_states with a lock */
 	struct ntripq append_queue;
+	/* Append work queue for jobs without a lock */
+	struct jobq append_jobq;
+
+	/* Number of jobs in append_queue and append_jobq */
+	int append_ntrip_njobs, append_njobs;
 
 	/* Mutexes protecting access to the queues */
-	P_MUTEX_T mutex;
-	P_MUTEX_T append_mutex;
+	P_MUTEX_T mutex;		// ntrip_queue and jobq
+	P_MUTEX_T append_mutex;		// append_queue and append_jobq
 
 	/*
 	 * Used to signal workers a new job has been appended
