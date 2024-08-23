@@ -398,7 +398,8 @@ _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list a
 		default:
 			fprintf(log->logfile, "[???] ");
 		}
-	}
+	} else
+		fputs("- ", log->logfile);
 
 	fprintf(log->logfile, "%lld ", this->id);
 
