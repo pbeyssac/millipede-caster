@@ -312,9 +312,9 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)
-			ntrip_log(st, LOG_NOTICE, "ntripcli read timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripcli read timeout\n");
 		if (events & BEV_EVENT_WRITING)
-			ntrip_log(st, LOG_NOTICE, "ntripcli write timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripcli write timeout\n");
 	}
 
 	if (st->own_livesource) {

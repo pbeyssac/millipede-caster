@@ -54,7 +54,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 		bufferevent_lock(bev);
 
 		if (kill_backlogged ? np->backlogged : !np->virtual) {
-			ntrip_log(np->ntrip_state, LOG_NOTICE, "dropping %p due to %s\n", np->ntrip_state, kill_backlogged?"backlog":"closed source");
+			ntrip_log(np->ntrip_state, LOG_NOTICE, "dropping due to %s\n", kill_backlogged?"backlog":"closed source");
 			killed++;
 		} else if (kill_backlogged == 0 && np->virtual) {
 			/*
@@ -177,7 +177,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		bufferevent_lock(bev);
 		if (np->ntrip_state->state == NTRIP_END) {
 			/* Subscriber currently closing, skip */
-			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping %p state=%d\n", np->ntrip_state, np->ntrip_state->state);
+			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d\n", np->ntrip_state->state);
 			bufferevent_unlock(bev);
 			ns++;
 			n++;
@@ -279,7 +279,7 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, struct nt
 			return NULL;
 		}
 		TAILQ_INSERT_TAIL(&this->livesources.queue, np, next);
-		ntrip_log(st, LOG_INFO, "%p Trying to subscribe to on-demand source %s\n", st, mountpoint);
+		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s\n", mountpoint);
 		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
 		joblist_append_redistribute(this->joblist, redistribute_source_stream, redis_args);
 		result = np;

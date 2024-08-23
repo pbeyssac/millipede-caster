@@ -414,7 +414,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	st->remote = 1;
 	sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);
 
-	ntrip_log(st, LOG_INFO, "New connection, ntrip_state=%p\n", st);
+	ntrip_log(st, LOG_INFO, "New connection\n");
 
 	st->state = NTRIP_WAIT_HTTP_METHOD;
 

@@ -83,7 +83,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 	if (!this->bev_freed) {
-		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p for %p\n", bev, this);
+		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p\n", bev);
 		bufferevent_free(bev);
 		this->bev_freed = 1;
 	} else
@@ -96,7 +96,7 @@ static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *be
  * Required lock: ntrip_state
  */
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
-	ntrip_log(this, LOG_DEBUG, "FREE %p %s\n", this, orig);
+	ntrip_log(this, LOG_DEBUG, "FREE %s\n", orig);
 
 	strfree(this->mountpoint);
 	strfree(this->virtual_mountpoint);
@@ -136,7 +136,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	 * This will prevent any further locking on the ntrip_state, so we do
 	 * it only once it is removed from ntrips.queue.
 	 */
-	ntrip_log(this, LOG_EDEBUG, "freeing bev %p for %p\n", this->bev, this);
+	ntrip_log(this, LOG_EDEBUG, "freeing bev %p\n", this->bev);
 	my_bufferevent_free(this, this->bev);
 	free(this);
 }
@@ -146,7 +146,7 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 }
 
 static void ntrip_deferred_free2(struct ntrip_state *this) {
-	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2 %p\n", this);
+	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2\n");
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
 	bufferevent_lock(this->bev);
@@ -162,7 +162,7 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
 
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	if (this->state == NTRIP_END) {
-		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free %p from %s\n", this, orig);
+		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free from %s\n", orig);
 		return;
 	}
 
@@ -191,8 +191,7 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 
 	joblist_drain(this);
 
-	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free %p njobs %d newjobs %d\n", this, this->njobs, this->newjobs);
-
+	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free njobs %d newjobs %d\n", this->njobs, this->newjobs);
 	joblist_append_ntrip_unlocked(this->caster->joblist, &ntrip_deferred_free2, this);
 }
 
@@ -221,7 +220,7 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 			 * just give up for the moment.
 			 */
 			P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
-			ntrip_log(st, LOG_DEBUG, "ntrip_deferred_run %p njobs %d newjobs %d, deferring more\n", st, st->njobs, st->newjobs);
+			ntrip_log(st, LOG_DEBUG, "ntrip_deferred_run njobs %d newjobs %d, deferring more\n", st->njobs, st->newjobs);
 			TAILQ_INSERT_TAIL(&this->ntrips.free_queue, st, nextf);
 			this->ntrips.nfree++;
 			bufferevent_unlock(bev);
@@ -230,7 +229,7 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 		}
 
 		assert(st->newjobs != -1);
-		ntrip_log(st, LOG_EDEBUG, "ntrip_deferred_run %p njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
+		ntrip_log(st, LOG_EDEBUG, "ntrip_deferred_run njobs %d newjobs %d\n", st->njobs, st->newjobs);
 
 		assert(st->njobs == 0);
 
@@ -324,11 +323,11 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 	if (existing_livesource) {
 		P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
 		if (on_demand && existing_state == LIVESOURCE_FETCH_PENDING) {
-			ntrip_log(this, LOG_INFO, "%p livesource %s %s -> RUNNING\n",
-				this, mountpoint, existing_state == LIVESOURCE_FETCH_PENDING ? "PENDING":"WAITING_RESTART");
+			ntrip_log(this, LOG_INFO, "livesource %s %s -> RUNNING\n",
+				mountpoint, existing_state == LIVESOURCE_FETCH_PENDING ? "PENDING":"WAITING_RESTART");
 			livesource_set_state(existing_livesource, LIVESOURCE_RUNNING);
 		} else if (existing_state == LIVESOURCE_RUNNING)
-			ntrip_log(this, LOG_INFO, "%p livesource %s already RUNNING\n", this, mountpoint);
+			ntrip_log(this, LOG_INFO, "livesource %s already RUNNING\n", mountpoint);
 		else
 			existing_livesource = NULL;
 		this->own_livesource = existing_livesource;
@@ -343,7 +342,7 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 	TAILQ_INSERT_TAIL(&this->caster->livesources.queue, np, next);
 	this->own_livesource = np;
 	P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
-	ntrip_log(this, LOG_INFO, "%p livesource %s created RUNNING\n", this, mountpoint);
+	ntrip_log(this, LOG_INFO, "livesource %s created RUNNING\n", mountpoint);
 	return np;
 }
 

@@ -207,7 +207,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	struct evkeyvalq opt_headers;
 	TAILQ_INIT(&opt_headers);
 
-	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb %p state %d len %d\n", st, st->state, evbuffer_get_length(input));
+	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d\n", st->state, evbuffer_get_length(input));
 
 	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 0) {
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
@@ -490,15 +490,15 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 	output = bufferevent_get_output(bev);
 	len = evbuffer_get_length(output);
 	if (len == 0) {
-		ntrip_log(st, LOG_EDEBUG, "flushed answer ntripsrv %p\n", st);
+		ntrip_log(st, LOG_EDEBUG, "flushed answer ntripsrv\n");
 		if (st->state == NTRIP_WAIT_CLOSE) {
-			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_free %p bev %p\n", st, bev);
+			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_free bev %p\n", bev);
 
 			ntrip_deferred_free(st, "ntripsrv_writecb");
 			return;
 		}
 	} else
-		ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb %p remaining len %d\n", st, len);
+		ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb remaining len %d\n", len);
 }
 
 void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
@@ -507,25 +507,25 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
 	if (events & BEV_EVENT_CONNECTED) {
-		ntrip_log(st, LOG_INFO, "Connected srv %p\n", st);
+		ntrip_log(st, LOG_INFO, "Connected srv\n");
 		return;
 	}
 
 	if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_EOF)
-			ntrip_log(st, LOG_INFO, "Connection closed (EOF) ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_INFO, "Connection closed (EOF)\n");
 		else {
 			char err[256];
 			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s\n", strerror_r(initial_errno, err, sizeof err));
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)
-			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout\n");
 		if (events & BEV_EVENT_WRITING)
-			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout ntrip_state %p.\n", st);
+			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout\n");
 	}
 
-	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb %p bev %p\n", st, bev);
+	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb bev %p\n", bev);
 	ntrip_deferred_free(st, "ntripsrv_eventcb");
 }
 

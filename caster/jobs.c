@@ -188,7 +188,7 @@ void joblist_run(struct joblist *this) {
 
 		nst = 0;
 
-		ntrip_log(st, LOG_EDEBUG, "starting jobs for ntrip state %p\n", st);
+		ntrip_log(st, LOG_EDEBUG, "starting jobs\n");
 
 		while ((j = STAILQ_FIRST(&st->jobq))) {
 			STAILQ_REMOVE_HEAD(&st->jobq, next);
@@ -215,7 +215,7 @@ void joblist_run(struct joblist *this) {
 			free(j);
 		}
 
-		ntrip_log(st, LOG_EDEBUG, "ran %d jobs for ntrip state %p\n", nst, st);
+		ntrip_log(st, LOG_EDEBUG, "ran %d jobs\n", nst);
 
 		bufferevent_unlock(bev);
 
@@ -280,7 +280,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 		return;
 	}
 
-	ntrip_log(st, LOG_EDEBUG, "appending job for %p njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
+	ntrip_log(st, LOG_EDEBUG, "appending job njobs %d newjobs %d\n", st->njobs, st->newjobs);
 
 	/*
 	 * Check whether the ntrip_state queue is empty.
@@ -329,13 +329,13 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 		 * Insertion needed in the main job queue.
 		 */
 		assert(st->newjobs != -1);
-		ntrip_log(st, LOG_EDEBUG, "inserting in joblist ntrip_queue %p njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
+		ntrip_log(st, LOG_EDEBUG, "inserting in joblist ntrip_queue njobs %d newjobs %d\n", st->njobs, st->newjobs);
 		STAILQ_INSERT_TAIL(&this->append_queue, st, next);
 		this->append_ntrip_njobs++;
 		st->newjobs = -1;
 	} else {
 		assert(st->newjobs == -1);
-		ntrip_log(st, LOG_EDEBUG, "ntrip_state %p already in job list, njobs %d newjobs %d\n", st, st->njobs, st->newjobs);
+		ntrip_log(st, LOG_EDEBUG, "already in job list, njobs %d newjobs %d\n", st->njobs, st->newjobs);
 	}
 
 	/*
