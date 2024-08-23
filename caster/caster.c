@@ -184,6 +184,8 @@ caster_new(struct config *config, const char *config_file) {
 	TAILQ_INIT(&this->livesources.queue);
 	TAILQ_INIT(&this->ntrips.queue);
 	TAILQ_INIT(&this->ntrips.free_queue);
+	this->ntrips.n = 0;
+	this->ntrips.nfree = 0;
 	TAILQ_INIT(&this->sourcetablestack.list);
 	return this;
 }

@@ -60,6 +60,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
+	caster->ntrips.n++;
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 	return this;
 }
@@ -111,6 +112,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	if (unlink) {
 		P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 		TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
+		this->caster->ntrips.n--;
 		P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 	}
 
@@ -176,6 +178,7 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 
 	while ((st = TAILQ_FIRST(&this->ntrips.free_queue))) {
 		TAILQ_REMOVE_HEAD(&this->ntrips.free_queue, nextf);
+		this->ntrips.nfree--;
 		P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
 
 		/* Keep a copy of the pointer because it will be lost after _ntrip_free */
@@ -195,6 +198,7 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 			P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
 			ntrip_log(st, LOG_DEBUG, "ntrip_deferred_run %p njobs %d newjobs %d, deferring more\n", st, st->njobs, st->newjobs);
 			TAILQ_INSERT_TAIL(&this->ntrips.free_queue, st, nextf);
+			this->ntrips.nfree++;
 			bufferevent_unlock(bev);
 			/* Exit the loop to avoid an infinite loop */
 			break;

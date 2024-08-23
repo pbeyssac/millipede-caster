@@ -29,6 +29,8 @@ struct caster_state {
 		struct general_ntripq free_queue;
 		P_RWLOCK_T free_lock;
 		int next_id;
+		int n;		// number of items in queue
+		int nfree;	// number of items in free_queue
 	} ntrips;
 	struct config *config;
 	const char *config_file;
