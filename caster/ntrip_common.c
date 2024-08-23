@@ -19,7 +19,7 @@
  * Create a NTRIP session state for a client or a server connection.
  */
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint) {
-	struct ntrip_state *this = (struct ntrip_state *)calloc(1, sizeof(struct ntrip_state));
+	struct ntrip_state *this = (struct ntrip_state *)malloc(sizeof(struct ntrip_state));
 	if (this == NULL) {
 		logfmt(&caster->flog, "ntrip_new failed: out of memory\n");
 		return NULL;
@@ -29,6 +29,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 		free(this);
 		return NULL;
 	}
+	this->host = NULL;
 	if (host && (this->host = mystrdup(host)) == NULL) {
 		strfree(this->mountpoint);
 		free(this);
@@ -41,22 +42,37 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->chunk_buf = NULL;
 	this->port = port;
 	this->remote_addr[0] = '\0';
+	this->remote = 0;
 	this->start = 0;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
 	this->server_version = 1;
 	this->client_version = 1;
+	this->source_virtual = 0;
+	this->source_on_demand = 0;
+	this->last_pos_valid = 0;
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
 	this->type = "starting";
 	this->user_agent = NULL;
+	this->user_agent_ntrip = 0;
 	this->own_livesource = NULL;
 	if (threads)
 		STAILQ_INIT(&this->jobq);
 	this->njobs = 0;
 	this->newjobs = 0;
+	this->bev_freed = 0;
 	this->bev = bev;
+	this->redistribute = 0;
+	this->persistent = 0;
+	this->tmp_sourcetable = NULL;
+	this->sourcetable_cb_arg = NULL;
+	this->subscription = NULL;
+	this->sourceline = NULL;
+	this->virtual_mountpoint = NULL;
+	this->status_code = 0;
+	memset(&this->http_args, 0, sizeof(this->http_args));
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
