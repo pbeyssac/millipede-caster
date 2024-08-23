@@ -84,6 +84,22 @@ int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, c
 }
 
 /*
+ * Compute content through a callback without any lock, then send it on the provided ntrip_state.
+ *
+ * Avoids keeping a lock on ntrip_state unless needed, to avoid deadlocks.
+ */
+void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)) {
+	struct mime_content *r = content_cb(st->caster);
+	bufferevent_lock(st->bev);
+	struct evbuffer *output = bufferevent_get_output(st->bev);
+	ntripsrv_send_result_ok(st, output, r->mime_type, NULL);
+	if (evbuffer_add_reference(output, r->s, r->len, mime_free_callback, r) < 0)
+		mime_free(r);
+	st->state = NTRIP_WAIT_CLOSE;
+	bufferevent_unlock(st->bev);
+}
+
+/*
  * Check password in the base
  */
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd) {

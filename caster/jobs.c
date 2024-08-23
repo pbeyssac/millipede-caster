@@ -119,6 +119,8 @@ void joblist_run(struct joblist *this) {
 				j->redistribute.cb(j->redistribute.arg);
 			else if (j->type == JOB_NTRIP_UNLOCKED)
 				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
+			else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
+				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb);
 			free(j);
 		}
 
@@ -402,6 +404,22 @@ void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip
 		_joblist_append_generic(this, NULL, &tmpj);
 	} else
 		cb(st);
+}
+
+/*
+ * Queue a new unlocked ntrip job, or directly execute in unthreaded mode.
+ */
+void joblist_append_ntrip_unlocked_content(struct joblist *this, void (*cb)(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster
+)), struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)) {
+	if (threads) {
+		struct job tmpj;
+		tmpj.type = JOB_NTRIP_UNLOCKED_CONTENT;
+		tmpj.ntrip_unlocked_content.cb = cb;
+		tmpj.ntrip_unlocked_content.st = st;
+		tmpj.ntrip_unlocked_content.content_cb = content_cb;
+		_joblist_append_generic(this, NULL, &tmpj);
+	} else
+		cb(st, content_cb);
 }
 
 /*

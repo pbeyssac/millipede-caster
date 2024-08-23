@@ -50,11 +50,7 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 		st->state = NTRIP_WAIT_CLOSE;
 		return 0;
 	} else if (!strcmp(uri, "/net")) {
-		const char *r = ntrip_list_json(st->caster, st);
-		ntripsrv_send_result_ok(st, output, "application/json", NULL);
-		if (evbuffer_add_reference(output, r, strlen(r), strfree_callback, NULL) < 0)
-			strfree((void *)r);
-		st->state = NTRIP_WAIT_CLOSE;
+		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, ntrip_list_json);
 		return 0;
 	} else {
 		*err = 404;

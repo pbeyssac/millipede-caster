@@ -239,7 +239,7 @@ void ntrip_deferred_run(struct caster_state *this, char *orig) {
 		logfmt(&this->flog, "ntrip_deferred_run did %d ntrip_free\n", n);
 }
 
-static json_object *ntrip_json(struct ntrip_state *st, int lock) {
+static json_object *ntrip_json(struct ntrip_state *st) {
         bufferevent_lock(st->bev);
 
 	char *ipstr = st->remote_addr;
@@ -274,25 +274,26 @@ static json_object *ntrip_json(struct ntrip_state *st, int lock) {
 /*
  * Return a list of ntrip_state as a JSON object.
  */
-const char *ntrip_list_json(struct caster_state *caster, struct ntrip_state *st) {
+struct mime_content *ntrip_list_json(struct caster_state *caster) {
 	const char *s;
 	json_object *new_list = json_object_new_object();
 	struct ntrip_state *sst;
+
 	P_RWLOCK_RDLOCK(&caster->ntrips.lock);
 	TAILQ_FOREACH(sst, &caster->ntrips.queue, nextg) {
 		char idstr[40];
-		/*
-		 * Don't require a lock from ntrip_json on the current connection
-		 */
-		json_object *nj = ntrip_json(sst, st != sst);
+		json_object *nj = ntrip_json(sst);
 		snprintf(idstr, sizeof idstr, "%d", sst->id);
 		json_object_object_add(new_list, idstr, nj);
 	}
 	P_RWLOCK_UNLOCK(&caster->ntrips.lock);
 
 	s = mystrdup(json_object_to_json_string(new_list));
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	json_object_put(new_list);
-	return s;
+	if (m == NULL)
+		strfree((char *)s);
+	return m;
 }
 
 /*

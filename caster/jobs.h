@@ -9,11 +9,14 @@ enum job_type {
 	JOB_LIBEVENT_EVENT,
 	JOB_NTRIP_LOCK,
 	JOB_NTRIP_UNLOCKED,
+	JOB_NTRIP_UNLOCKED_CONTENT,
 	JOB_REDISTRIBUTE
 };
 
 struct ntrip_state;
+struct caster_state;
 struct redistribute_cb_args;
+struct mime_content;
 
 /*
  * Job entry for FIFO lists, to dispatch tasks to workers.
@@ -62,6 +65,17 @@ struct job {
 			void (*cb)(struct ntrip_state *st);
 			struct ntrip_state *st;
 		} ntrip_unlocked;
+
+		/*
+		 * type == JOB_NTRIP_UNLOCKED_CONTENT: job associated with a ntrip_state,
+		 *	MIME content provided by a callback,
+		 *	requires no lock on ntrip_state.
+		 */
+		struct {
+			void (*cb)(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster));
+			struct ntrip_state *st;
+			struct mime_content *(*content_cb)(struct caster_state *caster);
+		} ntrip_unlocked_content;
 	};
 };
 
@@ -112,6 +126,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 void joblist_append_ntrip_locked(struct joblist *this, struct ntrip_state *st, void (*cb)(struct ntrip_state *arg));
 void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistribute_cb_args *redis_args), struct redistribute_cb_args *redis_args);
 void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip_state *st), struct ntrip_state *st);
+void joblist_append_ntrip_unlocked_content(struct joblist *this, void (*cb)(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)), struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster));
 void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);
 int jobs_start_threads(struct caster_state *caster, int nthreads);
