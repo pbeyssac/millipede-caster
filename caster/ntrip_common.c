@@ -129,6 +129,21 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 	_ntrip_free(this, orig, 1);
 }
 
+static void ntrip_deferred_free2(struct ntrip_state *this) {
+	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2 %p\n", this);
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
+	bufferevent_lock(this->bev);
+
+	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
+	this->caster->ntrips.n--;
+	TAILQ_INSERT_TAIL(&this->caster->ntrips.free_queue, this, nextf);
+	this->caster->ntrips.nfree++;
+	P_RWLOCK_UNLOCK(&this->caster->ntrips.free_lock);
+	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
+	bufferevent_unlock(this->bev);
+}
+
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	if (this->state == NTRIP_END) {
 		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free %p from %s\n", this, orig);
@@ -162,13 +177,7 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 
 	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free %p njobs %d newjobs %d\n", this, this->njobs, this->newjobs);
 
-	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
-	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
-	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
-
-	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
-	TAILQ_INSERT_TAIL(&this->caster->ntrips.free_queue, this, nextf);
-	P_RWLOCK_UNLOCK(&this->caster->ntrips.free_lock);
+	joblist_append_ntrip_unlocked(this->caster->joblist, &ntrip_deferred_free2, this);
 }
 
 void ntrip_deferred_run(struct caster_state *this, char *orig) {

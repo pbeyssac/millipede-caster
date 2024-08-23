@@ -117,6 +117,8 @@ void joblist_run(struct joblist *this) {
 			this->njobs--;
 			if (j->type == JOB_REDISTRIBUTE)
 				j->redistribute.cb(j->redistribute.arg);
+			else if (j->type == JOB_NTRIP_UNLOCKED)
+				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
 			free(j);
 		}
 
@@ -367,6 +369,20 @@ void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistr
 		_joblist_append_generic(this, NULL, &tmpj);
 	} else
 		cb(redis_args);
+}
+
+/*
+ * Queue a new unlocked ntrip job, or directly execute in unthreaded mode.
+ */
+void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip_state *st), struct ntrip_state *st) {
+	if (threads) {
+		struct job tmpj;
+		tmpj.type = JOB_NTRIP_UNLOCKED;
+		tmpj.ntrip_unlocked.cb = cb;
+		tmpj.ntrip_unlocked.st = st;
+		_joblist_append_generic(this, NULL, &tmpj);
+	} else
+		cb(st);
 }
 
 /*
