@@ -280,7 +280,7 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, struct nt
 		TAILQ_INSERT_TAIL(&this->livesources.queue, np, next);
 		ntrip_log(st, LOG_INFO, "%p Trying to subscribe to on-demand source %s\n", st, mountpoint);
 		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
-		redistribute_source_stream(redis_args);
+		joblist_append_redistribute(this->joblist, redistribute_source_stream, redis_args);
 		result = np;
 	}
 

@@ -6,8 +6,11 @@
 
 enum job_type {
 	JOB_LIBEVENT_RW,
-	JOB_LIBEVENT_EVENT
+	JOB_LIBEVENT_EVENT,
+	JOB_REDISTRIBUTE
 };
+
+struct redistribute_cb_args;
 
 /*
  * Job entry for FIFO lists, to dispatch tasks to workers.
@@ -30,6 +33,15 @@ struct job {
 			/* Event flags */
 			short events;
 		} event;
+
+		/*
+		 * type == JOB_REDISTRIBUTE:
+		 *	livesource redistribute job
+		 */
+		struct {
+			void (*cb)(struct redistribute_cb_args *arg);
+			struct redistribute_cb_args *arg;
+		} redistribute;
 	};
 };
 
@@ -77,6 +89,7 @@ struct joblist *joblist_new(struct caster_state *caster);
 void joblist_free(struct joblist *this);
 void joblist_run(struct joblist *this);
 void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events);
+void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistribute_cb_args *redis_args), struct redistribute_cb_args *redis_args);
 void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);
 int jobs_start_threads(struct caster_state *caster, int nthreads);

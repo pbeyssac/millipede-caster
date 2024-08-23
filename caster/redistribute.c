@@ -3,6 +3,7 @@
 #include <event2/bufferevent.h>
 
 #include "conf.h"
+#include "jobs.h"
 #include "redistribute.h"
 #include "ntripcli.h"
 #include "ntripsrv.h"
@@ -102,7 +103,7 @@ redistribute_cb(evutil_socket_t fd, short what, void *cbarg) {
 	logfmt(&caster->flog, "Trying to restart source %s\n", redis_args->mountpoint);
 	event_del(redis_args->ev);
 	redis_args->ev = NULL;
-	redistribute_source_stream(redis_args);
+	joblist_append_redistribute(redis_args->caster->joblist, redistribute_source_stream, redis_args);
 }
 
 /*

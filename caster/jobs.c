@@ -115,6 +115,8 @@ void joblist_run(struct joblist *this) {
 			assert(this->njobs > 0);
 			STAILQ_REMOVE_HEAD(&this->jobq, next);
 			this->njobs--;
+			if (j->type == JOB_REDISTRIBUTE)
+				j->redistribute.cb(j->redistribute.arg);
 			free(j);
 		}
 
@@ -351,6 +353,20 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		tmpj.event.events = events;
 	}
 	_joblist_append_generic(this, (struct ntrip_state *)arg, &tmpj);
+}
+
+/*
+ * Queue a new redistribute job, or directly execute in unthreaded mode.
+ */
+void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistribute_cb_args *redis_args), struct redistribute_cb_args *redis_args) {
+	if (threads) {
+		struct job tmpj;
+		tmpj.type = JOB_REDISTRIBUTE;
+		tmpj.redistribute.cb = cb;
+		tmpj.redistribute.arg = redis_args;
+		_joblist_append_generic(this, NULL, &tmpj);
+	} else
+		cb(redis_args);
 }
 
 /*
