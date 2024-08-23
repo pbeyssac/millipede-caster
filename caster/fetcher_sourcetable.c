@@ -129,10 +129,9 @@ fetcher_sourcetable_start(struct sourcetable_fetch_args *arg_cb) {
 		return;
 	}
 	logfmt(&arg_cb->caster->flog, "Starting sourcetable fetch from %s:%d\n", arg_cb->host, arg_cb->port);
-	struct ntrip_state *st = ntrip_new(arg_cb->caster, arg_cb->host, arg_cb->port, NULL);
+	struct ntrip_state *st = ntrip_new(arg_cb->caster, bev, arg_cb->host, arg_cb->port, NULL);
 	arg_cb->st = st;
 	st->sourcetable_cb_arg = arg_cb;
-	st->bev = bev;
 	st->type = "sourcetable_fetcher";
 
 	if (threads)

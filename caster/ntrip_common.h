@@ -185,7 +185,7 @@ struct ntrip_state {
 	char *virtual_mountpoint;
 };
 
-struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned short port, char *mountpoint);
+struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint);
 void ntrip_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this, char *orig);

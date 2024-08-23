@@ -136,13 +136,12 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 	/*
 	 * Create new client state.
 	 */
-	struct ntrip_state *st = ntrip_new(redis_args->caster, sp->caster, sp->port, redis_args->mountpoint);
+	struct ntrip_state *st = ntrip_new(redis_args->caster, bev, sp->caster, sp->port, redis_args->mountpoint);
 	if (st == NULL) {
 		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
 	}
 	st->own_livesource = redis_args->livesource;
-	st->bev = bev;
 	st->type = "source_fetcher";
 	st->redistribute = 1;
 	st->persistent = redis_args->persistent;

@@ -18,7 +18,7 @@
 /*
  * Create a NTRIP session state for a client or a server connection.
  */
-struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned short port, char *mountpoint) {
+struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint) {
 	struct ntrip_state *this = (struct ntrip_state *)calloc(1, sizeof(struct ntrip_state));
 	if (this == NULL) {
 		logfmt(&caster->flog, "ntrip_new failed: out of memory\n");
@@ -56,6 +56,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, char *host, unsigned 
 		STAILQ_INIT(&this->jobq);
 	this->njobs = 0;
 	this->newjobs = 0;
+	this->bev = bev;
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);

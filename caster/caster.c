@@ -388,9 +388,21 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct event_base *base = caster->base;
 	struct bufferevent *bev;
 
-	struct ntrip_state *st = ntrip_new(caster, NULL, 0, NULL);
+	if (threads)
+		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+	else
+		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
+
+	if (bev == NULL) {
+		logfmt(&caster->flog, "Error constructing bufferevent!");
+		event_base_loopbreak(base);
+		return;
+	}
+
+	struct ntrip_state *st = ntrip_new(caster, bev, NULL, 0, NULL);
 	if (st == NULL) {
 		logfmt(&caster->flog, "Error constructing ntrip_state for a new connection!");
+		bufferevent_free(bev);
 		event_base_loopbreak(base);
 		return;
 	}
@@ -404,18 +416,6 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	st->state = NTRIP_WAIT_HTTP_METHOD;
 
-	if (threads)
-		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
-	else
-		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
-
-	if (bev == NULL) {
-		ntrip_log(st, LOG_CRIT, "Error constructing bufferevent!");
-		event_base_loopbreak(base);
-		ntrip_deferred_free(st, "listener_cb");
-		return;
-	}
-	st->bev = bev;
 	// evbuffer_defer_callbacks(bufferevent_get_output(bev), st->caster->base);
 
 	if (threads)
