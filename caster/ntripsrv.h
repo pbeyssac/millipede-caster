@@ -5,7 +5,7 @@
 
 #include "ntrip_common.h"
 
-int ntripsrv_redo_virtual_pos(struct ntrip_state *st);
+void ntripsrv_redo_virtual_pos(struct ntrip_state *st);
 int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers);
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd);
 

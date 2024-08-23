@@ -121,19 +121,19 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 /*
  * Required lock: ntrip_state
  */
-int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
-	int r = 0;
+void ntripsrv_redo_virtual_pos(struct ntrip_state *arg) {
+	struct ntrip_state *st = (struct ntrip_state *)arg;
 	if (!st->last_pos_valid)
-		return 0;
+		return;
 
 	struct sourcetable *pos_sourcetable = stack_flatten(st->caster, &st->caster->sourcetablestack);
 	if (pos_sourcetable == NULL)
-		return -1;
+		return;
 
 	struct dist_table *s = sourcetable_find_pos(pos_sourcetable, &st->last_pos);
 	if (s == NULL) {
 		sourcetable_free(pos_sourcetable);
-		return -1;
+		return;
 	}
 
 	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d\n", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
@@ -167,7 +167,7 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 				struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, s->dist_array[0].on_demand, &source_state);
 				if (l && (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING))) {
 					if (redistribute_switch_source(st, m, &s->dist_array[0].pos, l) < 0)
-						r = -1;
+						ntrip_log(st, LOG_NOTICE, "Unable to switch source from %s to %s\n", st->virtual_mountpoint, m);
 				}
 			}
 		}
@@ -175,7 +175,7 @@ int ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 
 	sourcetable_free(pos_sourcetable);
 	dist_table_free(s);
-	return r;
+	return;
 }
 
 /*
@@ -424,10 +424,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			if (parse_gga(line, &pos) >= 0) {
 				st->last_pos = pos;
 				st->last_pos_valid = 1;
-				if (ntripsrv_redo_virtual_pos(st) < 0) {
-					err = 1;
-					break;
-				}
+				joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
 			if (!ntrip_handle_raw(st, bev))

@@ -7,6 +7,7 @@
 enum job_type {
 	JOB_LIBEVENT_RW,
 	JOB_LIBEVENT_EVENT,
+	JOB_NTRIP_LOCK,
 	JOB_NTRIP_UNLOCKED,
 	JOB_REDISTRIBUTE
 };
@@ -35,6 +36,14 @@ struct job {
 			/* Event flags */
 			short events;
 		} event;
+
+		/*
+		 * type == JOB_NTRIP_LOCK: job associated with a ntrip_state,
+		 *	requires a lock on ntrip_state.
+		 */
+		struct {
+			void (*cb)(struct ntrip_state *st);
+		} ntrip_locked;
 
 		/*
 		 * type == JOB_REDISTRIBUTE:
@@ -100,6 +109,7 @@ struct joblist *joblist_new(struct caster_state *caster);
 void joblist_free(struct joblist *this);
 void joblist_run(struct joblist *this);
 void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, void *arg), void (*cbe)(struct bufferevent *bev, short events, void *arg), struct bufferevent *bev, void *arg, short events);
+void joblist_append_ntrip_locked(struct joblist *this, struct ntrip_state *st, void (*cb)(struct ntrip_state *arg));
 void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistribute_cb_args *redis_args), struct redistribute_cb_args *redis_args);
 void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip_state *st), struct ntrip_state *st);
 void joblist_drain(struct ntrip_state *st);

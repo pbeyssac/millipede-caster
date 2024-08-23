@@ -201,6 +201,9 @@ void joblist_run(struct joblist *this) {
 				case JOB_LIBEVENT_EVENT:
 					j->event.cb(bev, j->event.events, (void *)st);
 					break;
+				case JOB_NTRIP_LOCK:
+					j->ntrip_locked.cb(st);
+					break;
 				default:
 					abort();
 					break;
@@ -229,6 +232,8 @@ static int job_equal(struct job *j1, struct job *j2) {
 		return j1->rw.cb == j2->rw.cb;
 	if (j1->type == JOB_LIBEVENT_EVENT)
 		return j1->event.events == j2->event.events && j1->event.cb == j2->event.cb;
+	if (j1->type == JOB_NTRIP_LOCK)
+		return j1->ntrip_locked.cb == j2->ntrip_locked.cb;
 	return 0;
 }
 
@@ -355,6 +360,20 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		tmpj.event.events = events;
 	}
 	_joblist_append_generic(this, (struct ntrip_state *)arg, &tmpj);
+}
+
+/*
+ * Queue a new job for a ntrip_state at the end of its list, or directly execute in unthreaded mode.
+ * Required lock: ntrip_state
+ */
+void joblist_append_ntrip_locked(struct joblist *this, struct ntrip_state *st, void (*cb)(struct ntrip_state *arg)) {
+	if (threads) {
+		struct job tmpj;
+		tmpj.type = JOB_NTRIP_LOCK;
+		tmpj.ntrip_locked.cb = cb;
+		_joblist_append_generic(this, st, &tmpj);
+	} else
+		cb(st);
 }
 
 /*

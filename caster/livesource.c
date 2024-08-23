@@ -6,6 +6,7 @@
 
 #include "conf.h"
 #include "caster.h"
+#include "jobs.h"
 #include "livesource.h"
 #include "ntrip_common.h"
 #include "ntripsrv.h"
@@ -59,7 +60,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 			/*
 			 * Try to resubscribe virtual sources to a new source
 			 */
-			ntripsrv_redo_virtual_pos(np->ntrip_state);
+			joblist_append_ntrip_locked(np->ntrip_state->caster->joblist, np->ntrip_state, &ntripsrv_redo_virtual_pos);
 		}
 
 		if (kill_backlogged == 0 || np->backlogged) {
