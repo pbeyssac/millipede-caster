@@ -36,6 +36,16 @@ struct auth_entry {
 	const char *password;		// password (ntrip 1 or 2)
 };
 
+/*
+ * Content with a MIME type
+ */
+struct mime_content {
+	const char *s;
+	const char *mime_type;
+	int len;
+	int use_strfree;
+};
+
 #if !DEBUG
 #define strfree free
 #define mystrdup strdup
@@ -46,6 +56,7 @@ struct auth_entry {
 
 void free_callback(const void *data, size_t datalen, void *extra);
 void strfree_callback(const void *data, size_t datalen, void *extra);
+void mime_free_callback(const void *data, size_t datalen, void *extra);
 
 float distance(pos_t *p1, pos_t *p2);
 char *b64encode(const char *str, size_t len, int add_nul);
@@ -58,6 +69,8 @@ void *strmalloc(size_t len);
 void *strrealloc(void *p, size_t len);
 void strfree(void *str);
 int parse_header(char *line, char **key, char **val);
+struct mime_content *mime_new(const char *s, int len, const char *mime_type, int use_strfree);
+void mime_free(struct mime_content *this);
 struct parsed_file *file_parse(const char *filename, int nfields, const char *seps);
 void file_free(struct parsed_file *p);
 void logdate(char *date, size_t len);

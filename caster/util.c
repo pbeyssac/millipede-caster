@@ -354,6 +354,33 @@ parse_header(char *line, char **key, char **val) {
 	return 1;
 }
 
+/*
+ * Create a mime_content.
+ *
+ *	s is owned by the structure and will be freed with it
+ *	if len < 0, it will be set to strlen(s)
+ *	mime_type stays owned by the caller and should not be freed while the mime_content exists
+ *	use_strfree says whether to use strfree() or free() in mime_free().
+ */
+struct mime_content *mime_new(const char *s, int len, const char *mime_type, int use_strfree) {
+	struct mime_content *m = (struct mime_content *)malloc(sizeof(struct mime_content));
+	if (m == NULL || s == NULL)
+		return NULL;
+	m->s = s;
+	m->len = len >= 0 ? len : strlen(s);
+	m->mime_type = mime_type;
+	m->use_strfree = use_strfree;
+	return m;
+}
+
+void mime_free(struct mime_content *this) {
+	if (this->use_strfree)
+		strfree((char *)this->s);
+	else
+		free((void *)this->s);
+	free(this);
+}
+
 #if DEBUG
 int str_alloc = 0;
 
@@ -401,6 +428,13 @@ void free_callback(const void *data, size_t datalen, void *extra) {
  */
 void strfree_callback(const void *data, size_t datalen, void *extra) {
 	strfree((void *)data);
+}
+
+/*
+ * Callback to free MIME data
+ */
+void mime_free_callback(const void *data, size_t datalen, void *extra) {
+	mime_free((struct mime_content *)extra);
 }
 
 static void string_array_free(string_array_t *s) {
