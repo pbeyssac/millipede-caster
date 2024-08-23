@@ -428,7 +428,6 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct timeval read_timeout = { st->caster->config->ntripsrv_default_read_timeout, 0 };
 	struct timeval write_timeout = { st->caster->config->ntripsrv_default_write_timeout, 0 };
 	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
-	ntrip_log(st, LOG_DEBUG, "ntrip_state=%p bev=%p\n", st, bev);
 }
 
 static void

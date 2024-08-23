@@ -125,16 +125,16 @@ fetcher_sourcetable_start(struct sourcetable_fetch_args *arg_cb) {
 		bev = bufferevent_socket_new(arg_cb->caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
 
 	if (bev == NULL) {
-		logfmt(&arg_cb->caster->flog, "Error constructing bufferevent in get_sourcetable!");
+		logfmt(&arg_cb->caster->flog, "Error constructing bufferevent in fetcher_sourcetable_start!");
 		return;
 	}
-	logfmt(&arg_cb->caster->flog, "Starting sourcetable fetch from %s:%d\n", arg_cb->host, arg_cb->port);
 	struct ntrip_state *st = ntrip_new(arg_cb->caster, bev, arg_cb->host, arg_cb->port, NULL);
 	if (st == NULL) {
 		bufferevent_free(bev);
 		logfmt(&arg_cb->caster->flog, "Error constructing ntrip_state in fetcher_sourcetable_start!");
 		return;
 	}
+	ntrip_log(st, LOG_NOTICE, "Starting sourcetable fetch from %s:%d\n", arg_cb->host, arg_cb->port);
 	arg_cb->st = st;
 	st->sourcetable_cb_arg = arg_cb;
 	st->type = "sourcetable_fetcher";

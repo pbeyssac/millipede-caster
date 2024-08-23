@@ -490,7 +490,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 	output = bufferevent_get_output(bev);
 	len = evbuffer_get_length(output);
 	if (len == 0) {
-		ntrip_log(st, LOG_DEBUG, "flushed answer ntripsrv %p\n", st);
+		ntrip_log(st, LOG_EDEBUG, "flushed answer ntripsrv %p\n", st);
 		if (st->state == NTRIP_WAIT_CLOSE) {
 			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_free %p bev %p\n", st, bev);
 
