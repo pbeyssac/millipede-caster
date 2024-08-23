@@ -59,7 +59,7 @@ static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *
 	return 0;
 }
 
-int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, char *mime_type, struct evkeyvalq *opt_headers) {
+int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers) {
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 	if (this->client_version == 1)
