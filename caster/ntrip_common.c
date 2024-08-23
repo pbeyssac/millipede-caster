@@ -263,7 +263,7 @@ static json_object *ntrip_json(struct ntrip_state *st) {
 	unsigned port = sockaddr_port(&st->peeraddr.generic);
 	jsonip = ipstr[0] ? json_object_new_string(ipstr) : json_object_new_null();
 	json_object *new_obj = json_object_new_object();
-	json_object *jsonid = json_object_new_int(st->id);
+	json_object *jsonid = json_object_new_int64(st->id);
 	json_object *jsonport = json_object_new_int(port);
 	json_object_object_add(new_obj, "id", jsonid);
 	json_object_object_add(new_obj, "ip", jsonip);
@@ -299,7 +299,7 @@ struct mime_content *ntrip_list_json(struct caster_state *caster) {
 	TAILQ_FOREACH(sst, &caster->ntrips.queue, nextg) {
 		char idstr[40];
 		json_object *nj = ntrip_json(sst);
-		snprintf(idstr, sizeof idstr, "%d", sst->id);
+		snprintf(idstr, sizeof idstr, "%lld", sst->id);
 		json_object_object_add(new_list, idstr, nj);
 	}
 	P_RWLOCK_UNLOCK(&caster->ntrips.lock);
@@ -399,6 +399,8 @@ _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list a
 			fprintf(log->logfile, "[???] ");
 		}
 	}
+
+	fprintf(log->logfile, "%lld ", this->id);
 
 	if (threads)
 		fprintf(log->logfile, "[%lu] ", (long)pthread_getspecific(this->caster->thread_id));

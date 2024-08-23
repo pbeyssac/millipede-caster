@@ -70,7 +70,7 @@ struct ntrip_state {
 
 	struct caster_state *caster;
 	enum ntrip_session_state state;
-	int id;		// Unique id for external reference
+	long long id;		// Unique id for external reference; must not wrap
 	const char *type;
 	time_t start;	// time the connection was established
 

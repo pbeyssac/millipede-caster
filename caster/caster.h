@@ -28,7 +28,7 @@ struct caster_state {
 		P_RWLOCK_T lock;
 		struct general_ntripq free_queue;
 		P_RWLOCK_T free_lock;
-		int next_id;
+		long long next_id;	// must never wrap
 		int n;		// number of items in queue
 		int nfree;	// number of items in free_queue
 	} ntrips;
