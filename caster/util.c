@@ -307,12 +307,16 @@ int parse_gga(const char *line, pos_t *pos) {
 }
 
 /*
- * Return a "host:port" string.
+ * Return a "host:port" string for the Host: HTTP header.
  */
 char *host_port_str(char *host, unsigned short port) {
-	char *host_port = (char *)strmalloc(strlen(host) + 8);
-	if (host_port != NULL)
-		sprintf(host_port, "%s:%d", host, port);
+	char *host_port = (char *)strmalloc(strlen(host) + 9);
+	if (host_port != NULL) {
+		if (strchr(host, ':'))
+			sprintf(host_port, "[%s]:%d", host, port);
+		else
+			sprintf(host_port, "%s:%d", host, port);
+	}
 	return host_port;
 }
 
