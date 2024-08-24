@@ -207,6 +207,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	struct evbuffer *input = bufferevent_get_input(bev);
 	struct evbuffer *output = bufferevent_get_output(bev);
 	struct evkeyvalq opt_headers;
+
+	int method_post_source = 0;
+
 	TAILQ_INIT(&opt_headers);
 
 	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d\n", st->state, evbuffer_get_length(input));
@@ -374,61 +377,60 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					int sndbuf = st->caster->config->backlog_socket;
 					if (setsockopt(bufferevent_getfd(bev), SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof sndbuf) < 0)
 						ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
-				} else if (!strcmp(st->http_args[0], "POST")) {
-					if (st->http_args[1] == NULL || st->http_args[1][0] != '/') {
-						err = 400;
-						break;
+				} else if (!strcmp(st->http_args[0], "POST") || !strcmp(st->http_args[0], "SOURCE")) {
+					char *password;
+					char *user;
+					char *mountpoint;
+
+					method_post_source = 1;
+
+					if (!strcmp(st->http_args[0], "POST")) {
+						password = st->password;
+						user = st->user;
+						st->client_version = 2;
+						if (st->http_args[1] == NULL || st->http_args[1][0] != '/') {
+							err = 400;
+							break;
+						}
+						mountpoint = st->http_args[1]+1;
+					} else {
+						password = st->http_args[1];
+						user = NULL;
+						mountpoint = st->http_args[2];
+						st->client_version = 1;
 					}
-					char *mountpoint = st->http_args[1]+1;
 					struct sourceline *sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, mountpoint);
 					if (!sourceline) {
 						err = 404;
 						break;
 					}
-					st->type = "source";
-					if (livesource_find(st->caster, st, st->http_args[2], &sourceline->pos)) {
-						err = 409;
-						break;
-					}
-					if (!st->user || !st->password || !check_password(st, mountpoint, st->user, st->password)) {
+					if (st->client_version == 2 && (!st->user || !st->password)) {
 						err = 401;
 						break;
 					}
-					st->mountpoint = mystrdup(mountpoint);
-					if (ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 0) == NULL) {
-						err = 503;
-						break;
-					};
-					st->client_version = 2;
-					ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
-
-					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
-					st->state = NTRIP_WAIT_STREAM_SOURCE;
-					bufferevent_set_timeouts(bev, &read_timeout, NULL);
-				} else if (!strcmp(st->http_args[0], "SOURCE")) {
-					struct sourceline *sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, st->http_args[2]);
-					if (!sourceline || livesource_find(st->caster, st, st->http_args[2], &sourceline->pos)) {
-						evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
-						err = 1;
+					if (!check_password(st, mountpoint, user, password)) {
+						err = 401;
 						break;
 					}
-					if (!check_password(st, st->http_args[2], NULL, st->http_args[1])) {
-						evbuffer_add_reference(output, "ERROR - Bad Password\r\n", 22, NULL, NULL);
-						err = 1;
-						break;
-					}
-					//st->sourceline = sourceline;
 					st->type = "source";
-					st->mountpoint = mystrdup(st->http_args[2]);
+					st->mountpoint = mystrdup(mountpoint);
 					if (st->mountpoint == NULL) {
 						err = 503;
 						break;
 					}
-					if (ntrip_add_livesource(st, st->http_args[2], &sourceline->pos, 0) == NULL) {
+					if (livesource_find(st->caster, st, mountpoint, &sourceline->pos)) {
+						err = 409;
+						break;
+					}
+
+					if (ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 0) == NULL) {
 						err = 503;
 						break;
-					};
-					evbuffer_add_reference(output, "ICY 200 OK\r\n\r\n", 14, NULL, NULL);
+					}
+					if (st->client_version == 1)
+						evbuffer_add_reference(output, "ICY 200 OK\r\n\r\n", 14, NULL, NULL);
+					else
+						ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 					st->state = NTRIP_WAIT_STREAM_SOURCE;
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
@@ -462,13 +464,23 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		if (err == 400)
 			send_server_reply(st, output, 400, "Bad Request", NULL, NULL, NULL);
 		else if (err == 401) {
-			send_server_reply(st, output, 401, "Unauthorized", &opt_headers, NULL, NULL);
-			evbuffer_add_reference(output, "401\r\n", 5, NULL, NULL);
-		} else if (err == 404)
-			send_server_reply(st, output, 404, "Not Found", NULL, NULL, NULL);
-		else if (err == 409)
-			send_server_reply(st, output, 409, "Conflict", NULL, NULL, NULL);
-		else if (err == 500)
+			if (st->client_version == 1 && method_post_source)
+				evbuffer_add_reference(output, "ERROR - Bad Password\r\n", 22, NULL, NULL);
+			else {
+				send_server_reply(st, output, 401, "Unauthorized", &opt_headers, NULL, NULL);
+				evbuffer_add_reference(output, "401\r\n", 5, NULL, NULL);
+			}
+		} else if (err == 404) {
+			if (st->client_version == 1 && method_post_source)
+				evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
+			else
+				send_server_reply(st, output, 404, "Not Found", NULL, NULL, NULL);
+		} else if (err == 409) {
+			if (st->client_version == 1 && method_post_source)
+				evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
+			else
+				send_server_reply(st, output, 409, "Conflict", NULL, NULL, NULL);
+		} else if (err == 500)
 			send_server_reply(st, output, 500, "Internal Server Error", NULL, NULL, NULL);
 		else if (err == 501)
 			send_server_reply(st, output, 501, "Not Implemented", NULL, NULL, NULL);
