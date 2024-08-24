@@ -366,7 +366,7 @@ parse_header(char *line, char **key, char **val) {
  *	mime_type stays owned by the caller and should not be freed while the mime_content exists
  *	use_strfree says whether to use strfree() or free() in mime_free().
  */
-struct mime_content *mime_new(const char *s, int len, const char *mime_type, int use_strfree) {
+struct mime_content *mime_new(char *s, int len, const char *mime_type, int use_strfree) {
 	struct mime_content *m = (struct mime_content *)malloc(sizeof(struct mime_content));
 	if (m == NULL || s == NULL)
 		return NULL;
@@ -377,12 +377,26 @@ struct mime_content *mime_new(const char *s, int len, const char *mime_type, int
 	return m;
 }
 
+void mime_set_type(struct mime_content *this, const char *mime_type) {
+	this->mime_type = mime_type;
+}
+
 void mime_free(struct mime_content *this) {
 	if (this->use_strfree)
 		strfree((char *)this->s);
 	else
 		free((void *)this->s);
 	free(this);
+}
+
+void mime_append(struct mime_content *this, const char *s) {
+	int len = strlen(s);
+	char *new = (char *)strrealloc(this->s, this->len + len + 1);
+	if (new) {
+		this->s = new;
+		memcpy(this->s + this->len, s, len+1);
+		this->len += len;
+	}
 }
 
 #if DEBUG

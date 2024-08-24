@@ -40,9 +40,9 @@ struct auth_entry {
  * Content with a MIME type
  */
 struct mime_content {
-	const char *s;
+	char *s;
 	const char *mime_type;
-	int len;
+	size_t len;
 	int use_strfree;
 };
 
@@ -69,8 +69,10 @@ void *strmalloc(size_t len);
 void *strrealloc(void *p, size_t len);
 void strfree(void *str);
 int parse_header(char *line, char **key, char **val);
-struct mime_content *mime_new(const char *s, int len, const char *mime_type, int use_strfree);
+struct mime_content *mime_new(char *s, int len, const char *mime_type, int use_strfree);
+void mime_set_type(struct mime_content *this, const char *mime_type);
 void mime_free(struct mime_content *this);
+void mime_append(struct mime_content *this, const char *s);
 struct parsed_file *file_parse(const char *filename, int nfields, const char *seps);
 void file_free(struct parsed_file *p);
 void logdate(char *date, size_t len);
