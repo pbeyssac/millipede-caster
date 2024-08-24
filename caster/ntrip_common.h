@@ -72,7 +72,7 @@ struct ntrip_state {
 	enum ntrip_session_state state;
 	long long id;		// Unique id for external reference; must not wrap
 	const char *type;
-	time_t start;	// time the connection was established
+	struct timeval start;	// time the connection was established
 
 	/* linked-list pointers for main job queue */
 	STAILQ_ENTRY(ntrip_state) next;

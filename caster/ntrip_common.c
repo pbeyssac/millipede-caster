@@ -2,6 +2,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -36,6 +37,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 		return NULL;
 	}
 
+	gettimeofday(&this->start, NULL);
+
 	this->caster = caster;
 	this->state = NTRIP_WAIT_HTTP_STATUS;
 	this->chunk_state = CHUNK_NONE;
@@ -43,7 +46,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->port = port;
 	this->remote_addr[0] = '\0';
 	this->remote = 0;
-	this->start = 0;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
 	this->server_version = 1;
@@ -276,10 +278,8 @@ static json_object *ntrip_json(struct ntrip_state *st) {
 	if (st->user_agent)
 		json_object_object_add(new_obj, "user-agent", json_object_new_string(st->user_agent));
 
-	struct tm date;
-	gmtime_r(&st->start, &date);
-	char iso_date[22];
-	strftime(iso_date, sizeof iso_date, "%Y-%m-%dT%H:%M:%SZ", &date);
+	char iso_date[30];
+	iso_date_from_timeval(iso_date, sizeof iso_date, &st->start);
 	json_object_object_add(new_obj, "start", json_object_new_string(iso_date));
 
         bufferevent_unlock(st->bev);

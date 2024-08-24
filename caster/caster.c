@@ -409,7 +409,6 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		return;
 	}
 
-	st->start = time(NULL);
 	memcpy(&st->peeraddr, sa, socklen);
 	st->remote = 1;
 	sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);

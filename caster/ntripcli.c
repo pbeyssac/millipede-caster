@@ -272,7 +272,6 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
 	if (events & BEV_EVENT_CONNECTED) {
-		st->start = time(NULL);
 	 	evutil_socket_t fd = bufferevent_getfd(bev);
 		if (fd >= 0) {
 			socklen_t psocklen = sizeof(st->peeraddr);
