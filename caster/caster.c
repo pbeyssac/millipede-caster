@@ -397,7 +397,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	if (bev == NULL) {
 		logfmt(&caster->flog, "Error constructing bufferevent!");
-		event_base_loopbreak(base);
+		close(fd);
 		return;
 	}
 
@@ -405,7 +405,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	if (st == NULL) {
 		logfmt(&caster->flog, "Error constructing ntrip_state for a new connection!");
 		bufferevent_free(bev);
-		event_base_loopbreak(base);
+		close(fd);
 		return;
 	}
 
