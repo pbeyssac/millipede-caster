@@ -399,6 +399,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 503;
 						break;
 					};
+					st->client_version = 2;
 					ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
 
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
