@@ -1,0 +1,10 @@
+listen:
+  - port:		2103
+    ip:			::1
+host_auth_file:		host.auth
+source_auth_file:	source.auth
+sourcetable_file:	sourcetable.dat
+access_log:		../test-access.log
+log:			../test-caster.log
+
+log_level:		EDEBUG

@@ -3,7 +3,7 @@
 import socket
 
 HOST='::1'
-PORT=2102
+PORT=2103
 
 with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
   s.connect((HOST, PORT))

@@ -7,7 +7,7 @@ import socket
 #
 
 HOST='::1'
-PORT=2102
+PORT=2103
 
 tests = [b'ENSG', b'RICE', b'OUIL', b'SOPH', b'RIOM', b'WINTZ', b'WITT']
 n = 100

@@ -9,7 +9,7 @@ import sys
 #
 
 HOST='::1'
-PORT=2102
+PORT=2103
 
 tests = [
   (b'GET /adm/ HTTP/1.1\nUser-Agent: NTRIP test\n\n',
