@@ -17,7 +17,9 @@ tests = [
   (b'GET /adm HTTP/1.1\nUser-Agent: NTRIP test\n\n',
    b'^SOURCETABLE 200 OK\r\n'),
   (b'POST /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic dGVzdDE6dGVzdHB3IQ==\n\n',
-   b'^HTTP/1\.1 200 OK\r\n')
+   b'^HTTP/1\.1 200 OK\r\n'),
+  (b'SOURCE testpw! TEST1\nUser-Agent: NTRIP test\n\n',
+   b'^ICY 200 OK\r\n')
 ]
 
 err = 0
