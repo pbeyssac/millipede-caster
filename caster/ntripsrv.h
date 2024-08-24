@@ -6,7 +6,8 @@
 #include "ntrip_common.h"
 
 void ntripsrv_redo_virtual_pos(struct ntrip_state *st);
-int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers);
+int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, struct mime_content *m, struct evkeyvalq *opt_headers);
+int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers);
 void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster));
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd);
 

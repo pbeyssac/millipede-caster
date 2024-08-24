@@ -290,7 +290,7 @@ static json_object *ntrip_json(struct ntrip_state *st) {
  * Return a list of ntrip_state as a JSON object.
  */
 struct mime_content *ntrip_list_json(struct caster_state *caster) {
-	const char *s;
+	char *s;
 	json_object *new_list = json_object_new_object();
 	struct ntrip_state *sst;
 

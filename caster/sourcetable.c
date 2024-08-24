@@ -99,7 +99,7 @@ void sourcetable_free(struct sourcetable *this) {
 /*
  * Return sourcetable as a string.
  */
-char *sourcetable_get(struct sourcetable *this) {
+struct mime_content *sourcetable_get(struct sourcetable *this) {
 	struct sourceline *n;
 	P_RWLOCK_RDLOCK(&this->lock);
 
@@ -126,7 +126,10 @@ char *sourcetable_get(struct sourcetable *this) {
 		strcat(s, "ENDSOURCETABLE\r\n");
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
-	return s;
+	struct mime_content *m = mime_new(s, len, "gnss/sourcetable", 1);
+	if (m == NULL)
+		strfree(s);
+	return m;
 }
 
 void sourcetable_del_mountpoint(struct sourcetable *this, char *mountpoint) {

@@ -17,7 +17,9 @@
 const char *server_headers = "Server: NTRIP " SERVER_VERSION_STRING "\r\n";
 
 static void
-send_server_reply(struct ntrip_state *this, struct evbuffer *ev, int status_code, char *status, struct evkeyvalq *headers, char *firstword) {
+send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
+	int status_code, char *status, struct evkeyvalq *headers, char *firstword,
+	struct mime_content *m) {
 	char date[32];
 	time_t tstamp = time(NULL);
 	firstword = (this->client_version == 1 && firstword && this->user_agent_ntrip)?firstword:"HTTP/1.1";
@@ -26,6 +28,9 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev, int status_code
 	evbuffer_add_printf(ev, "%s %d %s\r\n%sDate: %s\r\n", firstword, status_code, status, server_headers, date);
 	if (this->server_version == 2)
 		evbuffer_add_reference(ev, "Ntrip-Version: Ntrip/2.0\r\n", 26, NULL, NULL);
+	if (m)
+		evbuffer_add_printf(ev, "Content-Length: %lu\r\nContent-Type: %s\r\n", m->len, m->mime_type);
+	evbuffer_add_reference(ev, "Connection: close\r\n", 19, NULL, NULL);
 	if (headers) {
 		struct evkeyval *np;
 		TAILQ_FOREACH(np, headers, next) {
@@ -33,41 +38,32 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev, int status_code
 		}
 	}
 	evbuffer_add_reference(ev, "\r\n", 2, NULL, NULL);
+	if (m && evbuffer_add_reference(ev, m->s, m->len, mime_free_callback, m) < 0)
+		// the call failed so we need to free m instead of letting the callback do it.
+		mime_free(m);
 }
 
 static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *output) {
-	struct evkeyvalq headers;
 	struct sourcetable *sourcetable = stack_flatten(this->caster, &this->caster->sourcetablestack);
-	char *s = sourcetable_get(sourcetable);
+	struct mime_content *m = sourcetable_get(sourcetable);
 	sourcetable_free(sourcetable);
-	if (s == NULL)
+	if (m == NULL)
 		return 503;
 
-	char lenstr[30];
-	snprintf(lenstr, sizeof lenstr, "%lu", strlen(s));
-	TAILQ_INIT(&headers);
-	evhttp_add_header(&headers, "Connection", "close");
-	evhttp_add_header(&headers, "Content-Length", lenstr);
-	evhttp_add_header(&headers, "Content-Type", this->client_version == 1?"text/plain":"gnss/sourcetable");
-	send_server_reply(this, output, 200, "OK", &headers, "SOURCETABLE");
-	evhttp_clear_headers(&headers);
-	//logfmt(this->&caster->flog, "\"%s\"\n", s);
-	if (evbuffer_add_reference(output, s, strlen(s), strfree_callback, NULL) < 0) {
-		// the call failed so we need to free s instead of letting the callback do it.
-		strfree(s);
-	}
+	if (this->client_version == 1)
+		mime_set_type(m, "text/plain");
+	send_server_reply(this, output, 200, "OK", NULL, "SOURCETABLE", m);
 	return 0;
 }
 
-int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers) {
+static int _ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct mime_content *m, struct evkeyvalq *opt_headers) {
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 	if (this->client_version == 1)
 		evbuffer_add_reference(output, "ICY 200 OK\r\n\r\n", 14, NULL, NULL);
 	else {
 		TAILQ_INIT(&headers);
-		evhttp_add_header(&headers, "Connection", "close");
-		if (mime_type != NULL)
+		if (m == NULL && mime_type != NULL)
 			evhttp_add_header(&headers, "Content-Type", mime_type);
 		evhttp_add_header(&headers, "Cache-Control", "no-store, no-cache, max-age=0");
 		evhttp_add_header(&headers, "Pragma", "no-cache");
@@ -77,10 +73,18 @@ int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, c
 				evhttp_add_header(&headers, np->key, np->value);
 			}
 		}
-		send_server_reply(this, output, 200, "OK", &headers, NULL);
+		send_server_reply(this, output, 200, "OK", &headers, NULL, m);
 		evhttp_clear_headers(&headers);
 	}
 	return 0;
+}
+
+int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, struct mime_content *m, struct evkeyvalq *opt_headers) {
+	return _ntripsrv_send_result_ok(this, output, NULL, m, opt_headers);
+}
+
+int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers) {
+	return _ntripsrv_send_result_ok(this, output, mime_type, NULL, opt_headers);
 }
 
 /*
@@ -92,9 +96,7 @@ void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*con
 	struct mime_content *r = content_cb(st->caster);
 	bufferevent_lock(st->bev);
 	struct evbuffer *output = bufferevent_get_output(st->bev);
-	ntripsrv_send_result_ok(st, output, r->mime_type, NULL);
-	if (evbuffer_add_reference(output, r->s, r->len, mime_free_callback, r) < 0)
-		mime_free(r);
+	ntripsrv_send_result_ok(st, output, r, NULL);
 	st->state = NTRIP_WAIT_CLOSE;
 	bufferevent_unlock(st->bev);
 }
@@ -347,7 +349,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						struct livesource *l = livesource_find_on_demand(st->caster, st, mountpoint, &sourceline->pos, st->source_on_demand, NULL);
 						if (l) {
 							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d\n", mountpoint, st->source_on_demand);
-							ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
+							ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 							st->state = NTRIP_WAIT_CLIENT_INPUT;
 
 							/* Regular NTRIP stream client: disable read and write timeouts */
@@ -359,7 +361,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							break;
 						}
 					} else {
-						ntripsrv_send_result_ok(st, output, "gnss/data", NULL);
+						ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 						st->state = NTRIP_WAIT_CLIENT_INPUT;
 
 						/* Regular NTRIP stream client: disable read and write timeouts */
@@ -397,7 +399,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 503;
 						break;
 					};
-					ntripsrv_send_result_ok(st, output, NULL, NULL);
+					ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
 
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 					st->state = NTRIP_WAIT_STREAM_SOURCE;
@@ -457,20 +459,20 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 	if (err) {
 		if (err == 400)
-			send_server_reply(st, output, 400, "Bad Request", NULL, NULL);
+			send_server_reply(st, output, 400, "Bad Request", NULL, NULL, NULL);
 		else if (err == 401) {
-			send_server_reply(st, output, 401, "Unauthorized", &opt_headers, NULL);
+			send_server_reply(st, output, 401, "Unauthorized", &opt_headers, NULL, NULL);
 			evbuffer_add_reference(output, "401\r\n", 5, NULL, NULL);
 		} else if (err == 404)
-			send_server_reply(st, output, 404, "Not Found", NULL, NULL);
+			send_server_reply(st, output, 404, "Not Found", NULL, NULL, NULL);
 		else if (err == 409)
-			send_server_reply(st, output, 409, "Conflict", NULL, NULL);
+			send_server_reply(st, output, 409, "Conflict", NULL, NULL, NULL);
 		else if (err == 500)
-			send_server_reply(st, output, 500, "Internal Server Error", NULL, NULL);
+			send_server_reply(st, output, 500, "Internal Server Error", NULL, NULL, NULL);
 		else if (err == 501)
-			send_server_reply(st, output, 501, "Not Implemented", NULL, NULL);
+			send_server_reply(st, output, 501, "Not Implemented", NULL, NULL, NULL);
 		else if (err == 503)
-			send_server_reply(st, output, 503, "Service Unavailable", NULL, NULL);
+			send_server_reply(st, output, 503, "Service Unavailable", NULL, NULL, NULL);
 		st->state = NTRIP_WAIT_CLOSE;
 	}
 	evhttp_clear_headers(&opt_headers);

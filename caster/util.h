@@ -83,7 +83,7 @@ char *mystrcasestr(const char *s, const char *find);
 
 #if DEBUG
 extern int str_alloc;
-char *malloc_stats_dump(int json);
+struct mime_content *malloc_stats_dump(int json);
 #endif
 
 #endif

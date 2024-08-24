@@ -13,7 +13,7 @@ PORT=2102
 
 tests = [
   (b'GET /adm/ HTTP/1.1\nUser-Agent: NTRIP test\n\n',
-   b'^HTTP/1\.1 401 Unauthorized\r\nServer: NTRIP Millipede Server .*\r\nDate: .* GMT\r\nWWW-Authenticate: Basic realm="/adm"\r\n\r\n401\r\n$'),
+   b'^HTTP/1\.1 401 Unauthorized\r\nServer: NTRIP Millipede Server .*\r\nDate: .* GMT\r\nConnection: close\r\nWWW-Authenticate: Basic realm="/adm"\r\n\r\n401\r\n$'),
   (b'GET /adm HTTP/1.1\nUser-Agent: NTRIP test\n\n',
    b'^SOURCETABLE 200 OK\r\n')
 ]

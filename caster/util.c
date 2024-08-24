@@ -651,51 +651,34 @@ mystrcasestr(const char *s, const char *find)
 }
 
 #ifdef DEBUG_JEMALLOC
-/*
- * Callback for jemalloc statistics.
- */
-struct malloc_cb_opaque {
-	char *result;
-	int len;
-};
-
 static void malloc_write_cb(void *opaque, const char *string) {
-	struct malloc_cb_opaque *o = (struct malloc_cb_opaque *) opaque;
-
-	if (o->result) {
-		int stringlen = strlen(string);
-		char *newresult = (char *)strrealloc(o->result, o->len + stringlen);
-		if (newresult) {
-			o->result = newresult;
-			memcpy(o->result + o->len-1, string, stringlen+1);
-			o->len += stringlen;
-		}
-	}
+	struct mime_content *m = (struct mime_content *) opaque;
+	mime_append(m, string);
 }
 
-char *malloc_stats_dump(int json) {
-	struct malloc_cb_opaque malloc_str;
-
-	malloc_str.result = (char *)strmalloc(1);
-	if (malloc_str.result) {
-		malloc_str.result[0] = '\0';
-		malloc_str.len = 1;
+struct mime_content *malloc_stats_dump(int json) {
+	char *empty = mystrdup("");
+	struct mime_content *m = mime_new(empty, 0, "application/json", 1);
+	if (m == NULL) {
+		strfree(empty);
+		return NULL;
 	}
 
 	if (json) {
-		//malloc_stats_print(malloc_write_cb, &malloc_str, "mdablxeJ");
-		malloc_stats_print(malloc_write_cb, &malloc_str, "J");
+		//malloc_stats_print(malloc_write_cb, m, "mdablxeJ");
+		malloc_stats_print(malloc_write_cb, m, "J");
 	} else {
-		//malloc_stats_print(malloc_write_cb, &malloc_str, "mdablxe");
-		malloc_stats_print(malloc_write_cb, &malloc_str, NULL);
+		//malloc_stats_print(malloc_write_cb, m, "mdablxe");
+		mime_set_type(m, "text/plain");
+		malloc_stats_print(malloc_write_cb, m, NULL);
 	}
-	return malloc_str.result;
+	return m;
 }
 
 #else
 
-char *malloc_stats_dump(int json) {
-	return mystrdup("{\"err\": \"no malloc stats available\"}");
+struct mime_content *malloc_stats_dump(int json) {
+	return mime_new(mystrdup("{\"err\": \"no malloc stats available\"}"), -1, "application/json", 1);
 }
 
 #endif

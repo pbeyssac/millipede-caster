@@ -36,11 +36,9 @@ int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *e
 		int len = strlen(uri);
 		int json = (len >= 5 && !strcmp(uri+len-5, ".json"))?1:0;
 
-		char *r = malloc_stats_dump(json);
-		if (r) {
-			ntripsrv_send_result_ok(st, output, "text/plain", NULL);
-			if (evbuffer_add_reference(output, r, strlen(r), strfree_callback, NULL) < 0)
-				strfree(r);
+		struct mime_content *m = malloc_stats_dump(json);
+		if (m) {
+			ntripsrv_send_result_ok(st, output, m, NULL);
 		} else {
 			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory\n");
 			*err = 500;

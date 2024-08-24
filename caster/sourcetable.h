@@ -5,6 +5,7 @@
 
 #include "queue.h"
 #include "sourceline.h"
+#include "util.h"
 
 struct caster_state;
 
@@ -67,7 +68,7 @@ struct sourcetable *sourcetable_read(const char *filename, int priority);
 struct sourcetable *sourcetable_new(char *host, unsigned short port);
 void sourcetable_free_unlocked(struct sourcetable *this);
 void sourcetable_free(struct sourcetable *this);
-char *sourcetable_get(struct sourcetable *this);
+struct mime_content *sourcetable_get(struct sourcetable *this);
 void sourcetable_del_mountpoint(struct sourcetable *this, char *mountpoint);
 int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand);
 int sourcetable_nentries(struct sourcetable *this, int omit_virtual);
