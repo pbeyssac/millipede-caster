@@ -145,6 +145,7 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 }
 
 static void ntrip_deferred_free2(struct ntrip_state *this) {
+	struct caster_state *caster = this->caster;
 	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2\n");
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
@@ -157,6 +158,9 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.free_lock);
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 	bufferevent_unlock(this->bev);
+
+	/* Certainly some work to do now */
+	ntrip_deferred_run(caster);
 }
 
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
