@@ -219,7 +219,7 @@ void joblist_run(struct joblist *this) {
 
 		bufferevent_unlock(bev);
 
-		ntrip_deferred_run(this->caster, "joblist_run");
+		ntrip_deferred_run(this->caster);
 		/*
 		 * Lock the list again for the next job.
 		 */

@@ -197,7 +197,7 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	joblist_append_ntrip_unlocked(this->caster->joblist, &ntrip_deferred_free2, this);
 }
 
-void ntrip_deferred_run(struct caster_state *this, char *orig) {
+void ntrip_deferred_run(struct caster_state *this) {
 	int n = 0;
 	struct ntrip_state *st;
 	P_RWLOCK_WRLOCK(&this->ntrips.free_lock);

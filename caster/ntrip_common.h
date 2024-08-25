@@ -188,7 +188,7 @@ struct ntrip_state {
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint);
 void ntrip_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);
-void ntrip_deferred_run(struct caster_state *this, char *orig);
+void ntrip_deferred_run(struct caster_state *this);
 struct mime_content *ntrip_list_json(struct caster_state *caster);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, pos_t *mountpoint_pos, int on_demand);
 void ntrip_unregister_livesource(struct ntrip_state *this);
