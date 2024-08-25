@@ -50,7 +50,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->remote = 0;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
-	this->server_version = 1;
+	this->server_version = 2;
 	this->client_version = 1;
 	this->source_virtual = 0;
 	this->source_on_demand = 0;
