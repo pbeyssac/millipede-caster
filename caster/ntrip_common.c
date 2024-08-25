@@ -118,9 +118,6 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 
 	strfree((char *)this->user_agent);
 
-	if (this->chunk_buf)
-		evbuffer_free(this->chunk_buf);
-
 	if (this->subscription)
 		livesource_del_subscriber(this->subscription, this);
 
@@ -178,6 +175,10 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 
 	if (this->own_livesource)
 		ntrip_unregister_livesource(this);
+	if (this->chunk_buf) {
+		evbuffer_free(this->chunk_buf);
+		this->chunk_buf = NULL;
+	}
 
 	bufferevent_disable(this->bev, EV_READ|EV_WRITE);
 	bufferevent_set_timeouts(this->bev, NULL, NULL);
