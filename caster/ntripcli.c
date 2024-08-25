@@ -104,7 +104,8 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 	struct evbuffer *input = bufferevent_get_input(bev);
 
-	//ntrip_log(st, LOG_DEBUG, "readcb %zd bytes\n", evbuffer_get_length(input));
+	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d\n", st->state, evbuffer_get_length(input));
+
 	while (!end && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 5) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
@@ -255,7 +256,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			st->tmp_sourcetable = NULL;
 		}
 		ntrip_deferred_free(st, "ntripcli_readcb/sourcetable");
-		return;
 	}
 }
 

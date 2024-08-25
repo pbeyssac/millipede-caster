@@ -165,6 +165,9 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
 	ntrip_deferred_run(caster);
 }
 
+/*
+ * Required locks: bufferevent, ntrip_state
+ */
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	if (this->state == NTRIP_END) {
 		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free from %s\n", orig);
@@ -204,6 +207,11 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	joblist_append_ntrip_unlocked(this->caster->joblist, &ntrip_deferred_free2, this);
 }
 
+/*
+ * Run deferred frees
+ *
+ * Used in threaded mode to avoid locking issues.
+ */
 void ntrip_deferred_run(struct caster_state *this) {
 	int n = 0;
 	struct ntrip_state *st;
