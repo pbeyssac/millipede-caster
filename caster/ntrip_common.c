@@ -529,6 +529,7 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 				return 1;
 			}
 			evbuffer_remove(st->chunk_buf, &packet->data[0], len_raw);
+			st->received_bytes += len_raw;
 			if (livesource_send_subscribers(st->own_livesource, packet, st->caster))
 				st->last_send = time(NULL);
 			packet_free(packet);
