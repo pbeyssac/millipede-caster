@@ -121,7 +121,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	strfree((char *)this->user_agent);
 
 	if (this->subscription)
-		livesource_del_subscriber(this->subscription, this);
+		livesource_del_subscriber(this);
 
 	if (this->tmp_sourcetable)
 		sourcetable_free(this->tmp_sourcetable);
@@ -256,7 +256,7 @@ void ntrip_deferred_run(struct caster_state *this) {
 			 * Done here instead of _ntrip_free() to avoid lock ordering problems.
 			 */
 			bufferevent_unlock(bev);
-			livesource_del_subscriber(sub, st);
+			livesource_del_subscriber(st);
 			bufferevent_lock(bev);
 		}
 

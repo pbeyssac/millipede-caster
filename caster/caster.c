@@ -138,6 +138,7 @@ caster_new(struct config *config, const char *config_file) {
 	this->sourcetable_fetchers_count = 0;
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
+	P_MUTEX_INIT(&this->livesources.delete_lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
 	this->ntrips.next_id = 1;
@@ -219,6 +220,7 @@ void caster_free(struct caster_state *this) {
 	if (this->joblist) joblist_free(this->joblist);
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
 	P_RWLOCK_DESTROY(&this->livesources.lock);
+	P_MUTEX_DESTROY(&this->livesources.delete_lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.free_lock);
 	P_RWLOCK_DESTROY(&this->authlock);
@@ -296,12 +298,14 @@ static int caster_listen(struct caster_state *this) {
 }
 
 void caster_del_livesource(struct caster_state *this, struct livesource *livesource) {
+	P_MUTEX_LOCK(&this->livesources.delete_lock);
 	P_RWLOCK_WRLOCK(&this->livesources.lock);
 
 	TAILQ_REMOVE(&this->livesources.queue, livesource, next);
 	livesource_free(livesource);
 
 	P_RWLOCK_UNLOCK(&this->livesources.lock);
+	P_MUTEX_UNLOCK(&this->livesources.delete_lock);
 }
 
 static void

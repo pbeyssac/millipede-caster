@@ -54,6 +54,7 @@ struct caster_state {
 	struct {
 		struct livesourceq queue;
 		P_RWLOCK_T lock;
+		P_MUTEX_T delete_lock;
 	} livesources;
 
 	sourcetable_stack_t sourcetablestack;

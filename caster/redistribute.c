@@ -19,7 +19,7 @@ int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, p
 	if (new_mountpoint == NULL)
 		return -1;
 	if (this->subscription) {
-		livesource_del_subscriber(this->subscription, this);
+		livesource_del_subscriber(this);
 	}
 	this->subscription = livesource_add_subscriber(livesource, this);
 	this->subscription->virtual = 1;

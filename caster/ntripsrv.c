@@ -351,6 +351,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 					st->type = "client";
 					if (!st->source_virtual) {
+						P_MUTEX_LOCK(&st->caster->livesources.delete_lock);
 						struct livesource *l = livesource_find_on_demand(st->caster, st, mountpoint, &sourceline->pos, st->source_on_demand, NULL);
 						if (l) {
 							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d\n", mountpoint, st->source_on_demand);
@@ -361,10 +362,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							bufferevent_set_timeouts(bev, NULL, NULL);
 							livesource_add_subscriber(l, st);
 						} else {
+							P_MUTEX_UNLOCK(&st->caster->livesources.delete_lock);
 							err = ntripsrv_send_sourcetable(st, output);
 							st->state = NTRIP_WAIT_CLOSE;
 							break;
 						}
+						P_MUTEX_UNLOCK(&st->caster->livesources.delete_lock);
 					} else {
 						ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 						st->state = NTRIP_WAIT_CLIENT_INPUT;
