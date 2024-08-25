@@ -503,22 +503,18 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
  */
 void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 {
-	size_t len;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-	struct evbuffer *output;
 
-	output = bufferevent_get_output(bev);
-	len = evbuffer_get_length(output);
-	if (len == 0) {
-		ntrip_log(st, LOG_EDEBUG, "flushed answer ntripsrv\n");
-		if (st->state == NTRIP_WAIT_CLOSE) {
-			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb ntrip_free bev %p\n", bev);
-
+	if (st->state == NTRIP_WAIT_CLOSE) {
+		size_t len;
+		struct evbuffer *output;
+		output = bufferevent_get_output(bev);
+		len = evbuffer_get_length(output);
+		if (len == 0)
 			ntrip_deferred_free(st, "ntripsrv_writecb");
-			return;
-		}
-	} else
-		ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb remaining len %d\n", len);
+		else
+			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb remaining len %d\n", len);
+	}
 }
 
 void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
