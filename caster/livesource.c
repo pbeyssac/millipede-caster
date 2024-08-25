@@ -173,30 +173,33 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	int nbacklogged = 0;
 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
-		struct bufferevent *bev = np->ntrip_state->bev;
+		struct ntrip_state *st = np->ntrip_state;
+		struct bufferevent *bev = st->bev;
 		bufferevent_lock(bev);
-		if (np->ntrip_state->state == NTRIP_END) {
+		if (st->state == NTRIP_END) {
 			/* Subscriber currently closing, skip */
-			ntrip_log(np->ntrip_state, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d\n", np->ntrip_state->state);
+			ntrip_log(st, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d\n", st->state);
 			bufferevent_unlock(bev);
 			ns++;
 			n++;
 			continue;
 		}
-		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(np->ntrip_state->bev));
+		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(st->bev));
 		if (backlog_len > caster->config->backlog_evbuffer) {
-			ntrip_log(np->ntrip_state, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
+			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
 		} else if (packet->caster->config->zero_copy) {
-			if (evbuffer_add_reference(bufferevent_get_output(np->ntrip_state->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
-				ntrip_log(np->ntrip_state, LOG_CRIT, "RTCM: evbuffer_add_reference failed\n");
+			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
+				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed\n");
 				ns++;
-			}
+			} else
+				st->sent_bytes += packet->datalen;
 		} else {
-			if (evbuffer_add(bufferevent_get_output(np->ntrip_state->bev), packet->data, packet->datalen) < 0) {
+			if (evbuffer_add(bufferevent_get_output(st->bev), packet->data, packet->datalen) < 0) {
 				ns++;
-			}
+			} else
+				st->sent_bytes += packet->datalen;
 		}
 		bufferevent_unlock(bev);
 		n++;

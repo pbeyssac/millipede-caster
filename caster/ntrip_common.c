@@ -38,6 +38,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	}
 
 	gettimeofday(&this->start, NULL);
+	this->received_bytes = 0;
+	this->sent_bytes = 0;
 
 	this->caster = caster;
 	this->state = NTRIP_WAIT_HTTP_STATUS;
@@ -270,8 +272,12 @@ static json_object *ntrip_json(struct ntrip_state *st) {
 	jsonip = ipstr[0] ? json_object_new_string(ipstr) : json_object_new_null();
 	json_object *new_obj = json_object_new_object();
 	json_object *jsonid = json_object_new_int64(st->id);
+	json_object *received_bytes = json_object_new_int64(st->received_bytes);
+	json_object *sent_bytes = json_object_new_int64(st->sent_bytes);
 	json_object *jsonport = json_object_new_int(port);
 	json_object_object_add(new_obj, "id", jsonid);
+	json_object_object_add(new_obj, "received_bytes", received_bytes);
+	json_object_object_add(new_obj, "sent_bytes", sent_bytes);
 	json_object_object_add(new_obj, "ip", jsonip);
 	json_object_object_add(new_obj, "port", jsonport);
 	json_object_object_add(new_obj, "type", json_object_new_string(st->type));
@@ -447,6 +453,7 @@ int ntrip_handle_raw(struct ntrip_state *st, struct bufferevent *bev) {
 		if (len_raw > st->caster->config->max_raw_packet)
 			len_raw = st->caster->config->max_raw_packet;
 		struct packet *rawp = packet_new(len_raw, st->caster);
+		st->received_bytes += len_raw;
 		if (rawp == NULL) {
 			evbuffer_drain(input, len_raw);
 			ntrip_log(st, LOG_CRIT, "Raw: Not enough memory, dropping %d bytes\n", len_raw);

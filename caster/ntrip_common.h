@@ -73,6 +73,7 @@ struct ntrip_state {
 	long long id;		// Unique id for external reference; must not wrap
 	const char *type;
 	struct timeval start;	// time the connection was established
+	unsigned long long received_bytes, sent_bytes;
 
 	/* linked-list pointers for main job queue */
 	STAILQ_ENTRY(ntrip_state) next;

@@ -41,6 +41,8 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 	if (m && evbuffer_add_reference(ev, m->s, m->len, mime_free_callback, m) < 0)
 		// the call failed so we need to free m instead of letting the callback do it.
 		mime_free(m);
+	else if (m)
+		this->sent_bytes += m->len;
 }
 
 static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *output) {
@@ -441,6 +443,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
+			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
+			st->received_bytes += len + 1;
 			pos_t pos;
 			ntrip_log(st, LOG_DEBUG, "GGA? \"%s\", %zd bytes\n", line, len);
 			if (parse_gga(line, &pos) >= 0) {

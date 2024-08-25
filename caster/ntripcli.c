@@ -203,6 +203,8 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
+			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
+			st->received_bytes += len + 1;
 			if (!strcmp(line, "ENDSOURCETABLE")) {
 				ntrip_log(st, LOG_INFO, "Complete sourcetable, %d entries\n", sourcetable_nentries(st->tmp_sourcetable, 0));
 				st->tmp_sourcetable->pullable = 1;
