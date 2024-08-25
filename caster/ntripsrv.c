@@ -418,12 +418,13 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 503;
 						break;
 					}
-					if (livesource_find(st->caster, st, mountpoint, &sourceline->pos)) {
+					struct livesource *old_livesource, *new_livesource;
+					new_livesource = ntrip_add_livesource(st, st->mountpoint, &old_livesource);
+					if (old_livesource != NULL) {
 						err = 409;
 						break;
 					}
-
-					if (ntrip_add_livesource(st, st->mountpoint, &sourceline->pos, 0) == NULL) {
+					if (new_livesource == NULL) {
 						err = 503;
 						break;
 					}
