@@ -110,6 +110,12 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
+			st->chunk_state = CHUNK_NONE;
+			if (st->chunk_buf) {
+				evbuffer_free(st->chunk_buf);
+				st->chunk_buf = NULL;
+			}
+
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
@@ -188,7 +194,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 				if (!strcasecmp(key, "transfer-encoding")) {
 					if (!strcasecmp(value, "chunked")) {
-						st->chunk_state = CHUNK_WAIT_LEN;
 						if (st->chunk_buf == NULL)
 							st->chunk_buf = evbuffer_new();
 						if (st->chunk_buf == NULL) {
@@ -196,6 +201,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 							end = 1;
 							break;
 						}
+						st->chunk_state = CHUNK_WAIT_LEN;
 					}
 				}
 			}
@@ -231,8 +237,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 			st->state = NTRIP_WAIT_STREAM_GET;
 		} else if (st->state == NTRIP_WAIT_STREAM_GET) {
-			//ntrip_log(st, LOG_INFO, "testing redistribute %d for %s\n", st->redistribute, st->mountpoint);
-			if (!ntrip_handle_raw(st, bev))
+			if (!ntrip_handle_raw(st))
 				break;
 			if (st->persistent)
 				continue;
@@ -243,7 +248,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 		}
 	}
-	if (end) {
+	if (end || st->state == NTRIP_FORCE_CLOSE) {
 		if (st->sourcetable_cb_arg != NULL) {
 			/* Notify the callback the transfer is over, and failed. */
 			ntrip_log(st, LOG_DEBUG, "sourcetable loading failed\n");

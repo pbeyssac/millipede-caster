@@ -220,6 +220,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
+			// Cancel chunk encoding from client by default
+			st->chunk_state = CHUNK_NONE;
+
 			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
@@ -257,13 +260,13 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					//
 				} else if (!strcasecmp(key, "transfer-encoding")) {
 					if (!strcasecmp(value, "chunked")) {
-						st->chunk_state = CHUNK_WAIT_LEN;
 						if (st->chunk_buf == NULL)
 							st->chunk_buf = evbuffer_new();
 						if (st->chunk_buf == NULL) {
 							err = 503;
 							break;
 						}
+						st->chunk_state = CHUNK_WAIT_LEN;
 					}
 				} else if (!strcasecmp(key, "ntrip-version")) {
 					if (!strcasecmp(value, "ntrip/2.0"))
@@ -456,7 +459,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
-			if (!ntrip_handle_raw(st, bev))
+			if (!ntrip_handle_raw(st))
 				break;
 		}
 
@@ -497,6 +500,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		st->state = NTRIP_WAIT_CLOSE;
 	}
 	evhttp_clear_headers(&opt_headers);
+	if (st->state == NTRIP_FORCE_CLOSE)
+		ntrip_deferred_free(st, "ntripsrv_readcb");
 }
 
 /*

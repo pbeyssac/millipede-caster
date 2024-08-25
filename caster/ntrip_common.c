@@ -447,11 +447,11 @@ void ntrip_log(void *arg, int level, const char *fmt, ...) {
 	va_end(ap);
 }
 
-int ntrip_handle_raw(struct ntrip_state *st, struct bufferevent *bev) {
-	struct evbuffer *input = bufferevent_get_input(bev);
+int ntrip_handle_raw(struct ntrip_state *st) {
+	struct evbuffer *input = bufferevent_get_input(st->bev);
 
 	if (st->chunk_state != CHUNK_NONE)
-		return ntrip_handle_raw_chunk(st, bev);
+		return ntrip_handle_raw_chunk(st);
 
 	while (1) {
 
@@ -479,10 +479,10 @@ int ntrip_handle_raw(struct ntrip_state *st, struct bufferevent *bev) {
 /*
  * Extract raw data in HTTP chunks
  */
-int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
+int ntrip_handle_raw_chunk(struct ntrip_state *st) {
 	size_t len;
 	size_t chunk_len;
-	struct evbuffer *input = bufferevent_get_input(bev);
+	struct evbuffer *input = bufferevent_get_input(st->bev);
 	unsigned long len_raw;
 
 	while (1) {
@@ -498,12 +498,17 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 			if (sscanf(line, "%zx", &chunk_len) == 1) {
 				// ntrip_log(st, LOG_DEBUG, "ok chunk_len: \"%s\" (%zu)\n", line, chunk_len);
 			} else {
-				free(line);
 				ntrip_log(st, LOG_INFO, "failed chunk_len: \"%s\"\n", line);
+				free(line);
+				st->state = NTRIP_FORCE_CLOSE;
 				return 0;
 			}
 			free(line);
-			st->chunk_state = CHUNK_IN_PROGRESS;
+
+			if (chunk_len == 0)
+				st->chunk_state = CHUNK_LAST;
+			else
+				st->chunk_state = CHUNK_IN_PROGRESS;
 			st->chunk_len = chunk_len;
 		} else if (st->chunk_state == CHUNK_IN_PROGRESS) {
 			len_raw = evbuffer_get_length(input);
@@ -534,7 +539,7 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 				st->last_send = time(NULL);
 			packet_free(packet);
 			return 1;
-		} else if (st->chunk_state == CHUNK_WAITING_TRAILER) {
+		} else if (st->chunk_state == CHUNK_WAITING_TRAILER || st->chunk_state == CHUNK_LAST) {
 			char data[2];
 			long len_raw = evbuffer_get_length(input);
 			if (len_raw < 2)
@@ -543,6 +548,14 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
 			evbuffer_remove(input, data, 2);
 			if (data[0] != '\r' || data[1] != '\n')
 				ntrip_log(st, LOG_INFO, "Wrong chunk trailer\n");
+
+			if (st->chunk_state == CHUNK_LAST) {
+				ntrip_log(st, LOG_EDEBUG, "0-length chunk, closing\n");
+				st->state = NTRIP_FORCE_CLOSE;
+				st->chunk_state = CHUNK_NONE;
+				return 0;
+			}
+
 			st->chunk_state = CHUNK_WAIT_LEN;
 		}
 	}
@@ -552,10 +565,10 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev) {
  * Handle receipt and retransmission of 1 RTCM packet.
  * Return 0 if more data is needed.
  */
-static int ntrip_handle_rtcm(struct ntrip_state *st, struct bufferevent *bev) {
+static int ntrip_handle_rtcm(struct ntrip_state *st) {
 	unsigned short len_rtcm;
 	struct evbuffer_ptr p;
-	struct evbuffer *input = bufferevent_get_input(bev);
+	struct evbuffer *input = bufferevent_get_input(st->bev);
 	/*
 	 * Look for 0xd3 header byte
 	 */

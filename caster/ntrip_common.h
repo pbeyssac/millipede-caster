@@ -20,7 +20,8 @@ enum ntrip_session_state {
 	NTRIP_WAIT_STREAM_SOURCE,	// Source connected, receive data (server)
 	NTRIP_WAIT_SOURCETABLE_LINE,	// Client waiting for the next sourcetable line
 	NTRIP_WAIT_CLIENT_INPUT,	// Server waiting for GGA lines from client
-	NTRIP_WAIT_CLOSE,		// End of connection, close
+	NTRIP_WAIT_CLOSE,		// End of connection, drain output then close
+	NTRIP_FORCE_CLOSE,		// End of connection, force close now
 	NTRIP_END			// Ready for ntrip_free
 };
 
@@ -31,7 +32,8 @@ enum ntrip_chunk_state {
 	CHUNK_NONE,		// no chunk encoding
 	CHUNK_WAIT_LEN,		// waiting for chunk len (hex digits + "\r\n")
 	CHUNK_IN_PROGRESS,	// in chunk
-	CHUNK_WAITING_TRAILER	// waiting for "\r\n" trailer
+	CHUNK_WAITING_TRAILER,	// waiting for "\r\n" trailer
+	CHUNK_LAST		// like CHUNK_WAITING_TRAILER, but quit after
 };
 
 /* Log levels, same as syslog and GEF + LOG_EDEBUG */
@@ -197,7 +199,7 @@ char *ntrip_peer_ipstr(struct ntrip_state *this);
 unsigned short ntrip_peer_port(struct ntrip_state *this);
 void ntrip_alog(void *arg, const char *fmt, ...);
 void ntrip_log(void *arg, int level, const char *fmt, ...);
-int ntrip_handle_raw(struct ntrip_state *st, struct bufferevent *bev);
-int ntrip_handle_raw_chunk(struct ntrip_state *st, struct bufferevent *bev);
+int ntrip_handle_raw(struct ntrip_state *st);
+int ntrip_handle_raw_chunk(struct ntrip_state *st);
 
 #endif
