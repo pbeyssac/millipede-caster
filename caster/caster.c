@@ -191,12 +191,16 @@ caster_new(struct config *config, const char *config_file) {
 }
 
 void caster_free(struct caster_state *this) {
-	event_free(this->signalpipe_event);
-	event_free(this->signalhup_event);
-	event_free(this->signalint_event);
+	if (this->signalpipe_event)
+		event_free(this->signalpipe_event);
+	if (this->signalhup_event)
+		event_free(this->signalhup_event);
+	if (this->signalint_event)
+		event_free(this->signalint_event);
 
 	for (int i = 0; i < this->config->bind_count; i++)
-		evconnlistener_free(this->listeners[i]);
+		if (this->listeners[i])
+			evconnlistener_free(this->listeners[i]);
 	free(this->listeners);
 	free(this->socks);
 
