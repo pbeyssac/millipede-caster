@@ -113,6 +113,7 @@ void joblist_run(struct joblist *this) {
 			assert(this->njobs > 0);
 			STAILQ_REMOVE_HEAD(&this->jobq, next);
 			this->njobs--;
+			P_MUTEX_UNLOCK(&this->mutex);
 			if (j->type == JOB_REDISTRIBUTE)
 				j->redistribute.cb(j->redistribute.arg);
 			else if (j->type == JOB_NTRIP_UNLOCKED)
@@ -120,6 +121,7 @@ void joblist_run(struct joblist *this) {
 			else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
 				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb);
 			free(j);
+			P_MUTEX_LOCK(&this->mutex);
 		}
 
 		/*
