@@ -256,10 +256,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			st->sourcetable_cb_arg->sourcetable_cb(-1, 0, st->sourcetable_cb_arg);
 			st->sourcetable_cb_arg = NULL;
 		}
-		if (st->tmp_sourcetable != NULL) {
-			sourcetable_free(st->tmp_sourcetable);
-			st->tmp_sourcetable = NULL;
-		}
 		ntrip_deferred_free(st, "ntripcli_readcb/sourcetable");
 	}
 }
