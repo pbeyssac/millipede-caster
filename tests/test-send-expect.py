@@ -19,7 +19,11 @@ tests = [
   (b'POST /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic dGVzdDE6dGVzdHB3IQ==\n\n',
    b'^HTTP/1\.1 200 OK\r\n'),
   (b'SOURCE testpw! TEST1\nUser-Agent: NTRIP test\n\n',
-   b'^ICY 200 OK\r\n')
+   b'^ICY 200 OK\r\n'),
+  (b'GET /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\n\n$',
+   b'^SOURCETABLE 200 OK\r\nServer: NTRIP Millipede Server \S+\r\nDate: (.*) GMT\r\nNtrip-Version: Ntrip/2\.0\r\nContent-Length: \d+\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nCAS'),
+  (b'GET /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nNtrip-Version: Ntrip/2.0\n\n$',
+   b'^HTTP/1.1 404 Not Found\r\nServer: NTRIP Millipede Server \S+\r\nDate: .* GMT\r\nNtrip-Version: Ntrip/2\.0\r\nConnection: close\r\n\r\n'),
 ]
 
 err = 0

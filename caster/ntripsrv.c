@@ -366,8 +366,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							livesource_add_subscriber(l, st);
 						} else {
 							P_MUTEX_UNLOCK(&st->caster->livesources.delete_lock);
-							err = ntripsrv_send_sourcetable(st, output);
-							st->state = NTRIP_WAIT_CLOSE;
+							if (st->client_version == 1) {
+								err = ntripsrv_send_sourcetable(st, output);
+								st->state = NTRIP_WAIT_CLOSE;
+							} else
+								err = 404;
 							break;
 						}
 						P_MUTEX_UNLOCK(&st->caster->livesources.delete_lock);
