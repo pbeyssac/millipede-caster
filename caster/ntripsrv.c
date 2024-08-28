@@ -9,6 +9,7 @@
 #include "conf.h"
 #include "adm.h"
 #include "caster.h"
+#include "http.h"
 #include "jobs.h"
 #include "ntrip_common.h"
 #include "redistribute.h"
@@ -277,30 +278,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_DEBUG, "Header %s: *****\n", key);
-					if (!strncmp(value, "Basic ", 6)) {
-						char *auth = b64decode(value+6, strlen(value+6), 1);
-						char *user, *password;
-						if (auth) {
-							int colon = strcspn(auth, ":");
-							if (auth[colon] == ':') {
-								auth[colon] = '\0';
-								user = auth;
-								password = auth + colon +1;
-								ntrip_log(st, LOG_DEBUG, "Decoded auth: %s, %s\n", user, password);
-								st->user = user;
-								st->password = password;
-							} else {
-								ntrip_log(st, LOG_DEBUG, "No ':' in %s\n", auth);
-								strfree(auth);
-							}
-						} else {
-							if (st->caster->config->log_level >= LOG_DEBUG) {
-								ntrip_log(st, LOG_DEBUG, "Can't decode Base64 string: %s\n", value+6);
-							} else {
-								ntrip_log(st, LOG_INFO, "Can't decode Base64 string\n");
-							}
-						}
-					} else {
+					if (http_decode_auth(value, &st->user, &st->password) >= 0)
+						ntrip_log(st, LOG_DEBUG, "Decoded auth: %s, %s\n", st->user, st->password);
+					else {
 						if (st->caster->config->log_level >= LOG_DEBUG) {
 							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"\n", value);
 						} else {
