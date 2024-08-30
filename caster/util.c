@@ -580,7 +580,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	}
 	pf->nlines = nlines;
 	pf->nfields = nfields;
-	strfree(line);
+	free(line);
 	fclose(fp);
 	return pf;
 }
