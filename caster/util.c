@@ -546,7 +546,6 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	}
 
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
-		char **pl = (char **)malloc(nfields*sizeof(char *));
 		char *septmp = line;
 
 		for (; line[linelen-1] == '\n' || line[linelen-1] == '\r'; linelen--)
@@ -562,6 +561,8 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 		if (line[0] == '#')
 			// skip comment line
 			continue;
+
+		char **pl = (char **)malloc(nfields*sizeof(char *));
 
 		int n;
 		for (n = 0; n < nfields && (token = strsep(&septmp, seps)) != NULL; n++) {
