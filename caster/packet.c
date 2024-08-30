@@ -21,6 +21,7 @@ void packet_free(struct packet *packet) {
 	 * we are the only thread handling it.
 	 */
 	if (!packet->caster->config->zero_copy) {
+		P_MUTEX_DESTROY(&packet->mutex);
 		free((void *)packet);
 		return;
 	}
