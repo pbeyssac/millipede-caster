@@ -207,6 +207,9 @@ void caster_free(struct caster_state *this) {
 
 	caster_free_fetchers(this);
 
+	auth_free(this->host_auth);
+	auth_free(this->source_auth);
+
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
 
