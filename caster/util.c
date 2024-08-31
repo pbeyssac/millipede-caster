@@ -600,8 +600,9 @@ void logdate(char *date, size_t len) {
 	char tmp_date[30];
 	struct timeval tstamp;
 	gettimeofday(&tstamp, NULL);
-	struct tm *t = localtime(&tstamp.tv_sec);
-	strftime(tmp_date, sizeof tmp_date, "%Y-%m-%d %H:%M:%S", t);
+	struct tm t;
+	localtime_r(&tstamp.tv_sec, &t);
+	strftime(tmp_date, sizeof tmp_date, "%Y-%m-%d %H:%M:%S", &t);
 	snprintf(date, len, "%s.%03ld ", tmp_date, tstamp.tv_usec/1000);
 }
 
