@@ -219,6 +219,7 @@ void caster_free(struct caster_state *this) {
 		TAILQ_REMOVE_HEAD(&this->sourcetablestack.list, next);
 		sourcetable_free(s);
 	}
+	P_RWLOCK_UNLOCK(&this->sourcetablestack.lock);
 
 	if (this->joblist) joblist_free(this->joblist);
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);

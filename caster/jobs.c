@@ -67,6 +67,7 @@ void joblist_free(struct joblist *this) {
 	}
 	_joblist_drain(&this->append_jobq);
 	P_MUTEX_UNLOCK(&this->append_mutex);
+	P_MUTEX_UNLOCK(&this->mutex);
 	P_MUTEX_DESTROY(&this->mutex);
 	P_MUTEX_DESTROY(&this->append_mutex);
 	if (pthread_cond_destroy(&this->condjob) < 0)
