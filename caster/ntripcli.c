@@ -275,16 +275,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
 	if (events & BEV_EVENT_CONNECTED) {
-	 	evutil_socket_t fd = bufferevent_getfd(bev);
-		if (fd >= 0) {
-			socklen_t psocklen = sizeof(st->peeraddr);
-			if (getpeername(fd, &st->peeraddr.generic, &psocklen) >= 0) {
-				st->remote = 1;
-				sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);
-			} else {
-				ntrip_log(st, LOG_NOTICE, "getpeername failed: %s\n", strerror(errno));
-			}
-		}
+		ntrip_set_peeraddr(st, NULL, 0);
 		ntrip_log(st, LOG_INFO, "Connected to %s:%d for /%s\n", st->host, st->port, st->mountpoint);
 		char *uri = (char *)strmalloc(strlen(st->mountpoint) + 3);
 		if (uri == NULL) {

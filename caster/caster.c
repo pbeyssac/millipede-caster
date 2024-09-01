@@ -421,9 +421,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		return;
 	}
 
-	memcpy(&st->peeraddr, sa, socklen);
-	st->remote = 1;
-	sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);
+	ntrip_set_peeraddr(st, sa, socklen);
 	st->state = NTRIP_WAIT_HTTP_METHOD;
 	ntrip_register(st);
 
