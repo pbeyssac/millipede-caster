@@ -46,8 +46,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
 	this->port = port;
-	this->remote_addr[0] = '\0';
-	this->remote = 0;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
 	this->server_version = 2;
@@ -77,6 +75,9 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->virtual_mountpoint = NULL;
 	this->status_code = 0;
 	memset(&this->http_args, 0, sizeof(this->http_args));
+	this->remote_addr[0] = '\0';
+	this->remote = 0;
+	memset(&this->peeraddr, 0, sizeof(this->peeraddr));
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
