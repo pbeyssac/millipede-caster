@@ -264,6 +264,8 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 		STAILQ_INSERT_TAIL(&this->append_jobq, j, next);
 		this->append_njobs++;
 		P_MUTEX_UNLOCK(&this->append_mutex);
+		if (pthread_cond_signal(&this->condjob) != 0)
+			caster_log_error(this->caster, "pthread_cond_signal");
 		return;
 	}
 
