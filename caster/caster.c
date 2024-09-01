@@ -192,6 +192,9 @@ caster_new(struct config *config, const char *config_file) {
 }
 
 void caster_free(struct caster_state *this) {
+	if (threads)
+		jobs_stop_threads(this->joblist);
+
 	if (this->signalpipe_event)
 		event_free(this->signalpipe_event);
 	if (this->signalhup_event)
@@ -649,7 +652,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	if (threads && jobs_start_threads(caster, nthreads) < 0) {
+	if (threads && jobs_start_threads(caster->joblist, nthreads) < 0) {
 		caster_free(caster);
 		fprintf(stderr, "Could not create threads!\n");
 		return 1;
