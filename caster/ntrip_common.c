@@ -74,16 +74,23 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->sourceline = NULL;
 	this->virtual_mountpoint = NULL;
 	this->status_code = 0;
+	this->id = 0;
 	memset(&this->http_args, 0, sizeof(this->http_args));
 	this->remote_addr[0] = '\0';
 	this->remote = 0;
 	memset(&this->peeraddr, 0, sizeof(this->peeraddr));
+	return this;
+}
+
+/*
+ * Insert ntrip_state in the main connection queue.
+ */
+void ntrip_register(struct ntrip_state *this) {
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
-	caster->ntrips.n++;
+	this->caster->ntrips.n++;
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
-	return this;
 }
 
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {

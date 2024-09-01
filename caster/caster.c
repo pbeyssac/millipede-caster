@@ -424,10 +424,10 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	memcpy(&st->peeraddr, sa, socklen);
 	st->remote = 1;
 	sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);
+	st->state = NTRIP_WAIT_HTTP_METHOD;
+	ntrip_register(st);
 
 	ntrip_log(st, LOG_INFO, "New connection\n");
-
-	st->state = NTRIP_WAIT_HTTP_METHOD;
 
 	// evbuffer_defer_callbacks(bufferevent_get_output(bev), st->caster->base);
 
