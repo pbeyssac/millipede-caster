@@ -46,8 +46,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
 	this->port = port;
-	this->remote_addr[0] = '\0';
-	this->remote = 0;
 	this->last_send = time(NULL);
 	this->subscription = NULL;
 	this->server_version = 2;
@@ -76,13 +74,43 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->sourceline = NULL;
 	this->virtual_mountpoint = NULL;
 	this->status_code = 0;
+	this->id = 0;
 	memset(&this->http_args, 0, sizeof(this->http_args));
+	this->remote_addr[0] = '\0';
+	this->remote = 0;
+	memset(&this->peeraddr, 0, sizeof(this->peeraddr));
+	return this;
+}
+
+/*
+ * Insert ntrip_state in the main connection queue.
+ */
+void ntrip_register(struct ntrip_state *this) {
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
-	caster->ntrips.n++;
+	this->caster->ntrips.n++;
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
-	return this;
+}
+
+/*
+ * Set peer address, either from a provided sockaddr (sa != NULL) or
+ * from getpeername() if sa == NULL.
+ */
+void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t socklen) {
+	if (sa == NULL) {
+		evutil_socket_t fd = bufferevent_getfd(this->bev);
+		if (fd < 0)
+			return;
+		socklen_t psocklen = sizeof(this->peeraddr);
+		if (getpeername(fd, &this->peeraddr.generic, &psocklen) < 0) {
+			ntrip_log(this, LOG_NOTICE, "getpeername failed: %s\n", strerror(errno));
+			return;
+		}
+	} else
+		memcpy(&this->peeraddr, sa, socklen < sizeof this->peeraddr ? socklen:sizeof this->peeraddr);
+	this->remote = 1;
+	sockaddr_ipstr(&this->peeraddr.generic, this->remote_addr, sizeof this->remote_addr);
 }
 
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {

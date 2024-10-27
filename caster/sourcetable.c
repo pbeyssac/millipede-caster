@@ -87,6 +87,7 @@ void sourcetable_free_unlocked(struct sourcetable *this) {
 		sourceline_free(n);
 	}
 
+	P_RWLOCK_UNLOCK(&this->lock);
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
 }

@@ -35,6 +35,7 @@ void log_reopen(struct log *this, const char *filename) {
 void log_free(struct log *this) {
 	P_RWLOCK_WRLOCK(&this->lock);
 	fclose(this->logfile);
+	P_RWLOCK_UNLOCK(&this->lock);
 	P_RWLOCK_DESTROY(&this->lock);
 }
 

@@ -76,6 +76,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 void livesource_free(struct livesource *this) {
 	P_RWLOCK_WRLOCK(&this->lock);
 	livesource_kill_subscribers_unlocked(this, 0);
+	P_RWLOCK_UNLOCK(&this->lock);
 	P_RWLOCK_DESTROY(&this->lock);
 	strfree(this->mountpoint);
 	free(this);

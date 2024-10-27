@@ -69,7 +69,7 @@ void *strmalloc(size_t len);
 void *strrealloc(void *p, size_t len);
 void strfree(void *str);
 int parse_header(char *line, char **key, char **val);
-struct mime_content *mime_new(char *s, int len, const char *mime_type, int use_strfree);
+struct mime_content *mime_new(char *s, long long len, const char *mime_type, int use_strfree);
 void mime_set_type(struct mime_content *this, const char *mime_type);
 void mime_free(struct mime_content *this);
 void mime_append(struct mime_content *this, const char *s);

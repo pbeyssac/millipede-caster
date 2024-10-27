@@ -366,7 +366,7 @@ parse_header(char *line, char **key, char **val) {
  *	mime_type stays owned by the caller and should not be freed while the mime_content exists
  *	use_strfree says whether to use strfree() or free() in mime_free().
  */
-struct mime_content *mime_new(char *s, int len, const char *mime_type, int use_strfree) {
+struct mime_content *mime_new(char *s, long long len, const char *mime_type, int use_strfree) {
 	struct mime_content *m = (struct mime_content *)malloc(sizeof(struct mime_content));
 	if (m == NULL || s == NULL)
 		return NULL;
@@ -546,7 +546,6 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	}
 
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
-		char **pl = (char **)malloc(nfields*sizeof(char *));
 		char *septmp = line;
 
 		for (; line[linelen-1] == '\n' || line[linelen-1] == '\r'; linelen--)
@@ -562,6 +561,8 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 		if (line[0] == '#')
 			// skip comment line
 			continue;
+
+		char **pl = (char **)malloc(nfields*sizeof(char *));
 
 		int n;
 		for (n = 0; n < nfields && (token = strsep(&septmp, seps)) != NULL; n++) {
@@ -579,7 +580,8 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	}
 	pf->nlines = nlines;
 	pf->nfields = nfields;
-	strfree(line);
+	free(line);
+	fclose(fp);
 	return pf;
 }
 
@@ -598,8 +600,9 @@ void logdate(char *date, size_t len) {
 	char tmp_date[30];
 	struct timeval tstamp;
 	gettimeofday(&tstamp, NULL);
-	struct tm *t = localtime(&tstamp.tv_sec);
-	strftime(tmp_date, sizeof tmp_date, "%Y-%m-%d %H:%M:%S", t);
+	struct tm t;
+	localtime_r(&tstamp.tv_sec, &t);
+	strftime(tmp_date, sizeof tmp_date, "%Y-%m-%d %H:%M:%S", &t);
 	snprintf(date, len, "%s.%03ld ", tmp_date, tstamp.tv_usec/1000);
 }
 

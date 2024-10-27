@@ -192,6 +192,9 @@ caster_new(struct config *config, const char *config_file) {
 }
 
 void caster_free(struct caster_state *this) {
+	if (threads)
+		jobs_stop_threads(this->joblist);
+
 	if (this->signalpipe_event)
 		event_free(this->signalpipe_event);
 	if (this->signalhup_event)
@@ -207,6 +210,9 @@ void caster_free(struct caster_state *this) {
 
 	caster_free_fetchers(this);
 
+	auth_free(this->host_auth);
+	auth_free(this->source_auth);
+
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
 
@@ -216,6 +222,7 @@ void caster_free(struct caster_state *this) {
 		TAILQ_REMOVE_HEAD(&this->sourcetablestack.list, next);
 		sourcetable_free(s);
 	}
+	P_RWLOCK_UNLOCK(&this->sourcetablestack.lock);
 
 	if (this->joblist) joblist_free(this->joblist);
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
@@ -417,13 +424,11 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		return;
 	}
 
-	memcpy(&st->peeraddr, sa, socklen);
-	st->remote = 1;
-	sockaddr_ipstr(&st->peeraddr.generic, st->remote_addr, sizeof st->remote_addr);
+	ntrip_set_peeraddr(st, sa, socklen);
+	st->state = NTRIP_WAIT_HTTP_METHOD;
+	ntrip_register(st);
 
 	ntrip_log(st, LOG_INFO, "New connection\n");
-
-	st->state = NTRIP_WAIT_HTTP_METHOD;
 
 	// evbuffer_defer_callbacks(bufferevent_get_output(bev), st->caster->base);
 
@@ -647,7 +652,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	if (threads && jobs_start_threads(caster, nthreads) < 0) {
+	if (threads && jobs_start_threads(caster->joblist, nthreads) < 0) {
 		caster_free(caster);
 		fprintf(stderr, "Could not create threads!\n");
 		return 1;

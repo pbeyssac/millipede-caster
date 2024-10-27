@@ -404,6 +404,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					st->type = "source";
+					if (st->mountpoint)
+						strfree(st->mountpoint);
 					st->mountpoint = mystrdup(mountpoint);
 					if (st->mountpoint == NULL) {
 						err = 503;

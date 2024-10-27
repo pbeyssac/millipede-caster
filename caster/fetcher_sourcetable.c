@@ -134,10 +134,11 @@ fetcher_sourcetable_start(struct sourcetable_fetch_args *arg_cb) {
 		logfmt(&arg_cb->caster->flog, "Error constructing ntrip_state in fetcher_sourcetable_start!");
 		return;
 	}
+	st->type = "sourcetable_fetcher";
+	st->sourcetable_cb_arg = arg_cb;
+	ntrip_register(st);
 	ntrip_log(st, LOG_NOTICE, "Starting sourcetable fetch from %s:%d\n", arg_cb->host, arg_cb->port);
 	arg_cb->st = st;
-	st->sourcetable_cb_arg = arg_cb;
-	st->type = "sourcetable_fetcher";
 
 	if (threads)
 		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);

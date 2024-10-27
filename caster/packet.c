@@ -21,6 +21,8 @@ void packet_free(struct packet *packet) {
 	 * we are the only thread handling it.
 	 */
 	if (!packet->caster->config->zero_copy) {
+		P_MUTEX_UNLOCK(&packet->mutex);
+		P_MUTEX_DESTROY(&packet->mutex);
 		free((void *)packet);
 		return;
 	}
@@ -28,6 +30,7 @@ void packet_free(struct packet *packet) {
 	P_MUTEX_LOCK(&packet->mutex);
 	packet->refcnt--;
 	if (packet->refcnt == 0) {
+		P_MUTEX_UNLOCK(&packet->mutex);
 		P_MUTEX_DESTROY(&packet->mutex);
 		free((void *)packet);
 	} else {

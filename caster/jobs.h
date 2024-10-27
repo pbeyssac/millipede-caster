@@ -10,7 +10,8 @@ enum job_type {
 	JOB_NTRIP_LOCK,
 	JOB_NTRIP_UNLOCKED,
 	JOB_NTRIP_UNLOCKED_CONTENT,
-	JOB_REDISTRIBUTE
+	JOB_REDISTRIBUTE,
+	JOB_STOP_THREAD
 };
 
 struct ntrip_state;
@@ -117,6 +118,10 @@ struct joblist {
 
 	/* The associated caster */
 	struct caster_state *caster;
+
+	/* Pointer to threads */
+	pthread_t *threads;
+	int nthreads;		// number of threads
 };
 
 struct joblist *joblist_new(struct caster_state *caster);
@@ -127,8 +132,10 @@ void joblist_append_ntrip_locked(struct joblist *this, struct ntrip_state *st, v
 void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistribute_cb_args *redis_args), struct redistribute_cb_args *redis_args);
 void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip_state *st), struct ntrip_state *st);
 void joblist_append_ntrip_unlocked_content(struct joblist *this, void (*cb)(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)), struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster));
+void joblist_append_stop(struct joblist *this);
 void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);
-int jobs_start_threads(struct caster_state *caster, int nthreads);
+int jobs_start_threads(struct joblist *this, int nthreads);
+void jobs_stop_threads(struct joblist *this);
 
 #endif

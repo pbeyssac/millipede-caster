@@ -4,6 +4,8 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <pthread.h>
+#include <signal.h>
+#include <unistd.h>
 
 #include "conf.h"
 #include "caster.h"
@@ -22,13 +24,15 @@ struct joblist *joblist_new(struct caster_state *caster) {
 		this->njobs = 0;
 		this->append_njobs = 0;
 		this->caster = caster;
+		this->nthreads = 0;
+		this->threads = NULL;
 		STAILQ_INIT(&this->ntrip_queue);
 		STAILQ_INIT(&this->append_queue);
 		STAILQ_INIT(&this->jobq);
 		STAILQ_INIT(&this->append_jobq);
 		P_MUTEX_INIT(&this->mutex, NULL);
 		P_MUTEX_INIT(&this->append_mutex, NULL);
-		if (pthread_cond_init(&this->condjob, NULL) < 0)
+		if (pthread_cond_init(&this->condjob, NULL) != 0)
 			caster_log_error(this->caster, "pthread_cond_init");
 	}
 	return this;
@@ -67,9 +71,10 @@ void joblist_free(struct joblist *this) {
 	}
 	_joblist_drain(&this->append_jobq);
 	P_MUTEX_UNLOCK(&this->append_mutex);
+	P_MUTEX_UNLOCK(&this->mutex);
 	P_MUTEX_DESTROY(&this->mutex);
 	P_MUTEX_DESTROY(&this->append_mutex);
-	if (pthread_cond_destroy(&this->condjob) < 0)
+	if (pthread_cond_destroy(&this->condjob) != 0)
 		caster_log_error(this->caster, "pthread_cond_signal");
 	free(this);
 }
@@ -120,6 +125,8 @@ void joblist_run(struct joblist *this) {
 				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
 			else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
 				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb);
+			else if (j->type == JOB_STOP_THREAD)
+				pthread_exit(NULL);
 			free(j);
 			P_MUTEX_LOCK(&this->mutex);
 		}
@@ -142,7 +149,7 @@ void joblist_run(struct joblist *this) {
 				/*
 				 * All queues empty => wait.
 				 */
-				if (pthread_cond_wait(&this->condjob, &this->mutex) < 0)
+				if (pthread_cond_wait(&this->condjob, &this->mutex) != 0)
 					caster_log_error(this->caster, "pthread_cond_wait");
 				continue;
 			}
@@ -257,6 +264,8 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 		STAILQ_INSERT_TAIL(&this->append_jobq, j, next);
 		this->append_njobs++;
 		P_MUTEX_UNLOCK(&this->append_mutex);
+		if (pthread_cond_signal(&this->condjob) != 0)
+			caster_log_error(this->caster, "pthread_cond_signal");
 		return;
 	}
 
@@ -332,7 +341,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	/*
 	 * Signal waiting workers there is a new job.
 	 */
-	if (pthread_cond_signal(&this->condjob) < 0)
+	if (pthread_cond_signal(&this->condjob) != 0)
 		caster_log_error(this->caster, "pthread_cond_signal");
 	P_MUTEX_UNLOCK(&this->append_mutex);
 }
@@ -413,6 +422,12 @@ void joblist_append_ntrip_unlocked_content(struct joblist *this, void (*cb)(stru
 		cb(st, content_cb);
 }
 
+void joblist_append_stop(struct joblist *this) {
+	struct job tmpj;
+	tmpj.type = JOB_STOP_THREAD;
+	_joblist_append_generic(this, NULL, &tmpj);
+}
+
 /*
  * Drain the job queue for a ntrip_state
  *
@@ -445,31 +460,69 @@ void *jobs_start_routine(void *arg) {
 	return NULL;
 }
 
-int jobs_start_threads(struct caster_state *caster, int nthreads) {
+int jobs_start_threads(struct joblist *this, int nthreads) {
+	int err = 0;
 	pthread_t *p = (pthread_t *)malloc(sizeof(pthread_t)*nthreads);
 	if (p == NULL) {
 		return -1;
 	}
 
-	pthread_key_create(&caster->thread_id, NULL);
-	pthread_setspecific(caster->thread_id, 0);
+	pthread_key_create(&this->caster->thread_id, NULL);
+	pthread_setspecific(this->caster->thread_id, 0);
 
 	// Set stack size to the configured value
-	size_t stacksize = caster->config->threads[0].stacksize;
+	size_t stacksize = this->caster->config->threads[0].stacksize;
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, stacksize);
 	printf("Setting thread stack size to %zu bytes\n", stacksize);
 
-	for (int i = 0; i < nthreads; i++) {
+	int i;
+	for (i = 0; i < nthreads; i++) {
 		struct thread_start_args *args = (struct thread_start_args *)malloc(sizeof(struct thread_start_args));
 		args->thread_id = i+1;
-		args->caster = caster;
+		args->caster = this->caster;
 		int r = pthread_create(&p[i], &attr, jobs_start_routine, args);
-		if (r < 0) {
-			return -1;
+		if (r != 0) {
+			err = 1;
+			free(args);
+			break;
 		}
 	}
 	pthread_attr_destroy(&attr);
+
+	if (err) {
+		this->nthreads = i;
+		jobs_stop_threads(this);
+		return -1;
+	}
+
+	this->threads = p;
+	this->nthreads = nthreads;
 	return 0;
+}
+
+void jobs_stop_threads(struct joblist *this) {
+	for (int i = 0; i < this->nthreads; i++) {
+		joblist_append_stop(this);
+		pthread_yield();
+	}
+
+	int r, nlive;
+
+	do {
+		nlive = 0;
+		for (int i = 0; i < this->nthreads; i++) {
+			r = pthread_kill(this->threads[i], 0);
+			if (r == 0)
+				nlive++;
+		}
+		if (nlive != 0) {
+			logfmt(&this->caster->flog, "%d thread(s) still active, waiting\n", nlive);
+			sleep(1);
+		}
+	} while (nlive);
+	free(this->threads);
+	this->threads = NULL;
+	this->nthreads = 0;
 }
