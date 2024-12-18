@@ -303,6 +303,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 400;
 						break;
 					}
+					char *querystring = strchr(st->http_args[1], '?');
+					if (querystring)
+						// Ignore query string
+						*querystring = '\0';
 					if (strlen(st->http_args[1]) >= 5 && !memcmp(st->http_args[1], "/adm/", 5)) {
 						st->type = "adm";
 						admsrv(st, "/adm", st->http_args[1] + 4, &err, &opt_headers);
