@@ -99,11 +99,9 @@ int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *ou
 void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)) {
 	struct mime_content *r = content_cb(st->caster);
 	bufferevent_lock(st->bev);
-	ntrip_lock(st);
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	ntripsrv_send_result_ok(st, output, r, NULL);
 	st->state = NTRIP_WAIT_CLOSE;
-	ntrip_unlock(st);
 	bufferevent_unlock(st->bev);
 }
 
