@@ -50,6 +50,8 @@ tests = [
    b'^SOURCETABLE 200 OK\r\nServer: NTRIP Millipede Server \S+\r\nDate: (.*) GMT\r\nNtrip-Version: Ntrip/2\.0\r\nContent-Length: \d+\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nCAS'),
   (b'GET /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nNtrip-Version: Ntrip/2.0\n\n$',
    b'^HTTP/1.1 404 Not Found\r\nServer: NTRIP Millipede Server \S+\r\nDate: .* GMT\r\nNtrip-Version: Ntrip/2\.0\r\nConnection: close\r\n\r\n'),
+  (b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nNtrip-Version: Ntrip/2.0\n\n',
+   b'^HTTP/1\.1 200 OK\r\n(?s:.)*\r\nCAS;castera\.ntrip\.eu\.org;2101;NTRIP-Caster-2\.0\.45;INRAE;0;FRA;48\.82;2\.34;0\.0\.0\.0;0;http://caster\.centipede\.fr/home\r\nNET;CENTIPEDE-RTK;INRAE;B;N;https://centipede\.fr;https://docs\.centipede\.fr;contact@centipede\.fr;none\r\nSTR;V;V;RTCM3;1004,1005,1006,1008,1012,1019,1020,1033,1042,1045,1046,1077,1087,1097,1107,1127,1230;;GPS\+GLO\+GAL\+BDS\+QZS;NONE;NONE;48\.824;2\.344;1;0;PB-Virtual,0;NONE;N;N;;\r\nENDSOURCETABLE\r\n$'),
 ]
 
 err = 0

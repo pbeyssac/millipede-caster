@@ -127,7 +127,7 @@ struct mime_content *sourcetable_get(struct sourcetable *this) {
 		strcat(s, "ENDSOURCETABLE\r\n");
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
-	struct mime_content *m = mime_new(s, len, "gnss/sourcetable", 1);
+	struct mime_content *m = mime_new(s, len-1, "gnss/sourcetable", 1);
 	if (m == NULL)
 		strfree(s);
 	return m;
