@@ -7,6 +7,7 @@
 #include <event2/http.h>
 
 #include "conf.h"
+#include "ntripsrv.h"
 #include "adm.h"
 #include "caster.h"
 #include "http.h"
@@ -98,39 +99,61 @@ int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *ou
 void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)) {
 	struct mime_content *r = content_cb(st->caster);
 	bufferevent_lock(st->bev);
+	ntrip_lock(st);
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	ntripsrv_send_result_ok(st, output, r, NULL);
 	st->state = NTRIP_WAIT_CLOSE;
+	ntrip_unlock(st);
 	bufferevent_unlock(st->bev);
 }
 
 /*
  * Check password in the base
+ *
+ * Returns:
+ *	0: mountpoint not found or wrong password, doesn't match a wildcard entry
+ *	1: mountpoint found and password is correct
+ *	2: mountpoint not found, but password matches a wildcard entry
  */
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd) {
-	int r = 0;
+	int r = CHECKPW_MOUNTPOINT_INVALID;
+	int explicit_mountpoint = 0;
+	struct auth_entry *wildcard_entry = NULL;
 
 	P_RWLOCK_RDLOCK(&this->caster->authlock);
 
 	struct auth_entry *auth = this->caster->source_auth;
 	if (auth == NULL) {
 		P_RWLOCK_UNLOCK(&this->caster->authlock);
-		return 0;
+		return CHECKPW_MOUNTPOINT_INVALID;
 	}
 
 	ntrip_log(this, LOG_DEBUG, "mountpoint %s user %s\n", mountpoint, user);
 	for (; auth->key != NULL; auth++) {
+		if (!strcmp(auth->key, "*")) {
+			wildcard_entry = auth;
+			continue;
+		}
 		if (!strcmp(auth->key, mountpoint)) {
+			explicit_mountpoint = 1;
 			ntrip_log(this, LOG_DEBUG, "mountpoint %s found\n", mountpoint);
 			if (user && strcmp(auth->user, user))
 				break;
 
 			if (!strcmp(auth->password, passwd)) {
 				ntrip_log(this, LOG_DEBUG, "source %s auth ok\n", mountpoint);
-				r = 1;
+				r = CHECKPW_MOUNTPOINT_VALID;
 				break;
 			}
 			break;
+		}
+	}
+
+	if (explicit_mountpoint == 0 && wildcard_entry) {
+		/* Mountpoint entry not found, use the wildcard instead */
+		if (!strcmp(wildcard_entry->password, passwd)) {
+			ntrip_log(this, LOG_DEBUG, "source %s auth ok using wildcard\n", mountpoint);
+			r = CHECKPW_MOUNTPOINT_WILDCARD;
 		}
 	}
 
@@ -395,16 +418,18 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						st->client_version = 1;
 					}
 					struct sourceline *sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, mountpoint);
-					if (!sourceline) {
-						err = 404;
-						break;
-					}
 					if (st->client_version == 2 && (!st->user || !st->password)) {
 						err = 401;
 						break;
 					}
-					if (!check_password(st, mountpoint, user, password)) {
+					int r;
+					r = check_password(st, mountpoint, user, password);
+					if (r == CHECKPW_MOUNTPOINT_INVALID) {
 						err = 401;
+						break;
+					}
+					if (!sourceline && r != CHECKPW_MOUNTPOINT_WILDCARD) {
+						err = 404;
 						break;
 					}
 					st->type = "source";

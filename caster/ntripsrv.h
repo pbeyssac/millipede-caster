@@ -5,6 +5,12 @@
 
 #include "ntrip_common.h"
 
+enum check_password_result {
+	CHECKPW_MOUNTPOINT_INVALID,
+	CHECKPW_MOUNTPOINT_VALID,
+	CHECKPW_MOUNTPOINT_WILDCARD
+};
+
 void ntripsrv_redo_virtual_pos(struct ntrip_state *st);
 int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, struct mime_content *m, struct evkeyvalq *opt_headers);
 int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers);
