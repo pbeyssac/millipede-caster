@@ -109,9 +109,9 @@ void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*con
  * Check password in the base
  *
  * Returns:
- *	0: mountpoint not found or wrong password, doesn't match a wildcard entry
- *	1: mountpoint found and password is correct
- *	2: mountpoint not found, but password matches a wildcard entry
+ *	CHECKPW_MOUNTPOINT_INVALID: mountpoint not found or wrong password, doesn't match a wildcard entry
+ *	CHECKPW_MOUNTPOINT_VALID: mountpoint found and password is correct
+ *	CHECKPW_MOUNTPOINT_WILDCARD: mountpoint not found, but password matches a wildcard entry
  */
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd) {
 	int r = CHECKPW_MOUNTPOINT_INVALID;
