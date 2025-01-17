@@ -518,7 +518,7 @@ static string_array_t *split(const char *s, char sep, int maxsplits) {
 }
 
 /*
- * Read a colon-separated file.
+ * Read a file with fields separated by characters in seps.
  */
 struct parsed_file *file_parse(const char *filename, int nfields, const char *seps) {
 	char *line = NULL;
