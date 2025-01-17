@@ -25,6 +25,7 @@
 
 #include "caster.h"
 #include "config.h"
+#include "ip.h"
 #include "jobs.h"
 #include "livesource.h"
 #include "log.h"
@@ -267,32 +268,22 @@ static int caster_listen(struct caster_state *this) {
 	int err = 0;
 	for (int i = 0; i < this->config->bind_count; i++) {
 		int r, port;
-		struct sockaddr *sin = (struct sockaddr *)(this->socks+i);
-		size_t size_sin = 0;
-
-		memset(&this->socks[i], 0, sizeof(this->socks[i]));
+		union sock *sin = this->socks+i;
 
 		port = htons(this->config->bind[i].port);
-		r = inet_pton(AF_INET6, this->config->bind[i].ip, &this->socks[i].sin6.sin6_addr);
-		if (r) {
-			this->socks[i].sin6.sin6_port = port;
-			this->socks[i].sin6.sin6_family = AF_INET6;
-			size_sin = sizeof(struct sockaddr_in6);
-		} else {
-			r = inet_pton(AF_INET, this->config->bind[i].ip, &this->socks[i].sin.sin_addr);
-			if (r) {
-				this->socks[i].sin.sin_port = port;
-				this->socks[i].sin.sin_family = AF_INET;
-				size_sin = sizeof(struct sockaddr_in);
-			} else {
-				fprintf(stderr, "Invalid IP %s\n", this->config->bind[i].ip);
-				err = 1;
-				continue;
-			}
+		r = ip_convert(this->config->bind[i].ip, sin);
+		if (!r) {
+			fprintf(stderr, "Invalid IP %s\n", this->config->bind[i].ip);
+			err = 1;
+			continue;
 		}
+		if (sin->generic.sa_family == AF_INET)
+			sin->v4.sin_port = port;
+		else
+			sin->v6.sin6_port = port;
 		this->listeners[i] = evconnlistener_new_bind(this->base, listener_cb, this,
 			LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, this->config->bind[i].queue_size,
-			sin, size_sin);
+			(struct sockaddr *)sin, sin->generic.sa_len);
 		if (!this->listeners[i]) {
 			fprintf(stderr, "Could not create a listener for %s:%d!\n", this->config->bind[i].ip, this->config->bind[i].port);
 			err = 1;

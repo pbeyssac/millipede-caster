@@ -5,6 +5,7 @@
 
 #include "conf.h"
 #include "caster.h"
+#include "ip.h"
 #include "livesource.h"
 #include "redistribute.h"
 #include "util.h"
@@ -122,11 +123,7 @@ struct ntrip_state {
 	enum ntrip_chunk_state chunk_state;	// current state in chunk reassembly
 
 	char remote;				// Flag: remote address is filled in peeraddr
-	union {
-		struct sockaddr_in v4;
-		struct sockaddr_in6 v6;
-		struct sockaddr generic;
-	} peeraddr;
+	union sock peeraddr;
 	char remote_addr[40];		// Conversion of the IP address part to an ASCII string
 
 	char *http_args[SIZE_HTTP_ARGS];

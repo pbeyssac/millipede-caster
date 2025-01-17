@@ -110,7 +110,7 @@ void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t so
 	} else
 		memcpy(&this->peeraddr, sa, socklen < sizeof this->peeraddr ? socklen:sizeof this->peeraddr);
 	this->remote = 1;
-	sockaddr_ipstr(&this->peeraddr.generic, this->remote_addr, sizeof this->remote_addr);
+	ip_str(&this->peeraddr, this->remote_addr, sizeof this->remote_addr);
 }
 
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
@@ -304,7 +304,7 @@ static json_object *ntrip_json(struct ntrip_state *st) {
 
 	char *ipstr = st->remote_addr;
 	json_object *jsonip;
-	unsigned port = sockaddr_port(&st->peeraddr.generic);
+	unsigned port = ip_port(&st->peeraddr);
 	jsonip = ipstr[0] ? json_object_new_string(ipstr) : json_object_new_null();
 	json_object *new_obj = json_object_new_object();
 	json_object *jsonid = json_object_new_int64(st->id);
@@ -408,7 +408,7 @@ void ntrip_unregister_livesource(struct ntrip_state *this) {
 char *ntrip_peer_ipstr(struct ntrip_state *this) {
 	char *r;
 	char inetaddr[64];
-	r = sockaddr_ipstr(&this->peeraddr.generic, inetaddr, sizeof inetaddr);
+	r = ip_str(&this->peeraddr, inetaddr, sizeof inetaddr);
 	return r?mystrdup(r):NULL;
 }
 

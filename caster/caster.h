@@ -14,11 +14,6 @@
 #include "sourcetable.h"
 #include "util.h"
 
-union sock {
-	struct sockaddr_in sin;
-	struct sockaddr_in6 sin6;
-};
-
 /*
  * State for a caster
  */

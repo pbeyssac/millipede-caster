@@ -1,11 +1,9 @@
 #include <arpa/inet.h>
 #include <math.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/cdefs.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
 #include <ctype.h>
@@ -604,34 +602,6 @@ void logdate(char *date, size_t len) {
 	localtime_r(&tstamp.tv_sec, &t);
 	strftime(tmp_date, sizeof tmp_date, "%Y-%m-%d %H:%M:%S", &t);
 	snprintf(date, len, "%s.%03ld ", tmp_date, tstamp.tv_usec/1000);
-}
-
-/*
- * Return in dest a string representing sockaddr if it is a known family
- * (AF_INET or AF_INET6), else NULL.
- */
-char *sockaddr_ipstr(struct sockaddr *sa, char *dest, int size_dest) {
-	switch(sa->sa_family) {
-	case AF_INET:
-		inet_ntop(sa->sa_family, &((struct sockaddr_in *)sa)->sin_addr, dest, size_dest);
-		return dest;
-	case AF_INET6:
-		inet_ntop(sa->sa_family, &((struct sockaddr_in6 *)sa)->sin6_addr, dest, size_dest);
-		return dest;
-	default:
-		return NULL;
-	}
-}
-
-unsigned short sockaddr_port(struct sockaddr *sa) {
-	switch(sa->sa_family) {
-	case AF_INET:
-		return ntohs(((struct sockaddr_in *)sa)->sin_port);
-	case AF_INET6:
-		return ntohs(((struct sockaddr_in6 *)sa)->sin6_port);
-	default:
-		return 0;
-	}
 }
 
 /*
