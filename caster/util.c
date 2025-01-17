@@ -526,6 +526,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	ssize_t linelen;
 	char *token;
 	int nlines = 0;
+	int err = 0;
 
 	FILE *fp = fopen(filename, "r+");
 
@@ -560,7 +561,22 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 			// skip comment line
 			continue;
 
-		char **pl = (char **)malloc(nfields*sizeof(char *));
+		char ***pls_tmp = realloc(pf->pls, (nlines+1)*(sizeof(char **)));
+
+		if (pls_tmp == NULL) {
+			err++;
+			break;
+		}
+
+		nlines++;
+		pf->pls = pls_tmp;
+
+		char **pl = (char **)calloc(1, nfields*sizeof(char *));
+		pf->pls[nlines-1] = pl;
+		if (pl == NULL) {
+			err++;
+			break;
+		}
 
 		int n;
 		for (n = 0; n < nfields && (token = strsep(&septmp, seps)) != NULL; n++) {
@@ -571,15 +587,15 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 			fprintf(stderr, "Invalid line %d in %s\n", nlines+1, filename);
 			break;
 		}
-		nlines++;
-		char ***pls_tmp = realloc(pf->pls, nlines*(sizeof(char **)));
-		pf->pls = pls_tmp;
-		pf->pls[nlines-1] = pl;
 	}
 	pf->nlines = nlines;
 	pf->nfields = nfields;
 	free(line);
 	fclose(fp);
+	if (err) {
+		file_free(pf);
+		return NULL;
+	}
 	return pf;
 }
 
