@@ -49,7 +49,7 @@ static char *ntripcli_http_request_str(struct ntrip_state *st, char *method, cha
 		return NULL;
 	}
 
-	P_RWLOCK_RDLOCK(&st->caster->authlock);
+	P_RWLOCK_RDLOCK(&st->caster->configlock);
 
 	if (st->caster->host_auth) {
 		for (struct auth_entry *a = &st->caster->host_auth[0]; a->user != NULL; a++) {
@@ -57,7 +57,7 @@ static char *ntripcli_http_request_str(struct ntrip_state *st, char *method, cha
 				if (http_headers_add_auth(&headers, a->user, a->password) < 0) {
 					evhttp_clear_headers(&headers);
 					strfree(host_port);
-					P_RWLOCK_UNLOCK(&st->caster->authlock);
+					P_RWLOCK_UNLOCK(&st->caster->configlock);
 					return NULL;
 				} else
 					break;
@@ -65,7 +65,7 @@ static char *ntripcli_http_request_str(struct ntrip_state *st, char *method, cha
 		}
 	}
 
-	P_RWLOCK_UNLOCK(&st->caster->authlock);
+	P_RWLOCK_UNLOCK(&st->caster->configlock);
 
 	display_headers(st, &headers);
 

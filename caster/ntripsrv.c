@@ -118,11 +118,11 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 	int explicit_mountpoint = 0;
 	struct auth_entry *wildcard_entry = NULL;
 
-	P_RWLOCK_RDLOCK(&this->caster->authlock);
+	P_RWLOCK_RDLOCK(&this->caster->configlock);
 
 	struct auth_entry *auth = this->caster->source_auth;
 	if (auth == NULL) {
-		P_RWLOCK_UNLOCK(&this->caster->authlock);
+		P_RWLOCK_UNLOCK(&this->caster->configlock);
 		return CHECKPW_MOUNTPOINT_INVALID;
 	}
 
@@ -155,7 +155,7 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 		}
 	}
 
-	P_RWLOCK_UNLOCK(&this->caster->authlock);
+	P_RWLOCK_UNLOCK(&this->caster->configlock);
 
 	return r;
 }

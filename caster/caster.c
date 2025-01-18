@@ -145,7 +145,7 @@ caster_new(struct config *config, const char *config_file) {
 	this->ntrips.next_id = 1;
 
 	// Used only for access to source_auth and host_auth
-	P_RWLOCK_INIT(&this->authlock, NULL);
+	P_RWLOCK_INIT(&this->configlock, NULL);
 
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
@@ -231,7 +231,7 @@ void caster_free(struct caster_state *this) {
 	P_MUTEX_DESTROY(&this->livesources.delete_lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.free_lock);
-	P_RWLOCK_DESTROY(&this->authlock);
+	P_RWLOCK_DESTROY(&this->configlock);
 	log_free(&this->flog);
 	log_free(&this->alog);
 	strfree(this->config_dir);
@@ -344,7 +344,7 @@ static void
 caster_reload_auth(struct caster_state *caster) {
 	logfmt(&caster->flog, "Reloading %s and %s\n", caster->config->host_auth_filename, caster->config->source_auth_filename);
 
-	P_RWLOCK_WRLOCK(&caster->authlock);
+	P_RWLOCK_WRLOCK(&caster->configlock);
 
 	if (caster->config->host_auth_filename) {
 		struct auth_entry *tmp = auth_parse(caster, caster->config->host_auth_filename);
@@ -361,7 +361,7 @@ caster_reload_auth(struct caster_state *caster) {
 		}
 	}
 
-	P_RWLOCK_UNLOCK(&caster->authlock);
+	P_RWLOCK_UNLOCK(&caster->configlock);
 }
 
 static void caster_reload_config(struct caster_state *this) {
