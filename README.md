@@ -1,4 +1,4 @@
-Millipede 0.3
+Millipede 0.4
 =============
 
 
@@ -17,7 +17,9 @@ Features:
  * Low memory footprint
  * Supports IPv6 and IPv4
  * NTRIP proxy to fetch from an external caster
+ * "blocklist" with quotas per IP prefix
  * On-demand stream subscription
+ * "wildcard" base configuration to allow unregistered sources to send hidden streams
 
 The current version requires:
  * libcyaml
