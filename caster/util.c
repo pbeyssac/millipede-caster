@@ -519,8 +519,9 @@ static string_array_t *split(const char *s, char sep, int maxsplits) {
 
 /*
  * Read a file with fields separated by characters in seps.
+ * Skip empty fields if skipempty is not 0.
  */
-struct parsed_file *file_parse(const char *filename, int nfields, const char *seps) {
+struct parsed_file *file_parse(const char *filename, int nfields, const char *seps, const int skipempty) {
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
@@ -579,9 +580,11 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 		}
 
 		int n;
-		for (n = 0; n < nfields && (token = strsep(&septmp, seps)) != NULL; n++) {
-			char *ctoken = mystrdup(token);
-			pl[n] = ctoken;
+		for (n = 0; n < nfields && (token = strsep(&septmp, seps)) != NULL;) {
+			if (!skipempty || token[0]) {
+				char *ctoken = mystrdup(token);
+				pl[n++] = ctoken;
+			}
 		}
 		if (n != nfields) {
 			fprintf(stderr, "Invalid line %d in %s\n", nlines+1, filename);

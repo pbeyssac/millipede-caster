@@ -73,7 +73,7 @@ void mime_set_type(struct mime_content *this, const char *mime_type);
 void mime_free(struct mime_content *this);
 void mime_append(struct mime_content *this, const char *s);
 void iso_date_from_timeval(char *iso_date, size_t iso_date_len, struct timeval *t);
-struct parsed_file *file_parse(const char *filename, int nfields, const char *seps);
+struct parsed_file *file_parse(const char *filename, int nfields, const char *seps, int skipempty);
 void file_free(struct parsed_file *p);
 void logdate(char *date, size_t len);
 

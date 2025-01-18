@@ -53,7 +53,7 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, str
  */
 static struct auth_entry *auth_parse(struct caster_state *caster, const char *filename) {
 	struct parsed_file *p;
-	p = file_parse(filename, 3, ":");
+	p = file_parse(filename, 3, ":", 0);
 
 	if (p == NULL) {
 		logfmt(&caster->flog, "Can't read or parse %s\n", filename);
