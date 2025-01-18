@@ -4,6 +4,7 @@ listen:
 host_auth_file:		host.auth
 source_auth_file:	source-wildcard.auth
 sourcetable_file:	sourcetable.dat
+blocklist_file:		blocklist
 access_log:		../test-access.log
 log:			../test-caster.log
 

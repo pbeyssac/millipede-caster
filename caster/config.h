@@ -113,10 +113,11 @@ struct config {
 	int max_raw_packet;
 
 	/*
-	 * Host and sources filenames
+	 * Host, blocklist and sources filenames
 	 */
 	const char *host_auth_filename;
 	const char *source_auth_filename;
+	const char *blocklist_filename;
 	const char *sourcetable_filename;
 	int sourcetable_priority;
 

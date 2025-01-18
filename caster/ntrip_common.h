@@ -123,6 +123,7 @@ struct ntrip_state {
 	enum ntrip_chunk_state chunk_state;	// current state in chunk reassembly
 
 	char remote;				// Flag: remote address is filled in peeraddr
+	char counted;				// Flag: counted in IP quotas
 	union sock peeraddr;
 	char remote_addr[40];		// Conversion of the IP address part to an ASCII string
 
@@ -187,6 +188,7 @@ struct ntrip_state {
 
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint);
 void ntrip_register(struct ntrip_state *this);
+int ntrip_register_check(struct ntrip_state *this);
 void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t socklen);
 void ntrip_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);

@@ -137,12 +137,16 @@ caster_new(struct config *config, const char *config_file) {
 	this->socks = NULL;
 	this->sourcetable_fetchers = NULL;
 	this->sourcetable_fetchers_count = 0;
+	this->blocklist = NULL;
+
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
 	P_MUTEX_INIT(&this->livesources.delete_lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
 	this->ntrips.next_id = 1;
+
+	this->ntrips.ipcount = hash_table_new(509);
 
 	// Used only for access to source_auth and host_auth
 	P_RWLOCK_INIT(&this->configlock, NULL);
@@ -172,10 +176,11 @@ caster_new(struct config *config, const char *config_file) {
 	fchdir(current_dir);
 	close(current_dir);
 
-	if (r1 < 0 || r2 < 0 || !this->config_dir || (threads && this->joblist == NULL)) {
+	if (r1 < 0 || r2 < 0 || !this->config_dir || (threads && this->joblist == NULL) || this->ntrips.ipcount == NULL) {
 		if (this->joblist) joblist_free(this->joblist);
 		if (r1 < 0) log_free(&this->flog);
 		if (r2 < 0) log_free(&this->alog);
+		if (this->ntrips.ipcount) hash_table_free(this->ntrips.ipcount);
 		strfree(this->config_dir);
 		free(this);
 		return NULL;
@@ -208,11 +213,14 @@ void caster_free(struct caster_state *this) {
 			evconnlistener_free(this->listeners[i]);
 	free(this->listeners);
 	free(this->socks);
+	hash_table_free(this->ntrips.ipcount);
 
 	caster_free_fetchers(this);
 
 	auth_free(this->host_auth);
 	auth_free(this->source_auth);
+	if (this->blocklist)
+		prefix_table_free(this->blocklist);
 
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
@@ -364,6 +372,23 @@ caster_reload_auth(struct caster_state *caster) {
 	P_RWLOCK_UNLOCK(&caster->configlock);
 }
 
+static void
+caster_reload_blocklist(struct caster_state *caster) {
+	P_RWLOCK_WRLOCK(&caster->configlock);
+	struct prefix_table *p;
+	if (caster->blocklist) {
+		prefix_table_free(caster->blocklist);
+		caster->blocklist = NULL;
+	}
+
+	if (caster->config->blocklist_filename) {
+		logfmt(&caster->flog, "Reloading %s\n", caster->config->blocklist_filename);
+		p = prefix_table_new(caster->config->blocklist_filename);
+		caster->blocklist = p;
+	}
+	P_RWLOCK_UNLOCK(&caster->configlock);
+}
+
 static void caster_reload_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
@@ -384,6 +409,7 @@ static void caster_chdir_reload(struct caster_state *this, int reopen_logs) {
 		caster_reopen_logs(this);
 	caster_reload_sourcetables(this);
 	caster_reload_auth(this);
+	caster_reload_blocklist(this);
 	fchdir(current_dir);
 	close(current_dir);
 }
@@ -416,8 +442,13 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	}
 
 	ntrip_set_peeraddr(st, sa, socklen);
+
 	st->state = NTRIP_WAIT_HTTP_METHOD;
-	ntrip_register(st);
+
+	if (ntrip_register_check(st) < 0) {
+		ntrip_deferred_free(st, "listener_cb");
+		return;
+	}
 
 	ntrip_log(st, LOG_INFO, "New connection\n");
 

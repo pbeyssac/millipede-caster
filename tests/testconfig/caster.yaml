@@ -1,6 +1,8 @@
 listen:
   - port:		2103
     ip:			::1
+  - port:		2103
+    ip:			127.0.0.1
 host_auth_file:		host.auth
 source_auth_file:	source.auth
 sourcetable_file:	sourcetable.dat

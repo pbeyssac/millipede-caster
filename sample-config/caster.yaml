@@ -29,11 +29,15 @@ listen:
 host_auth_file:		/usr/local/etc/millipede/host.auth
 
 #
+# Blocklist file path (optional)
+#
+blocklist_file:	blocklist
+
+#
 # Source credentials for local sources and their STR lines
 #
 source_auth_file:	/usr/local/etc/millipede/source.auth
 sourcetable_file:	/usr/local/etc/millipede/sourcetable.dat
-
 
 #
 # Log files

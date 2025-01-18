@@ -79,18 +79,75 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->remote_addr[0] = '\0';
 	this->remote = 0;
 	memset(&this->peeraddr, 0, sizeof(this->peeraddr));
+	this->counted = 0;
 	return this;
+}
+
+/*
+ *
+ * Increment counter for this IP.
+ *
+ * Required lock: ntrips.lock
+ */
+static int ntrip_quota_incr(struct ntrip_state *this) {
+	this->counted = 1;
+	return hash_table_incr(this->caster->ntrips.ipcount, this->remote_addr);
+}
+
+/*
+ * Decrement counter for this IP.
+ *
+ * Required lock: ntrips.lock
+ */
+static void ntrip_quota_decr(struct ntrip_state *this) {
+	if (!this->counted)
+		return;
+	hash_table_decr(this->caster->ntrips.ipcount, this->remote_addr);
+}
+
+/*
+ * Insert ntrip_state in the main connection queue.
+ * Check IP quotas.
+ */
+static int _ntrip_register(struct ntrip_state *this, int quota_check) {
+	int r = 0;
+	int ipcount = -1, quota = -1;
+
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
+
+	if (quota_check)
+		ipcount = ntrip_quota_incr(this);
+
+	this->id = this->caster->ntrips.next_id++;
+	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
+	this->caster->ntrips.n++;
+
+	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
+
+	if (quota_check) {
+		P_RWLOCK_RDLOCK(&this->caster->configlock);
+		if (this->caster->blocklist)
+			quota = prefix_table_get_quota(this->caster->blocklist, &this->peeraddr);
+		P_RWLOCK_UNLOCK(&this->caster->configlock);
+	}
+
+	if (quota >= 0 && ipcount > quota) {
+		ntrip_log(this, LOG_WARNING, "over quota (%d connections, max %d), dropping\n", ipcount, quota);
+		r = -1;
+		// ntrip_quota_decr(this) will be called later, when we remove the state from ntrips.queue
+	}
+
+	return r;
 }
 
 /*
  * Insert ntrip_state in the main connection queue.
  */
 void ntrip_register(struct ntrip_state *this) {
-	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
-	this->id = this->caster->ntrips.next_id++;
-	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
-	this->caster->ntrips.n++;
-	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
+	_ntrip_register(this, 0);
+}
+int ntrip_register_check(struct ntrip_state *this) {
+	return _ntrip_register(this, 1);
 }
 
 /*
@@ -158,6 +215,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 		P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 		TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
 		this->caster->ntrips.n--;
+		ntrip_quota_decr(this);
 		P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 	}
 
@@ -181,6 +239,7 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
 	bufferevent_lock(this->bev);
 
+	ntrip_quota_decr(this);
 	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
 	this->caster->ntrips.n--;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.free_queue, this, nextf);

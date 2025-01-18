@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "conf.h"
+#include "ip.h"
 #include "util.h"
 
 static void b64_test() {
@@ -36,6 +38,93 @@ static void gga_test() {
 	}
 }
 
+static void test_ip_analyze_prefixquota() {
+	struct iptest {
+		char *arg1, *arg2, *expect;
+	};
+
+	struct iptest iptestlist[] = {
+		{ "::0", "0", "::/128 0" },
+		{ "::0/0", "0", "::/0 0" },
+		{ "::/0", "0", "::/0 0" },
+		{ "::1", "32", "::1/128 32" },
+		{ "::1/127", "32", NULL },
+		{ "127.0.0.1 32", "127.0.0.1/32 32" },
+		{ "127.0.0.1", "-32", NULL },
+		{ "127.0.0.1/31", "33", NULL },
+		{ "255.255.255.255/32", "1", "255.255.255.255/32 1" },
+		{ "255.255.255.255/31", "1", NULL },
+		{ "255.255.255.255/30", "1", NULL },
+		{ "255.255.255.255/29", "1", NULL },
+		{ "255.255.255.255/28", "1", NULL },
+		{ "255.255.255.255/27", "1", NULL },
+		{ "255.255.255.255/26", "1", NULL },
+		{ "255.255.255.255/25", "1", NULL },
+		{ "255.255.255.255/24", "1", NULL },
+		{ "255.255.255.255/23", "1", NULL },
+		{ "255.255.255.255/22", "1", NULL },
+		{ "255.255.255.255/21", "1", NULL },
+		{ "255.255.255.255/20", "1", NULL },
+		{ "255.255.255.255/19", "1", NULL },
+		{ "255.255.255.255/18", "1", NULL },
+		{ "255.255.255.255/17", "1", NULL },
+		{ "255.255.255.255/16", "1", NULL },
+		{ "255.255.255.255/15", "1", NULL },
+		{ "255.255.255.255/14", "1", NULL },
+		{ "255.255.255.255/13", "1", NULL },
+		{ "255.255.255.255/12", "1", NULL },
+		{ "255.255.255.255/11", "1", NULL },
+		{ "255.255.255.255/10", "1", NULL },
+		{ "255.255.255.255/9", "1", NULL },
+		{ "255.255.255.255/8", "1", NULL },
+		{ "255.255.255.255/7", "1", NULL },
+		{ "255.255.255.255/6", "1", NULL },
+		{ "255.255.255.255/5", "1", NULL },
+		{ "255.255.255.255/4", "1", NULL },
+		{ "255.255.255.255/3", "1", NULL },
+		{ "255.255.255.255/2", "1", NULL },
+		{ "255.255.255.255/1", "1", NULL },
+		{ "255.255.255.255/0", "1", NULL },
+		{ "2ffe::ff", "32", "2ffe::ff/128 32" },
+		{ "2FFE::2:FF", "32", "2ffe::2:ff/128 32" },
+		{ "2FFE::2:FF", "32", "2ffe::2:ff/128 32" },
+		{ "2FFE::FF/0", "54", NULL },
+		{ "2FFE::FF/12", "54", NULL },
+		{ "2FFE::FF/128", "54", "2ffe::ff/128 54"},
+		{ "2FFE::FF/129", "54", NULL },
+		{ "2FFE::FF/134", "54", NULL },
+		{ NULL, NULL, NULL }
+	};
+	struct prefix_quota *r;
+	for (struct iptest *ipt = &iptestlist[0]; ipt->arg1 != NULL; ipt++)  {
+		char *r2 = NULL;
+		char *ippref = strdup(ipt->arg1);
+		char *quota = ipt->arg2;
+		char *expect = ipt->expect;
+		printf("%s %s => ", ippref, quota);
+		r = prefix_quota_parse(ippref, quota);
+		if (r == NULL) {
+			printf("NULL");
+		} else {
+			r2 = prefix_quota_str(r);
+			printf("%s", r2);
+		}
+		if (r == NULL && expect == NULL)
+			puts(" OK");
+		else if (r != NULL && expect == NULL)
+			printf(" FAIL (%s instead of NULL)\n", r2);
+		else if (r == NULL && expect != NULL)
+			printf(" FAIL (NULL instead of %s)\n", expect);
+		else if (strcmp(r2, expect))
+			printf(" FAIL (%s instead of %s)\n", r2, expect);
+		else
+			printf(" OK (%s)\n", r2);
+		free(r2);
+		free(r);
+		free(ippref);
+	}
+}
+
 #if 0
 static void sourcetable_test(struct sourcetable *sourcetable) {
 	char *ggalist[] = {
@@ -65,4 +154,5 @@ static void sourcetable_test(struct sourcetable *sourcetable) {
 int main() {
 	gga_test();
 	b64_test();
+	test_ip_analyze_prefixquota();
 }

@@ -35,6 +35,7 @@ static struct config default_config = {
 	.source_auth_filename = "source.auth",
 	.host_auth_filename = "host.auth",
 	.sourcetable_filename = "sourcetable.dat",
+	.blocklist_filename = NULL,
 	.sourcetable_priority = 90,
 	.backlog_socket = 112*1024,
 	.backlog_evbuffer = 16*1024,
@@ -137,6 +138,8 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 		"source_auth_file", CYAML_FLAG_POINTER, struct config, source_auth_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"host_auth_file", CYAML_FLAG_POINTER, struct config, host_auth_filename, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_STRING_PTR(
+		"blocklist_file", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config, blocklist_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"sourcetable_file", CYAML_FLAG_POINTER, struct config, sourcetable_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_INT(
@@ -270,6 +273,7 @@ void config_free(struct config *this) {
 
 	free((char *)this->host_auth_filename);
 	free((char *)this->source_auth_filename);
+	free((char *)this->blocklist_filename);
 	free((char *)this->sourcetable_filename);
 	free((char *)this->log);
 	free((char *)this->access_log);

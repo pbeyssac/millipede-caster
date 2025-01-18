@@ -1,0 +1,16 @@
+# Blocklist
+#
+# First field: IP prefix
+# Second field: allowed quota, -1 = no limit
+#
+# default: no limit
+#
+0.0.0.0/0 -1
+127.0.0.1 -1
+::1 -1
+
+# blocked
+10.0.0.0/8 0
+
+# 10 connections per IP
+192.168.0.0/16 10
