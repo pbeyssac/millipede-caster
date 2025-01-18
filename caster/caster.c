@@ -428,14 +428,14 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
 
 	if (bev == NULL) {
-		logfmt(&caster->flog, "Error constructing bufferevent!");
+		logfmt(&caster->flog, "Error constructing bufferevent!\n");
 		close(fd);
 		return;
 	}
 
 	struct ntrip_state *st = ntrip_new(caster, bev, NULL, 0, NULL);
 	if (st == NULL) {
-		logfmt(&caster->flog, "Error constructing ntrip_state for a new connection!");
+		logfmt(&caster->flog, "Error constructing ntrip_state for a new connection!\n");
 		bufferevent_free(bev);
 		close(fd);
 		return;
