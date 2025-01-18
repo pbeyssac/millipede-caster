@@ -430,6 +430,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 404;
 						break;
 					}
+					st->wildcard = (r == CHECKPW_MOUNTPOINT_WILDCARD);
 					st->type = "source";
 					if (st->mountpoint)
 						strfree(st->mountpoint);

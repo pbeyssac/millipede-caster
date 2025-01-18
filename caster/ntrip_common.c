@@ -59,6 +59,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->type = "starting";
 	this->user_agent = NULL;
 	this->user_agent_ntrip = 0;
+	this->wildcard = 0;
 	this->own_livesource = NULL;
 	if (threads)
 		STAILQ_INIT(&this->jobq);
@@ -376,6 +377,7 @@ static json_object *ntrip_json(struct ntrip_state *st) {
 	json_object_object_add(new_obj, "ip", jsonip);
 	json_object_object_add(new_obj, "port", jsonport);
 	json_object_object_add(new_obj, "type", json_object_new_string(st->type));
+	json_object_object_add(new_obj, "wildcard", json_object_new_boolean(st->wildcard));
 	if (!strcmp(st->type, "source") || !strcmp(st->type, "source_fetcher"))
 		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->mountpoint));
 	else if (!strcmp(st->type, "client"))
