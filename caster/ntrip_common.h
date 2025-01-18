@@ -31,10 +31,12 @@ enum ntrip_session_state {
  */
 enum ntrip_chunk_state {
 	CHUNK_NONE,		// no chunk encoding
+	CHUNK_INIT,		// chunk encoding detected, waiting for init
 	CHUNK_WAIT_LEN,		// waiting for chunk len (hex digits + "\r\n")
 	CHUNK_IN_PROGRESS,	// in chunk
 	CHUNK_WAITING_TRAILER,	// waiting for "\r\n" trailer
-	CHUNK_LAST		// like CHUNK_WAITING_TRAILER, but quit after
+	CHUNK_LAST,		// like CHUNK_WAITING_TRAILER, but last chunk
+	CHUNK_END		// finished, ready to be freed
 };
 
 /* Log levels, same as syslog and GEF + LOG_EDEBUG */
@@ -114,6 +116,12 @@ struct ntrip_state {
 
 	struct bufferevent *bev;		// main bufferevent associated with the session
 	char bev_freed;				// has it been freed already?
+	struct evbuffer *input;
+
+	struct {
+		struct evbuffer *raw_input;
+		bufferevent_filter_cb in_filter;
+	} filter;
 
 	/*
 	 * HTTP chunk handling
@@ -202,6 +210,9 @@ unsigned short ntrip_peer_port(struct ntrip_state *this);
 void ntrip_alog(void *arg, const char *fmt, ...);
 void ntrip_log(void *arg, int level, const char *fmt, ...);
 int ntrip_handle_raw(struct ntrip_state *st);
+int ntrip_filter_run_input(struct ntrip_state *st);
 int ntrip_handle_raw_chunk(struct ntrip_state *st);
+enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input, struct evbuffer *dst, ev_ssize_t dst_limit, enum bufferevent_flush_mode mode, void *ctx);
+int ntrip_chunk_decode_init(struct ntrip_state *st);
 
 #endif

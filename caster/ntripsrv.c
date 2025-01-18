@@ -228,7 +228,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	char *line = NULL;
 	size_t len;
 	int err = 0;
-	struct evbuffer *input = bufferevent_get_input(bev);
 	struct evbuffer *output = bufferevent_get_output(bev);
 	struct evkeyvalq opt_headers;
 
@@ -236,16 +235,19 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 	TAILQ_INIT(&opt_headers);
 
-	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d\n", st->state, evbuffer_get_length(input));
+	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d\n", st->state, evbuffer_get_length(st->filter.raw_input));
 
-	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 0) {
+	if (ntrip_filter_run_input(st) < 0)
+		return;
+
+	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(st->input) > 0) {
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
 			// Cancel chunk encoding from client by default
 			st->chunk_state = CHUNK_NONE;
 
-			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
+			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
 			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes\n", line, len);
@@ -267,7 +269,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			}
 			st->state = NTRIP_WAIT_HTTP_HEADER;
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
-			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
+			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
 			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes\n", line, len);
@@ -281,15 +283,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				if (!strcasecmp(key, "host")) {
 					//
 				} else if (!strcasecmp(key, "transfer-encoding")) {
-					if (!strcasecmp(value, "chunked")) {
-						if (st->chunk_buf == NULL)
-							st->chunk_buf = evbuffer_new();
-						if (st->chunk_buf == NULL) {
-							err = 503;
-							break;
-						}
-						st->chunk_state = CHUNK_WAIT_LEN;
-					}
+					if (!strcasecmp(value, "chunked"))
+						st->chunk_state = CHUNK_INIT;
 				} else if (!strcasecmp(key, "ntrip-version")) {
 					if (!strcasecmp(value, "ntrip/2.0"))
 						st->client_version = 2;
@@ -313,6 +308,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				}
 			} else {
 				ntrip_log(st, LOG_DEBUG, "[End headers]\n");
+				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
+					err = 503;
+					break;
+				}
 				if (!strcmp(st->http_args[0], "SOURCE")) {
 					/* Don't log the password */
 					ntrip_alog(st, "%s *** %s\n", st->http_args[0], st->http_args[2]);
@@ -459,7 +458,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				}
 			}
 		} else if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
-			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
+			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */

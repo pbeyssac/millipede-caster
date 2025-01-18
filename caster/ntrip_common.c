@@ -67,6 +67,9 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->newjobs = 0;
 	this->bev_freed = 0;
 	this->bev = bev;
+	this->input = bufferevent_get_input(bev);
+	this->filter.in_filter = NULL;
+	this->filter.raw_input = this->input;
 	this->redistribute = 0;
 	this->persistent = 0;
 	this->tmp_sourcetable = NULL;
@@ -275,11 +278,19 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	if (this->chunk_buf) {
 		evbuffer_free(this->chunk_buf);
 		this->chunk_buf = NULL;
+		this->chunk_state = CHUNK_NONE;
+	}
+	struct bufferevent *bev = this->bev;
+
+	size_t remain = evbuffer_get_length(bufferevent_get_output(bev));
+	if (remain) {
+		ntrip_log(this, LOG_DEBUG, "Warning: potentiel evbuffer leak, %ld bytes remaining\n", remain);
+		evbuffer_drain(bufferevent_get_output(bev), remain);
 	}
 
-	bufferevent_disable(this->bev, EV_READ|EV_WRITE);
-	bufferevent_set_timeouts(this->bev, NULL, NULL);
-	bufferevent_setcb(this->bev, NULL, NULL, NULL, NULL);
+	bufferevent_disable(bev, EV_READ|EV_WRITE);
+	bufferevent_set_timeouts(bev, NULL, NULL);
+	bufferevent_setcb(bev, NULL, NULL, NULL, NULL);
 
 	/*
 	 * In unthreaded mode, no locking issue: do the rest at once.
@@ -537,14 +548,12 @@ void ntrip_log(void *arg, int level, const char *fmt, ...) {
 }
 
 int ntrip_handle_raw(struct ntrip_state *st) {
-	struct evbuffer *input = bufferevent_get_input(st->bev);
-
-	if (st->chunk_state != CHUNK_NONE)
-		return ntrip_handle_raw_chunk(st);
+	struct evbuffer *input = st->input;
 
 	while (1) {
 
 		unsigned long len_raw = evbuffer_get_length(input);
+		ntrip_log(st, LOG_INFO, "ntrip_handle_raw ready to get %d bytes\n", len_raw);
 		if (len_raw < st->caster->config->min_raw_packet)
 			return 0;
 		if (len_raw > st->caster->config->max_raw_packet)
@@ -557,6 +566,7 @@ int ntrip_handle_raw(struct ntrip_state *st) {
 			return 1;
 		}
 		evbuffer_remove(input, &rawp->data[0], len_raw);
+
 		//ntrip_log(st, LOG_DEBUG, "Raw: packet source %s size %d\n", st->mountpoint, len_raw);
 		if (livesource_send_subscribers(st->own_livesource, rawp, st->caster))
 			st->last_send = time(NULL);
@@ -565,89 +575,125 @@ int ntrip_handle_raw(struct ntrip_state *st) {
 	}
 }
 
+int ntrip_filter_run_input(struct ntrip_state *st) {
+	if (st->filter.in_filter != NULL) {
+		enum bufferevent_filter_result r;
+		r = st->filter.in_filter(st->filter.raw_input, st->input, -1, BEV_NORMAL, st);
+
+		if (r == BEV_NEED_MORE)
+			return -1;
+
+		if (r != BEV_OK) {
+			ntrip_deferred_free(st, "after chunk_decoder");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 /*
- * Extract raw data in HTTP chunks
+ * Filter to decapsulate HTTP chunks.
+ *
+ * Compatible with the libevent bufferevent_filter API, just in case.
+ *
+ * flags: BEV_NORMAL, BEV_FLUSH, BEV_FINISHED
+ * returns: BEV_OK, BEV_NEED_MORE, BEV_ERROR
  */
-int ntrip_handle_raw_chunk(struct ntrip_state *st) {
+static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input, struct evbuffer *dst, ev_ssize_t dst_limit, enum bufferevent_flush_mode mode, void *ctx) {
+	struct ntrip_state *st = (struct ntrip_state *)ctx;
 	size_t len;
 	size_t chunk_len;
-	struct evbuffer *input = bufferevent_get_input(st->bev);
 	unsigned long len_raw;
+	int len_done = 0;
 
+	ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode len %d limit %d flush_mode %d\n", evbuffer_get_length(input), dst_limit, mode);
 	while (1) {
+		len_raw = evbuffer_get_length(input);
+		if (len_raw <= 0) {
+			ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d\n", len_done);
+			return len_done?BEV_OK:BEV_NEED_MORE;
+		}
+
 		if (st->chunk_state == CHUNK_WAIT_LEN) {
 			char *line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF_STRICT);
-			if (line == NULL)
-				return 0;
+			if (line == NULL) {
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode readln failed, OK/MORE done %d\n", len_done);
+				return len_done?BEV_OK:BEV_NEED_MORE;
+			}
 
 			char *p = line;
 			while (*p && *p != ';' && *p != '\n' && *p != '\r') p++;
 			*p = '\0';
 
-			if (sscanf(line, "%zx", &chunk_len) == 1) {
-				// ntrip_log(st, LOG_DEBUG, "ok chunk_len: \"%s\" (%zu)\n", line, chunk_len);
-			} else {
+			if (sscanf(line, "%zx", &chunk_len) != 1) {
 				ntrip_log(st, LOG_INFO, "failed chunk_len: \"%s\"\n", line);
 				free(line);
 				st->state = NTRIP_FORCE_CLOSE;
-				return 0;
+				st->chunk_state = CHUNK_NONE;
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/ERROR done %d\n", len_done);
+				return len_done?BEV_OK:BEV_ERROR;
 			}
 			free(line);
 
-			if (chunk_len == 0)
+			if (chunk_len == 0) {
 				st->chunk_state = CHUNK_LAST;
-			else
+			} else
 				st->chunk_state = CHUNK_IN_PROGRESS;
 			st->chunk_len = chunk_len;
 		} else if (st->chunk_state == CHUNK_IN_PROGRESS) {
-			len_raw = evbuffer_get_length(input);
-			if (len_raw <= 0)
-				return 0;
+			int len_used;
 			if (len_raw <= st->chunk_len) {
-				evbuffer_add_buffer(st->chunk_buf, input);
-				st->chunk_len -= len_raw;
+				len_used = len_raw;
+				evbuffer_add_buffer(dst, input);
+				st->chunk_len -= len_used;
 			} else {
-				len_raw = st->chunk_len;
-				unsigned char *data = evbuffer_pullup(input, len_raw);
-				evbuffer_add(st->chunk_buf, data, len_raw);
-				evbuffer_drain(input, len_raw);
+				len_used = st->chunk_len;
+				unsigned char *data = evbuffer_pullup(input, len_used);
+				evbuffer_add(dst, data, len_used);
+				evbuffer_drain(input, len_used);
 				st->chunk_len = 0;
 			}
+			len_done += len_used;
 			if (st->chunk_len == 0)
 				st->chunk_state = CHUNK_WAITING_TRAILER;
-
-			len_raw = evbuffer_get_length(st->chunk_buf);
-			struct packet *packet = packet_new(len_raw, st->caster);
-			if (packet == NULL) {
-				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping packet\n");
-				return 1;
-			}
-			evbuffer_remove(st->chunk_buf, &packet->data[0], len_raw);
-			st->received_bytes += len_raw;
-			if (livesource_send_subscribers(st->own_livesource, packet, st->caster))
-				st->last_send = time(NULL);
-			packet_free(packet);
-			return 1;
+			st->received_bytes += len_used;
 		} else if (st->chunk_state == CHUNK_WAITING_TRAILER || st->chunk_state == CHUNK_LAST) {
 			char data[2];
-			long len_raw = evbuffer_get_length(input);
-			if (len_raw < 2)
-				return 0;
+			if (len_raw < 2) {
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d\n", len_done);
+				return len_done?BEV_OK:BEV_NEED_MORE;
+			}
 			// skip trailing CR LF
 			evbuffer_remove(input, data, 2);
 			if (data[0] != '\r' || data[1] != '\n')
-				ntrip_log(st, LOG_INFO, "Wrong chunk trailer\n");
+				ntrip_log(st, LOG_INFO, "Wrong chunk trailer 0x%02x 0x%02x\n", data[0], data[1]);
 
 			if (st->chunk_state == CHUNK_LAST) {
-				ntrip_log(st, LOG_EDEBUG, "0-length chunk, closing\n");
 				st->state = NTRIP_FORCE_CLOSE;
-				st->chunk_state = CHUNK_NONE;
-				return 0;
+				st->chunk_state = CHUNK_END;
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode 0-length done %d, closing\n", len_done);
+				return BEV_OK;
 			}
-
 			st->chunk_state = CHUNK_WAIT_LEN;
-		}
+		} else if (st->chunk_state == CHUNK_END)
+			return BEV_ERROR;
 	}
+}
+
+int ntrip_chunk_decode_init(struct ntrip_state *st) {
+	if (st->chunk_buf == NULL)
+		st->chunk_buf = evbuffer_new();
+	if (st->chunk_buf == NULL)
+		return -1;
+	st->filter.in_filter = ntrip_chunk_decode;
+	st->chunk_state = CHUNK_WAIT_LEN;
+
+	st->input = st->chunk_buf;
+	if (evbuffer_get_length(st->filter.raw_input) > 0) {
+		ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode_init for %d bytes\n", evbuffer_get_length(st->filter.raw_input));
+		ntrip_chunk_decode(st->filter.raw_input, st->input, -1, BEV_NORMAL, st);
+	}
+	return 0;
 }
 
 /*

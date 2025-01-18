@@ -102,11 +102,12 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	char *line;
 	size_t len;
 
-	struct evbuffer *input = bufferevent_get_input(bev);
+	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d\n", st->state, evbuffer_get_length(st->filter.raw_input));
 
-	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d\n", st->state, evbuffer_get_length(input));
+	if (ntrip_filter_run_input(st) < 0)
+		return;
 
-	while (!end && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(input) > 5) {
+	while (!end && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(st->input) > 5) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
@@ -116,7 +117,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				st->chunk_buf = NULL;
 			}
 
-			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
+			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
 			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes on /%s\n", line, len, st->mountpoint);
@@ -165,12 +166,15 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
-			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
+			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
 			ntrip_log(st, LOG_DEBUG, "Got header \"%s\", %zd bytes\n", line, len);
 			if (strlen(line) == 0) {
-				if (strlen(st->mountpoint)) {
+				ntrip_log(st, LOG_DEBUG, "[End headers]\n");
+				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
+					end = 1;
+				} else if (strlen(st->mountpoint)) {
 					st->state = NTRIP_REGISTER_SOURCE;
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
@@ -193,21 +197,13 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				}
 
 				if (!strcasecmp(key, "transfer-encoding")) {
-					if (!strcasecmp(value, "chunked")) {
-						if (st->chunk_buf == NULL)
-							st->chunk_buf = evbuffer_new();
-						if (st->chunk_buf == NULL) {
-							free(line);
-							end = 1;
-							break;
-						}
-						st->chunk_state = CHUNK_WAIT_LEN;
-					}
+					if (!strcasecmp(value, "chunked"))
+						st->chunk_state = CHUNK_INIT;
 				}
 			}
 			free(line);
 		} else if (st->state == NTRIP_WAIT_SOURCETABLE_LINE) {
-			line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF);
+			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
@@ -325,9 +321,8 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		st->sourcetable_cb_arg->sourcetable_cb(-1, 0, st->sourcetable_cb_arg);
 		st->sourcetable_cb_arg = NULL;
 	}
-	struct evbuffer *input = bufferevent_get_input(bev);
-	int bytes_left = evbuffer_get_length(input);
-	ntrip_log(st, bytes_left ? LOG_NOTICE:LOG_INFO, "Connection closed, %zu bytes left.\n", evbuffer_get_length(input));
+	int bytes_left = evbuffer_get_length(st->input);
+	ntrip_log(st, bytes_left ? LOG_NOTICE:LOG_INFO, "Connection closed, %zu bytes left.\n", evbuffer_get_length(st->input));
 
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
