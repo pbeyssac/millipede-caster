@@ -390,7 +390,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					 * We only limit the send buffer on NTRIP clients, except for the sourcetable.
 					 */
 					int sndbuf = st->caster->config->backlog_socket;
-					if (setsockopt(bufferevent_getfd(bev), SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof sndbuf) < 0)
+					if (setsockopt(st->fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof sndbuf) < 0)
 						ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
 				} else if (!strcmp(st->http_args[0], "POST") || !strcmp(st->http_args[0], "SOURCE")) {
 					char *password;

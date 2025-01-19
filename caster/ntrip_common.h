@@ -117,6 +117,7 @@ struct ntrip_state {
 	struct bufferevent *bev;		// main bufferevent associated with the session
 	char bev_freed;				// has it been freed already?
 	struct evbuffer *input;
+	int fd;					// file descriptor for the bufferevent
 
 	struct {
 		struct evbuffer *raw_input;

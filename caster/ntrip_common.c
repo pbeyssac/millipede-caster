@@ -67,6 +67,10 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->newjobs = 0;
 	this->bev_freed = 0;
 	this->bev = bev;
+
+	// Explicitly copied to avoid locking issues later with bufferevent_getfd()
+	this->fd = bufferevent_getfd(bev);
+
 	this->input = bufferevent_get_input(bev);
 	this->filter.in_filter = NULL;
 	this->filter.raw_input = this->input;
@@ -160,11 +164,8 @@ int ntrip_register_check(struct ntrip_state *this) {
  */
 void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t socklen) {
 	if (sa == NULL) {
-		evutil_socket_t fd = bufferevent_getfd(this->bev);
-		if (fd < 0)
-			return;
 		socklen_t psocklen = sizeof(this->peeraddr);
-		if (getpeername(fd, &this->peeraddr.generic, &psocklen) < 0) {
+		if (getpeername(this->fd, &this->peeraddr.generic, &psocklen) < 0) {
 			ntrip_log(this, LOG_NOTICE, "getpeername failed: %s\n", strerror(errno));
 			return;
 		}
