@@ -212,7 +212,6 @@ void ntrip_log(void *arg, int level, const char *fmt, ...);
 int ntrip_handle_raw(struct ntrip_state *st);
 int ntrip_filter_run_input(struct ntrip_state *st);
 int ntrip_handle_raw_chunk(struct ntrip_state *st);
-enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input, struct evbuffer *dst, ev_ssize_t dst_limit, enum bufferevent_flush_mode mode, void *ctx);
 int ntrip_chunk_decode_init(struct ntrip_state *st);
 
 #endif
