@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
 
@@ -397,6 +398,24 @@ static json_object *ntrip_json(struct ntrip_state *st) {
 
 	if (st->user_agent)
 		json_object_object_add(new_obj, "user-agent", json_object_new_string(st->user_agent));
+
+	struct tcp_info ti;
+	socklen_t ti_len = sizeof ti;
+	if (getsockopt(st->fd, IPPROTO_TCP, TCP_INFO, &ti, &ti_len) >= 0) {
+		json_object *tcpi_obj = json_object_new_object();
+		json_object_object_add(tcpi_obj, "rtt", json_object_new_int64(ti.tcpi_rtt));
+		json_object_object_add(tcpi_obj, "rttvar", json_object_new_int64(ti.tcpi_rttvar));
+		json_object_object_add(tcpi_obj, "snd_mss", json_object_new_int64(ti.tcpi_snd_mss));
+		json_object_object_add(tcpi_obj, "rcv_mss", json_object_new_int64(ti.tcpi_rcv_mss));
+		json_object_object_add(tcpi_obj, "last_data_recv", json_object_new_int64(ti.tcpi_last_data_recv));
+		json_object_object_add(tcpi_obj, "rcv_wnd", json_object_new_int64(ti.tcpi_rcv_space));
+#ifdef __FreeBSD__
+		// FreeBSD-specific
+		json_object_object_add(tcpi_obj, "snd_wnd", json_object_new_int64(ti.tcpi_snd_wnd));
+		json_object_object_add(tcpi_obj, "snd_rexmitpack", json_object_new_int64(ti.tcpi_snd_rexmitpack));
+#endif
+		json_object_object_add(new_obj, "tcp_info", tcpi_obj);
+	}
 
 	char iso_date[30];
 	iso_date_from_timeval(iso_date, sizeof iso_date, &st->start);
