@@ -16,11 +16,12 @@ struct sourceline {
 	char virtual;		// source is virtual
 	char on_demand;
 	char *host;
+	int priority;		// priority for this source, higher = better
 	unsigned short port;
 };
 TAILQ_HEAD (sourcelineq, sourceline);
 
-struct sourceline *sourceline_new(const char *host, unsigned short port, const char *key, const char *value);
+struct sourceline *sourceline_new(const char *host, unsigned short port, const char *key, const char *value, int priority);
 struct sourceline *sourceline_copy(struct sourceline *orig);
 void sourceline_free(struct sourceline *this);
 

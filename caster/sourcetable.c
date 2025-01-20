@@ -176,7 +176,7 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 		}
 		key[p2-p1] = '\0';
 		memcpy(key, p1, p2-p1);
-		struct sourceline *n1 = sourceline_new(this->caster, this->port, key, sourcetable_entry);
+		struct sourceline *n1 = sourceline_new(this->caster, this->port, key, sourcetable_entry, this->priority);
 		strfree(key);
 		if (n1 == NULL) {
 			strfree(valueparse);

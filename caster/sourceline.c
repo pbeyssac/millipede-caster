@@ -6,7 +6,7 @@
 #include "util.h"
 
 
-struct sourceline *sourceline_new(const char *host, unsigned short port, const char *key, const char *value) {
+struct sourceline *sourceline_new(const char *host, unsigned short port, const char *key, const char *value, int priority) {
 	struct sourceline *this = (struct sourceline *)malloc(sizeof(struct sourceline));
 	char *duphost = mystrdup(host);
 	char *dupkey = mystrdup(key);
@@ -22,6 +22,7 @@ struct sourceline *sourceline_new(const char *host, unsigned short port, const c
 	this->key = dupkey;
 	this->value = dupvalue;
 	this->port = port;
+	this->priority = priority;
 	return this;
 }
 
@@ -29,7 +30,7 @@ struct sourceline *sourceline_new(const char *host, unsigned short port, const c
  * Return a deep copy of a struct sourceline
  */
 struct sourceline *sourceline_copy(struct sourceline *orig) {
-	struct sourceline *this = sourceline_new(orig->host, orig->port, orig->key, orig->value);
+	struct sourceline *this = sourceline_new(orig->host, orig->port, orig->key, orig->value, orig->priority);
 	if (this == NULL)
 		return NULL;
 	this->pos = orig->pos;
