@@ -156,71 +156,12 @@ static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *
 int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand) {
 	int r = 0;
 	if (!strncmp(sourcetable_entry, "STR;", 4)) {
-		char *valueparse = mystrdup(sourcetable_entry);
-		if (valueparse == NULL)
+		struct sourceline *n1 = sourceline_new_parse(sourcetable_entry, this->caster, this->port, this->priority, on_demand);
+		if (n1 == NULL)
 			return -1;
-		char *p1 = valueparse + 4;
-		char *p2 = p1;
-		char *token;
-
-		while (*p2 && *p2 != ';') p2++;
-		if (!*p2) {
-			fprintf(stderr, "unable to parse %s\n", sourcetable_entry);
-			strfree(valueparse);
-			return -1;
-		}
-
-		char *key = (char *)strmalloc(p2 - p1 + 1);
-		if (key == NULL) {
-			strfree(valueparse);
-			return -1;
-		}
-		key[p2-p1] = '\0';
-		memcpy(key, p1, p2-p1);
-		struct sourceline *n1 = sourceline_new(this->caster, this->port, key, sourcetable_entry, this->priority);
-		strfree(key);
-		if (n1 == NULL) {
-			strfree(valueparse);
-			return -1;
-		}
-		n1->virtual = 0;
-		n1->on_demand = on_demand;
-		int err = 0, n = 0;
-		pos_t pos;
-		char *septmp = valueparse;
-		while ((token = strsep(&septmp, ";")) != NULL) {
-			//printf("TOKEN %d %s\n", n, token);
-			if (n == 9) {
-				if (sscanf(token, "%f", &pos.lat) != 1) {
-					err = 1;
-				}
-			} else if (n == 10) {
-				if (sscanf(token, "%f", &pos.lon) != 1) {
-					err = 1;
-				}
-			} else if (n == 11) {
-				int virtual;
-				if (sscanf(token, "%d", &virtual) == 1)
-					n1->virtual = virtual;
-			} else if (n == 17) {
-				int bps = 9600;
-				if (sscanf(token, "%d", &bps) == 1)
-					n1->bps = bps;
-			}
-			n++;
-		}
-		if (n != 19) err = 1;
-		if (err) {
-			fprintf(stderr, "END %d err %d\n", n, err);
+		r = _sourcetable_add_direct(this, n1);
+		if (r < 0)
 			sourceline_free(n1);
-			r = -1;
-		} else {
-			n1->pos = pos;
-			r = _sourcetable_add_direct(this, n1);
-			if (r < 0)
-				sourceline_free(n1);
-		}
-		strfree(valueparse);
 	} else {
 		P_RWLOCK_WRLOCK(&this->lock);
 		int new_len = strlen(this->header) + strlen(sourcetable_entry) + 3;
