@@ -12,17 +12,20 @@ HOST='::1'
 PORT=2103
 
 test_series = [
-  [(b'b\r\n12345', b'^12345$'),
+  [(b'AB\r\n', b'AB'),
+   (b'b\r\n12345', b'^12345$'),
    (b'6789A\n\r\n8\r\nABCDEFG\n\r\n', b'^6789A\nABCDEFG\n$'),
    (b'4\r\nDEF\n\r\n', b'^DEF\n$'),
    (b'0\r\n\r\n', b'^$'),
   ],
-  [(b'a\r\n012345678\n', b'^012345678\n$'),
+  [(b'CD\r\n', b'CD'),
+   (b'a\r\n012345678\n', b'^012345678\n$'),
    (b'\r\n9\r\n022345678\r\na', b'^022345678$'),
    (b'\r\n032345678\n\r\n', b'^032345678\n$'),
    (b'0\r\n\r\na\r\n012345678\n\r\n', b'^$'),
   ],
-  [(b'W\r\n01234', b'^$'),
+  [(b'EF\r\n', b'EF'),
+   (b'W\r\n01234', b'^$'),
   ],
 ]
 
@@ -31,7 +34,10 @@ err = 0
 for tests in test_series:
   ssource = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
   ssource.connect((HOST, PORT))
-  ssource.sendall(b'POST /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic dGVzdDE6dGVzdHB3IQ==\nTransfer-Encoding: chunked\n\n')
+
+  # include a chunk len right after the headers, to check it is not lost
+  # but not a full chunk as it would be dropped for lack of clients.
+  ssource.sendall(b'POST /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic dGVzdDE6dGVzdHB3IQ==\nTransfer-Encoding: chunked\n\n2\r\n')
   sdata = ssource.recv(1024)
 
   sclient = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
