@@ -160,6 +160,13 @@ int ntrip_register_check(struct ntrip_state *this) {
 }
 
 /*
+ * Cache the socket fd for easier access later.
+ */
+void ntrip_set_fd(struct ntrip_state *this) {
+	this->fd = bufferevent_getfd(this->bev);
+}
+
+/*
  * Set peer address, either from a provided sockaddr (sa != NULL) or
  * from getpeername() if sa == NULL.
  */
