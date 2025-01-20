@@ -1,5 +1,6 @@
 #include "conf.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,14 +55,15 @@ struct sourcetable *sourcetable_new(char *host, unsigned short port) {
 	struct sourcetable *this = (struct sourcetable *)malloc(sizeof(struct sourcetable));
 	char *duphost = (host == NULL) ? NULL : mystrdup(host);
 	char *header = mystrdup("");
-	if ((host != NULL && duphost == NULL) || header == NULL || this == NULL) {
+	struct hash_table *kv = hash_table_new(509, (void (*)(void *))sourceline_free);
+	if ((host != NULL && duphost == NULL) || header == NULL || this == NULL || kv == NULL) {
 		strfree(duphost);
 		strfree(header);
 		free(this);
+		if (kv) hash_table_free(kv);
 		return NULL;
 	}
 
-	TAILQ_INIT(&this->sources);
 	P_RWLOCK_INIT(&this->lock, NULL);
 	this->caster = duphost;
 	this->port = port;
@@ -70,22 +72,19 @@ struct sourcetable *sourcetable_new(char *host, unsigned short port) {
 	this->pullable = 0;
 	this->local = 0;
 	this->priority = 0;
+	this->key_val = kv;
 	struct timeval t = { 0, 0 };
 	this->fetch_time = t;
+	this->nvirtual = 0;
 	return this;
 }
 
 void sourcetable_free_unlocked(struct sourcetable *this) {
-	struct sourceline *n;
-
 	strfree(this->header);
 	strfree(this->caster);
 	strfree((char *)this->filename);
 
-	while ((n = TAILQ_FIRST(&this->sources))) {
-		TAILQ_REMOVE_HEAD(&this->sources, next);
-		sourceline_free(n);
-	}
+	hash_table_free(this->key_val);
 
 	P_RWLOCK_UNLOCK(&this->lock);
 	P_RWLOCK_DESTROY(&this->lock);
@@ -110,8 +109,12 @@ struct mime_content *sourcetable_get(struct sourcetable *this) {
 
 	int len = strlen(this->header)+17;
 
-	TAILQ_FOREACH(n, &this->sources, next)
+	struct element *e;
+	struct hash_iterator hi;
+	HASH_FOREACH(e, this->key_val, hi) {
+		n = (struct sourceline *)e->value;
 		len += strlen(n->value) + 2;
+	}
 
 	char *s = (char *)strmalloc(len);
 
@@ -119,12 +122,19 @@ struct mime_content *sourcetable_get(struct sourcetable *this) {
 	 * Build the result per se
 	 */
 	if (s != NULL) {
+		struct element **ep;
+		int ne;
+		ep = hash_array(this->key_val, &ne);
+
 		strcpy(s, this->header);
-		TAILQ_FOREACH(n, &this->sources, next) {
+		for (int i = 0; i < ne; i++) {
+			e = ep[i];
+			n = (struct sourceline *)e->value;
 			strcat(s, n->value);
 			strcat(s, "\r\n");
 		}
 		strcat(s, "ENDSOURCETABLE\r\n");
+		hash_array_free(ep);
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
 	struct mime_content *m = mime_new(s, len-1, "gnss/sourcetable", 1);
@@ -133,27 +143,18 @@ struct mime_content *sourcetable_get(struct sourcetable *this) {
 	return m;
 }
 
-void sourcetable_del_mountpoint(struct sourcetable *this, char *mountpoint) {
-	struct sourceline *np;
+static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
+	int r;
 	P_RWLOCK_WRLOCK(&this->lock);
-
-	TAILQ_FOREACH(np, &this->sources, next) {
-		if (!strcmp(mountpoint, np->key)) {
-			TAILQ_REMOVE(&this->sources, np, next);
-			break;
-		}
-	}
-
+	r = hash_table_add(this->key_val, s->key, s);
+	if (s->virtual)
+		this->nvirtual++;
 	P_RWLOCK_UNLOCK(&this->lock);
-}
-
-static void _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
-	P_RWLOCK_WRLOCK(&this->lock);
-	TAILQ_INSERT_TAIL(&this->sources, s, next);
-	P_RWLOCK_UNLOCK(&this->lock);
+	return r;
 }
 
 int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand) {
+	int r = 0;
 	if (!strncmp(sourcetable_entry, "STR;", 4)) {
 		char *valueparse = mystrdup(sourcetable_entry);
 		if (valueparse == NULL)
@@ -211,11 +212,13 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 		if (n != 19) err = 1;
 		if (err) {
 			fprintf(stderr, "END %d err %d\n", n, err);
+			sourceline_free(n1);
+			r = -1;
 		} else {
 			n1->pos = pos;
-			P_RWLOCK_WRLOCK(&this->lock);
-			TAILQ_INSERT_TAIL(&this->sources, n1, next);
-			P_RWLOCK_UNLOCK(&this->lock);
+			r = _sourcetable_add_direct(this, n1);
+			if (r < 0)
+				sourceline_free(n1);
 		}
 		strfree(valueparse);
 	} else {
@@ -231,20 +234,14 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 		this->header = s;
 		P_RWLOCK_UNLOCK(&this->lock);
 	}
-	return 0;
+	return r;
 }
 
 /*
  * Return the number of entries in a sourcetable, unlocked
  */
 static int _sourcetable_nentries_unlocked(struct sourcetable *this, int omit_virtual) {
-	struct sourceline *np;
-	int n = 0;
-	TAILQ_FOREACH(np, &this->sources, next) {
-		if (!np->virtual || !omit_virtual)
-			n++;
-	}
-	return n;
+	return hash_len(this->key_val) - (omit_virtual ? this->nvirtual : 0);
 }
 
 /*
@@ -309,7 +306,11 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
 	 * Prepare the table to be sorted.
 	 */
 	int i = 0;
-	TAILQ_FOREACH(np, &this->sources, next) {
+
+	struct hash_iterator hi;
+	struct element *e;
+	HASH_FOREACH(e, this->key_val, hi) {
+		np = (struct sourceline *)e->value;
 		// printf("%d: %s pos (%f, %f)\n", i, np->key, np->pos.lat, np->pos.lon);
 		if (!np->virtual) {
 			dist_array[i].dist = distance(&np->pos, pos);
@@ -343,18 +344,10 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
  * Find a mountpoint in a sourcetable.
  */
 struct sourceline *sourcetable_find_mountpoint(struct sourcetable *this, char *mountpoint) {
-	struct sourceline *np;
-	struct sourceline *result = NULL;
+	struct sourceline *result;
 
 	P_RWLOCK_RDLOCK(&this->lock);
-
-	TAILQ_FOREACH(np, &this->sources, next) {
-		if (!strcmp(mountpoint, np->key)) {
-			result = np;
-			break;
-		}
-	}
-
+	result = (struct sourceline *)hash_table_get(this->key_val, mountpoint);
 	P_RWLOCK_UNLOCK(&this->lock);
 
 	return result;
@@ -454,30 +447,23 @@ void stack_replace_host(sourcetable_stack_t *stack, char *host, unsigned port, s
 }
 
 /*
- * Helper function for stack_flatten:
- *	order 2 mountpoints by name.
- */
-static int _cmp_sourceline(const void *ap1, const void *ap2) {
-	struct mp_prio *p1 = (struct mp_prio *)ap1;
-	struct mp_prio *p2 = (struct mp_prio *)ap2;
-	return strcmp(p1->sourceline->key, p2->sourceline->key);
-}
-
-/*
  * Return an aggregated sourcetable as computed from our sourcetable stack.
  */
 struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack_t *this) {
 	struct sourcetable *s;
-	struct sourceline *np;
-	struct mp_prio *mount_set = (struct mp_prio *)malloc(sizeof(struct mp_prio));
-	int n_prio = 0;
-	int i;
 	char *header = mystrdup("");
+	struct hash_iterator hi;
+	struct element *e;
+	struct sourcetable *r = sourcetable_new(NULL, 0);
 
-	if (header == NULL)
-		return NULL;
-	if (mount_set == NULL)
-		return NULL;
+	if (header == NULL || r == NULL)
+		goto cancel;
+
+	/*
+	 * Directly build the returned sourcetable
+	 */
+	strfree(r->header);
+	r->header = header;
 
 	P_RWLOCK_RDLOCK(&this->lock);
 
@@ -495,51 +481,48 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 				P_RWLOCK_UNLOCK(&this->lock);
 				goto cancel;
 			}
-			strfree(header);
-			header = header_tmp;
+			strfree(r->header);
+			r->header = header_tmp;
 			local_table = 1;
 		} else
 			local_table = 0;
 
-		TAILQ_FOREACH(np, &s->sources, next) {
+		HASH_FOREACH(e, s->key_val, hi) {
+			struct sourceline *sp = (struct sourceline *)e->value;
 			/*
 			 * If the mountpoint is from our local table, skip if not live.
 			 */
-			if (local_table && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
+			if (local_table && (!sp->virtual && !livesource_find(caster, NULL, sp->key, &sp->pos)))
 				continue;
 
-			for (i = 0; i < n_prio; i++) {
+			struct element *e = hash_table_get_element(r->key_val, sp->key);
+			struct sourceline *mp;
 
-				if (!strcmp(mount_set[i].sourceline->key, np->key)) {
-
-					/*
-					 * Mountpoint already in table, keep the highest priority entry
-					 */
-					if (mount_set[i].priority < s->priority) {
-						sourceline_free(mount_set[i].sourceline);
-						mount_set[i].priority = s->priority;
-						mount_set[i].sourceline = sourceline_copy(np);
-						if (mount_set[i].sourceline == NULL) {
-							P_RWLOCK_UNLOCK(&s->lock);
-							P_RWLOCK_UNLOCK(&this->lock);
-							goto cancel;
-						}
+			if (e) {
+				mp = (struct sourceline *)e->value;
+				/*
+				 * Mountpoint already in table, keep the highest priority entry
+				 */
+				if (mp->priority < sp->priority) {
+					mp = sourceline_copy(sp);
+					if (mp == NULL) {
+						P_RWLOCK_UNLOCK(&s->lock);
+						P_RWLOCK_UNLOCK(&this->lock);
+						goto cancel;
 					}
-					break;
+					hash_table_replace(r->key_val, e, mp);
 				}
-			}
-			if (i == n_prio) {
+			} else {
 				/*
 				 * Entry not found, add.
 				 */
-
-				struct mp_prio *mount_set2 = (struct mp_prio *)realloc(mount_set, sizeof(struct mp_prio)*(n_prio+1));
-				if (mount_set2 == NULL)
+				mp = sourceline_copy(sp);
+				if (mp == NULL) {
+					P_RWLOCK_UNLOCK(&s->lock);
+					P_RWLOCK_UNLOCK(&this->lock);
 					goto cancel;
-				mount_set = mount_set2;
-				mount_set[n_prio].priority = s->priority;
-				mount_set[n_prio].sourceline = sourceline_copy(np);
-				n_prio++;
+				}
+				_sourcetable_add_direct(r, mp);
 			}
 		}
 
@@ -547,32 +530,10 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 	}
 
 	P_RWLOCK_UNLOCK(&this->lock);
-
-
-	/*
-	 * Now the interim table is ready, build the real sourcetable from it.
-	 */
-
-	struct sourcetable *r = sourcetable_new(NULL, 0);
-	if (r == NULL)
-		goto cancel;
-	strfree(r->header);
-	r->header = header;
-
-	/* Sort by mountpoint name */
-	qsort(mount_set, n_prio, sizeof(mount_set[0]), _cmp_sourceline);
-
-	for (i = 0; i < n_prio; i++)
-		_sourcetable_add_direct(r, mount_set[i].sourceline);
-	free(mount_set);
 	return r;
 
 cancel:
-	for (i = 0; i < n_prio; i++)
-		sourceline_free(mount_set[i].sourceline);
-
-
 	strfree(header);
-	free(mount_set);
+	if (r) sourcetable_free(r);
 	return NULL;
 }

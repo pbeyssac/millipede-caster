@@ -3,6 +3,7 @@
 
 #include "conf.h"
 
+#include "hash.h"
 #include "queue.h"
 #include "sourceline.h"
 #include "util.h"
@@ -19,11 +20,12 @@ struct sourcetable {
 	char *caster;                   // from which caster hostname did we get this table
 	unsigned short port;            // caster port
 	char *header;                   // All "CAS" & "NET" lines
-	struct sourcelineq sources;     // "STR" lines in a linked list
+	struct hash_table *key_val;	// "STR" lines in a hash table
 	int pullable;                   // 1: pull mounpoints streams from the caster on demand
 	int local;                      // 1: table read from local file
 	const char *filename;           // if local
 	int priority;
+	int nvirtual;			// number of "virtual" entries
 	struct timeval fetch_time;              // time of fetch, if remote table
 };
 TAILQ_HEAD (sourcetableq, sourcetable);
