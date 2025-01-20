@@ -19,15 +19,22 @@ struct element {
 };
 
 /*
+ * Easier syntax for casting:
+ * (hash_free_callback) is equivalent to (void(*)(void *))
+ */
+typedef void (*hash_free_callback)(void *);
+
+/*
  * Main table
  */
 struct hash_table {
 	int nentries;				// total number of entries
 	int n_buckets;				// size of element_lists
 	struct elementlisthead *element_lists;	// 1 element per hash bucket
+	void (*free_callback)(void *);
 };
 
-struct hash_table *hash_table_new(int n_buckets);
+struct hash_table *hash_table_new(int n_buckets, void free_callback(void *));
 void hash_table_free(struct hash_table *this);
 
 int hash_table_add(struct hash_table *this, const char *key, void *value);

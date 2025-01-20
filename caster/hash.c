@@ -19,7 +19,7 @@ static unsigned int hash_key(struct hash_table *this, const char *key) {
 /*
  * Create a hash table with the indicated number of buckets.
  */
-struct hash_table *hash_table_new(int n_buckets) {
+struct hash_table *hash_table_new(int n_buckets, void free_callback(void *)) {
 	struct elementlisthead *element_lists;
 	if (n_buckets <= 0)
 		return NULL;
@@ -34,6 +34,7 @@ struct hash_table *hash_table_new(int n_buckets) {
 	this->element_lists = element_lists;
 	this->n_buckets = n_buckets;
 	this->nentries = 0;
+	this->free_callback = free_callback ? free_callback : free;
 
 	/* Initialize the bucket lists */
 	for (int h = 0; h < n_buckets; h++)
@@ -44,9 +45,9 @@ struct hash_table *hash_table_new(int n_buckets) {
 /*
  * Free an element.
  */
-static void _hash_table_free_element(struct element *e) {
+static void _hash_table_free_element(struct hash_table *this, struct element *e) {
 	strfree((char *)(e->key));
-	free(e->value);
+	this->free_callback(e->value);
 	free(e);
 }
 
@@ -61,7 +62,7 @@ void hash_table_free(struct hash_table *this) {
 		struct elementlisthead *t = &this->element_lists[h];
 		while ((e = SLIST_FIRST(t))) {
 			SLIST_REMOVE_HEAD(t, next);
-			_hash_table_free_element(e);
+			_hash_table_free_element(this, e);
 			n++;
 		}
 	}
@@ -136,7 +137,7 @@ int hash_table_del(struct hash_table *this, const char *key) {
 	struct element *e = hash_table_find(this, key, &h, 1);
 	if (e == NULL)
 		return -1;
-	_hash_table_free_element(e);
+	_hash_table_free_element(this, e);
 	return 0;
 }
 

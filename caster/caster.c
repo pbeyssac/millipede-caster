@@ -146,7 +146,7 @@ caster_new(struct config *config, const char *config_file) {
 	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
 	this->ntrips.next_id = 1;
 
-	this->ntrips.ipcount = hash_table_new(509);
+	this->ntrips.ipcount = hash_table_new(509, NULL);
 
 	// Used only for access to source_auth and host_auth
 	P_RWLOCK_INIT(&this->configlock, NULL);
