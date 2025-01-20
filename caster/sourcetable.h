@@ -74,13 +74,14 @@ struct mime_content *sourcetable_get(struct sourcetable *this);
 void sourcetable_del_mountpoint(struct sourcetable *this, char *mountpoint);
 int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand);
 int sourcetable_nentries(struct sourcetable *this, int omit_virtual);
+void sourcetable_diff(struct ntrip_state *st, struct sourcetable *t1, struct sourcetable *t2);
 struct sourceline *sourcetable_find_mountpoint(struct sourcetable *this, char *mountpoint);
 struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos);
 void dist_table_free(struct dist_table *this);
 void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max);
 struct sourceline *stack_find_mountpoint(sourcetable_stack_t *stack, char *mountpoint);
 struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpoint, struct sourcetable **sourcetable);
-void stack_replace_host(sourcetable_stack_t *stack, char *host, unsigned port, struct sourcetable *new_sourcetable);
+void stack_replace_host(struct ntrip_state *st, sourcetable_stack_t *stack, char *host, unsigned port, struct sourcetable *new_sourcetable);
 struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack_t *this);
 
 #endif

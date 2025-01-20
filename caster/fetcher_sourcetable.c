@@ -53,7 +53,7 @@ static void _fetcher_sourcetable_stop(struct sourcetable_fetch_args *this, int k
 		this->st = NULL;
 	}
 	if (!keep_sourcetable)
-		stack_replace_host(&this->caster->sourcetablestack, this->host, this->port, NULL);
+		stack_replace_host(this->st, &this->caster->sourcetablestack, this->host, this->port, NULL);
 }
 
 void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
@@ -88,17 +88,14 @@ sourcetable_cb(int fd, short what, void *arg) {
 	timersub(&t1, &a->t0, &t1);
 
 	if (sourcetable != NULL) {
-		logfmt(&caster->flog, "sourcetable loaded from %s:%d, %d entries, %.3f ms\n",
-			a->host,
-			a->port,
+		ntrip_log(a->st, LOG_NOTICE, "sourcetable loaded, %d entries, %.3f ms\n",
 			sourcetable_nentries(sourcetable, 0),
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 		sourcetable->priority = a->priority;
-		stack_replace_host(&a->caster->sourcetablestack, a->host, a->port, sourcetable);
+		stack_replace_host(a->st, &a->caster->sourcetablestack, a->host, a->port, sourcetable);
 		a->sourcetable = NULL;
 	} else {
-		logfmt(&caster->flog, "sourcetable load failed from %s:%d, %.3f ms\n",
-			a->host, a->port,
+		ntrip_log(a->st, LOG_NOTICE, "sourcetable load failed, %.3f ms\n",
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 	}
 	a->st = NULL;

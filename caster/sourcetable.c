@@ -195,6 +195,54 @@ int sourcetable_nentries(struct sourcetable *this, int omit_virtual) {
 	return r;
 }
 
+void sourcetable_diff(struct ntrip_state *st, struct sourcetable *t1, struct sourcetable *t2) {
+	struct element **keys1, **keys2;
+	int n1, n2;
+	int i1, i2;
+
+	P_RWLOCK_RDLOCK(&t1->lock);
+	keys1 = hash_array(t1->key_val, &n1);
+	P_RWLOCK_UNLOCK(&t1->lock);
+	if (!keys1)
+		return;
+	P_RWLOCK_RDLOCK(&t2->lock);
+	keys2 = hash_array(t2->key_val, &n2);
+	P_RWLOCK_UNLOCK(&t2->lock);
+	if (!keys2) {
+		hash_array_free(keys1);
+		return;
+	}
+
+	i1 = 0;
+	i2 = 0;
+	int c;
+	while (i1 < n1 && i2 < n2) {
+		c = strcmp(keys1[i1]->key, keys2[i2]->key);
+		if (c < 0) {
+			ntrip_log(st, LOG_INFO, "Removed source %s\n", keys1[i1]->key);
+			i1++;
+			continue;
+		}
+		if (c > 0) {
+			ntrip_log(st, LOG_INFO, "Added source %s\n", keys2[i2]->key);
+			i2++;
+			continue;
+		}
+		i1++;
+		i2++;
+	}
+	while (i1 < n1) {
+		ntrip_log(st, LOG_INFO, "Removed source %s\n", keys1[i1]->key);
+		i1++;
+	}
+	while (i2 < n2) {
+		ntrip_log(st, LOG_INFO, "Added source %s\n", keys2[i2]->key);
+		i2++;
+	}
+	hash_array_free(keys1);
+	hash_array_free(keys2);
+}
+
 static int _cmp_dist(const void *pos1, const void *pos2) {
 	struct spos *p1 = (struct spos *)pos1;
 	struct spos *p2 = (struct spos *)pos2;
@@ -362,7 +410,7 @@ struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpo
  * Remove a sourcetable identified by host+port in the sourcetable stack.
  * Insert a new one instead, if new_sourcetable is not NULL.
  */
-void stack_replace_host(sourcetable_stack_t *stack, char *host, unsigned port, struct sourcetable *new_sourcetable) {
+void stack_replace_host(struct ntrip_state *st, sourcetable_stack_t *stack, char *host, unsigned port, struct sourcetable *new_sourcetable) {
 	struct sourcetable *s;
 	struct sourcetable *r = NULL;
 
@@ -379,6 +427,11 @@ void stack_replace_host(sourcetable_stack_t *stack, char *host, unsigned port, s
 
 	if (r) {
 		TAILQ_REMOVE(&stack->list, r, next);
+		if (new_sourcetable != NULL) {
+			P_RWLOCK_UNLOCK(&r->lock);
+			sourcetable_diff(st, r, new_sourcetable);
+			P_RWLOCK_WRLOCK(&r->lock);
+		}
 		sourcetable_free_unlocked(r);
 	}
 	if (new_sourcetable != NULL)
