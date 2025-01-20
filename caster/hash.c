@@ -119,12 +119,18 @@ int hash_table_add(struct hash_table *this, const char *key, void *value) {
 }
 
 /*
+ * Get an element, return its pointer or NULL if not found.
+ */
+struct element *hash_table_get_element(struct hash_table *this, const char *key) {
+	unsigned int h;
+	return hash_table_find(this, key, &h, 0);
+}
+
+/*
  * Get an element, return its value pointer or NULL if not found.
  */
 void *hash_table_get(struct hash_table *this, const char *key) {
-	unsigned int h;
-	struct element *e;
-	e = hash_table_find(this, key, &h, 0);
+	struct element *e = hash_table_get_element(this, key);
 	return e == NULL ? e:e->value;
 }
 
