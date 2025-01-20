@@ -19,6 +19,11 @@
 struct joblist *joblist_new(struct caster_state *caster) {
 	struct joblist *this = (struct joblist *)malloc(sizeof(struct joblist));
 	if (this != NULL) {
+		if (pthread_cond_init(&this->condjob, NULL) != 0) {
+			free(this);
+			caster_log_error(this->caster, "pthread_cond_init");
+			return NULL;
+		}
 		this->ntrip_njobs = 0;
 		this->append_ntrip_njobs = 0;
 		this->njobs = 0;
@@ -32,8 +37,6 @@ struct joblist *joblist_new(struct caster_state *caster) {
 		STAILQ_INIT(&this->append_jobq);
 		P_MUTEX_INIT(&this->mutex, NULL);
 		P_MUTEX_INIT(&this->append_mutex, NULL);
-		if (pthread_cond_init(&this->condjob, NULL) != 0)
-			caster_log_error(this->caster, "pthread_cond_init");
 	}
 	return this;
 }
