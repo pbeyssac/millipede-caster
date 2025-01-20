@@ -187,3 +187,35 @@ void hash_table_decr(struct hash_table *this, const char *key) {
 int hash_len(struct hash_table *this) {
 	return this->nentries;
 }
+
+/*
+ * Initialize an iterator.
+ */
+void hash_iterator_init(struct hash_iterator *this, struct hash_table *ht) {
+	this->bucket_number = -1;
+	this->e = NULL;
+	this->ht = ht;
+}
+
+/*
+ * Return the next element, or NULL when finished.
+ */
+struct element *hash_iterator_next(struct hash_iterator *this) {
+	if (this->e) {
+		this->e = SLIST_NEXT(this->e, next);
+		if (this->e)
+			return this->e;
+	}
+
+	while (this->e == NULL) {
+		this->bucket_number++;
+		if (this->bucket_number == this->ht->n_buckets) {
+			/* Make sure we crash if the iterator is ever used again */
+			this->ht = NULL;
+			this->e = NULL;
+			return NULL;
+		}
+		this->e = SLIST_FIRST(&this->ht->element_lists[this->bucket_number]);
+	}
+	return this->e;
+}

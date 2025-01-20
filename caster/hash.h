@@ -34,6 +34,12 @@ struct hash_table {
 	void (*free_callback)(void *);
 };
 
+struct hash_iterator {
+	int bucket_number;
+	struct element *e;
+	struct hash_table *ht;
+};
+
 struct hash_table *hash_table_new(int n_buckets, void free_callback(void *));
 void hash_table_free(struct hash_table *this);
 
@@ -45,5 +51,11 @@ int hash_table_del(struct hash_table *this, const char *key);
 int hash_table_incr(struct hash_table *this, const char *key);
 void hash_table_decr(struct hash_table *this, const char *key);
 int hash_len(struct hash_table *this);
+
+void hash_iterator_init(struct hash_iterator *this, struct hash_table *ht);
+struct element *hash_iterator_next(struct hash_iterator *this);
+
+#define	HASH_FOREACH(e, kv, hi) \
+			for (hash_iterator_init(&(hi), (kv)); ((e)=hash_iterator_next(&(hi)));)
 
 #endif
