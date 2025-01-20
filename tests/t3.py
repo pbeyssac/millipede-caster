@@ -17,5 +17,5 @@ socks = [socket.socket(socket.AF_INET6, socket.SOCK_STREAM) for i in range(n)]
 for i, s in enumerate(socks):
   s.connect((HOST, PORT))
   s.sendall(b'GET /%s HTTP/1.1\nUser-Agent: NTRIP test\n\n' % tests[i % len(tests)])
-  data = s.recv(1024)
+  data = s.recv(10240)
   print('Received', repr(data))
