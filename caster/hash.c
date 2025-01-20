@@ -33,6 +33,7 @@ struct hash_table *hash_table_new(int n_buckets) {
 
 	this->element_lists = element_lists;
 	this->n_buckets = n_buckets;
+	this->nentries = 0;
 
 	/* Initialize the bucket lists */
 	for (int h = 0; h < n_buckets; h++)
@@ -54,15 +55,18 @@ static void _hash_table_free_element(struct element *e) {
  */
 void hash_table_free(struct hash_table *this) {
 	struct element *e;
+	int n = 0;
 
 	for (int h = 0; h < this->n_buckets; h++) {
 		struct elementlisthead *t = &this->element_lists[h];
 		while ((e = SLIST_FIRST(t))) {
 			SLIST_REMOVE_HEAD(t, next);
 			_hash_table_free_element(e);
+			n++;
 		}
 	}
 
+	assert(n == this->nentries);
 	free(this->element_lists);
 	free(this);
 }
@@ -86,6 +90,7 @@ static struct element *hash_table_find(struct hash_table *this, const char *key,
 					SLIST_REMOVE_AFTER(last, next);
 				else
 					SLIST_REMOVE_HEAD(head, next);
+				this->nentries--;
 			}
 			return e;
 		}
@@ -108,6 +113,7 @@ int hash_table_add(struct hash_table *this, const char *key, void *value) {
 	e->value = value;
 	e->key = mystrdup(key);
 	SLIST_INSERT_HEAD(&this->element_lists[h], e, next);
+	this->nentries++;
 	return 0;
 }
 
@@ -161,4 +167,8 @@ void hash_table_decr(struct hash_table *this, const char *key) {
 		if (*v == 0)
 			hash_table_del(this, key);
 	}
+}
+
+int hash_len(struct hash_table *this) {
+	return this->nentries;
 }

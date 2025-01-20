@@ -22,6 +22,7 @@ struct element {
  * Main table
  */
 struct hash_table {
+	int nentries;				// total number of entries
 	int n_buckets;				// size of element_lists
 	struct elementlisthead *element_lists;	// 1 element per hash bucket
 };
@@ -34,5 +35,6 @@ void *hash_table_get(struct hash_table *this, const char *key);
 int hash_table_del(struct hash_table *this, const char *key);
 int hash_table_incr(struct hash_table *this, const char *key);
 void hash_table_decr(struct hash_table *this, const char *key);
+int hash_len(struct hash_table *this);
 
 #endif
