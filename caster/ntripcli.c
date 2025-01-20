@@ -222,6 +222,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				end = 1;
 			} else {
 				if (sourcetable_add(st->tmp_sourcetable, line, 1) < 0) {
+					ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d\n", st->tmp_sourcetable->caster, st->tmp_sourcetable->port);
 					end = 1;
 				}
 			}
