@@ -49,6 +49,9 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 
 static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *output) {
 	struct sourcetable *sourcetable = stack_flatten(this->caster, &this->caster->sourcetablestack);
+	if (sourcetable == NULL)
+		return 503;
+
 	struct mime_content *m = sourcetable_get(sourcetable);
 	sourcetable_free(sourcetable);
 	if (m == NULL)
