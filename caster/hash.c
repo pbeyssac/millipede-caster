@@ -101,6 +101,14 @@ static struct element *hash_table_find(struct hash_table *this, const char *key,
 }
 
 /*
+ * Replace an element.
+ */
+void hash_table_replace(struct hash_table *this, struct element *e, void *value) {
+	this->free_callback(e->value);
+	e->value = value;
+}
+
+/*
  * Insert an element.
  */
 int hash_table_add(struct hash_table *this, const char *key, void *value) {
