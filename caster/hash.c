@@ -53,13 +53,18 @@ static void _hash_table_free_element(struct element *e) {
  * Free a complete hash table.
  */
 void hash_table_free(struct hash_table *this) {
-	struct element *e, *tmpe;
+	struct element *e;
+
 	for (int h = 0; h < this->n_buckets; h++) {
 		struct elementlisthead *t = &this->element_lists[h];
-		SLIST_FOREACH_SAFE(e, t, next, tmpe) {
+		while ((e = SLIST_FIRST(t))) {
+			SLIST_REMOVE_HEAD(t, next);
 			_hash_table_free_element(e);
 		}
 	}
+
+	free(this->element_lists);
+	free(this);
 }
 
 /*
