@@ -54,6 +54,8 @@ int hash_len(struct hash_table *this);
 
 void hash_iterator_init(struct hash_iterator *this, struct hash_table *ht);
 struct element *hash_iterator_next(struct hash_iterator *this);
+void hash_array_free(struct element **ep);
+struct element **hash_array(struct hash_table *this, int *pn);
 
 #define	HASH_FOREACH(e, kv, hi) \
 			for (hash_iterator_init(&(hi), (kv)); ((e)=hash_iterator_next(&(hi)));)

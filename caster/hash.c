@@ -219,3 +219,37 @@ struct element *hash_iterator_next(struct hash_iterator *this) {
 	}
 	return this->e;
 }
+
+static int _cmp_keys(const void *p1, const void *p2) {
+	struct element *k1 = *(struct element **)p1;
+	struct element *k2 = *(struct element **)p2;
+	return strcmp(k1->key, k2->key);
+}
+
+/*
+ * Return an array of pointers to all elements, sorted by key.
+ */
+struct element **hash_array(struct hash_table *this, int *pn) {
+	int n;
+	struct element **ep;
+	int i;
+
+	n = this->nentries;
+	ep = (struct element **)malloc(sizeof(*ep)*n);
+	if (!ep)
+		return NULL;
+
+	struct hash_iterator hi;
+	struct element *e;
+	i = 0;
+	HASH_FOREACH(e, this, hi)
+		ep[i++] = e;
+	assert(i == n);
+	qsort(ep, i, sizeof(struct element *), _cmp_keys);
+	*pn = i;
+	return ep;
+}
+
+void hash_array_free(struct element **ep) {
+	free(ep);
+}
