@@ -7,8 +7,10 @@
 #include "util.h"
 
 /*
- * Return in dest a string representing sockaddr if it is a known family
- * (AF_INET or AF_INET6), else NULL.
+ * Store in dest a string representing sockaddr, port excluded, if it is a known family
+ * (AF_INET or AF_INET6).
+ *
+ * Return dest, or NULL if unknown family.
  */
 char *ip_str(union sock *sa, char *dest, int size_dest) {
 	switch(sa->generic.sa_family) {
@@ -47,6 +49,9 @@ char *ip_str_port(union sock *sa, char *dest, int size_dest) {
 	}
 }
 
+/*
+ * Return the port from sa, in host byte order.
+ */
 unsigned short ip_port(union sock *sa) {
 	switch(sa->generic.sa_family) {
 	case AF_INET:
