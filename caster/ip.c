@@ -13,10 +13,34 @@
 char *ip_str(union sock *sa, char *dest, int size_dest) {
 	switch(sa->generic.sa_family) {
 	case AF_INET:
-		inet_ntop(sa->generic.sa_family, &sa->v4.sin_addr, dest, size_dest);
+		inet_ntop(sa->v4.sin_family, &sa->v4.sin_addr, dest, size_dest);
 		return dest;
 	case AF_INET6:
-		inet_ntop(sa->generic.sa_family, &sa->v6.sin6_addr, dest, size_dest);
+		inet_ntop(sa->v6.sin6_family, &sa->v6.sin6_addr, dest, size_dest);
+		return dest;
+	default:
+		return NULL;
+	}
+}
+
+/*
+ * Store in dest a string representing sockaddr, port included, if it is a known family
+ * (AF_INET or AF_INET6).
+ *
+ * Return dest, or NULL if unknown family.
+ */
+char *ip_str_port(union sock *sa, char *dest, int size_dest) {
+	char ip[40];
+	switch(sa->generic.sa_family) {
+	case AF_INET:
+		snprintf(dest, size_dest, "%s:%hu",
+			inet_ntop(sa->v4.sin_family, &sa->v4.sin_addr, ip, sizeof ip),
+			ntohs(sa->v4.sin_port));
+		return dest;
+	case AF_INET6:
+		snprintf(dest, size_dest, "%s.%hu",
+			inet_ntop(sa->v6.sin6_family, &sa->v6.sin6_addr, ip, sizeof ip),
+			ntohs(sa->v6.sin6_port));
 		return dest;
 	default:
 		return NULL;
@@ -32,6 +56,30 @@ unsigned short ip_port(union sock *sa) {
 	default:
 		return 0;
 	}
+}
+
+/*
+ * Compare two IP addresses + ports + family..
+ */
+int ip_cmp(union sock *s1, union sock *s2) {
+	int r;
+	r = s1->generic.sa_family - s2->generic.sa_family;
+	if (r)
+		return r;
+
+	switch(s1->generic.sa_family) {
+	case AF_INET:
+		r = s1->v4.sin_addr.s_addr - s2->v4.sin_addr.s_addr;
+		if (r)
+			return r;
+		return s1->v4.sin_port - s2->v4.sin_port;
+	case AF_INET6:
+		r = memcmp(&s1->v6.sin6_addr, &s2->v6.sin6_addr, sizeof(s1->v6.sin6_addr));
+		if (r)
+			return r;
+		return s1->v6.sin6_port - s2->v6.sin6_port;
+	}
+	return -1;
 }
 
 /*

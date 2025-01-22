@@ -40,7 +40,9 @@ struct prefix_table {
 };
 
 char *ip_str(union sock *sa, char *dest, int size_dest);
+char *ip_str_port(union sock *sa, char *dest, int size_dest);
 unsigned short ip_port(union sock *sa);
+int ip_cmp(union sock *s1, union sock *s2);
 
 int ip_convert(char *ipstr, union sock *sock);
 struct prefix_quota *prefix_quota_parse(char *ip_prefix, const char *quota_str);
