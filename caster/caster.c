@@ -134,7 +134,7 @@ caster_new(struct config *config, const char *config_file) {
 	}
 
 	this->listeners = NULL;
-	this->socks = NULL;
+	this->listeners_count = 0;
 	this->sourcetable_fetchers = NULL;
 	this->sourcetable_fetchers_count = 0;
 	this->blocklist = NULL;
@@ -148,7 +148,7 @@ caster_new(struct config *config, const char *config_file) {
 
 	this->ntrips.ipcount = hash_table_new(509, NULL);
 
-	// Used only for access to source_auth and host_auth
+	// Used for access to source_auth, host_auth, blocklist and listener config
 	P_RWLOCK_INIT(&this->configlock, NULL);
 
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
@@ -197,6 +197,20 @@ caster_new(struct config *config, const char *config_file) {
 	return this;
 }
 
+static void caster_free_listener(struct listener *this) {
+	if (this->listener)
+		evconnlistener_free(this->listener);
+	free(this);
+}
+
+static void caster_free_listeners(struct caster_state *this) {
+	for (int i = 0; i < this->listeners_count; i++)
+		caster_free_listener(this->listeners[i]);
+	free(this->listeners);
+	this->listeners = NULL;
+	this->listeners_count = 0;
+}
+
 void caster_free(struct caster_state *this) {
 	if (threads)
 		jobs_stop_threads(this->joblist);
@@ -208,11 +222,7 @@ void caster_free(struct caster_state *this) {
 	if (this->signalint_event)
 		event_free(this->signalint_event);
 
-	for (int i = 0; i < this->config->bind_count; i++)
-		if (this->listeners[i])
-			evconnlistener_free(this->listeners[i]);
-	free(this->listeners);
-	free(this->socks);
+	caster_free_listeners(this);
 	hash_table_free(this->ntrips.ipcount);
 
 	caster_free_fetchers(this);
@@ -249,23 +259,48 @@ void caster_free(struct caster_state *this) {
 }
 
 /*
- * Configure and activate listening ports.
+ * Configure a listening port for libevent.
  */
-static int caster_listen(struct caster_state *this) {
+static int caster_start_listener(struct caster_state *this, struct config_bind *config, union sock *sin, struct listener *listener) {
+	listener->listener = NULL;
+	listener->sockaddr = *sin;
+	listener->caster = this;
+
+	listener->listener = evconnlistener_new_bind(this->base, listener_cb, listener,
+		LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, config->queue_size,
+		(struct sockaddr *)sin, sin->generic.sa_len);
+	if (!listener->listener) {
+		fprintf(stderr, "Could not create a listener for %s:%d!\n", config->ip, config->port);
+		return -1;
+	}
+	return 0;
+}
+
+/*
+ * Reconfigure listening ports, reusing already existing sockets if possible.
+ */
+static int caster_reload_listeners(struct caster_state *this) {
+	union sock sin;
+	unsigned short port;
+	int r, i;
+	struct listener **new_listeners;
+	char ip[64];
+
+	P_RWLOCK_WRLOCK(&this->configlock);
 	if (this->config->bind_count == 0) {
 		fprintf(stderr, "No configured ports to listen to, aborting.\n");
+		if (this->listeners)
+			caster_free_listeners(this);
+		P_RWLOCK_UNLOCK(&this->configlock);
 		return -1;
 	}
 
-	this->socks = (union sock *)malloc(sizeof(union sock)*this->config->bind_count);
-	if (!this->socks) {
-		fprintf(stderr, "Can't allocate socket addresses\n");
-		return -1;
-	}
-
-	this->listeners = (struct evconnlistener **)malloc(sizeof(struct evconnlistener *)*this->config->bind_count);
-	if (!this->listeners) {
+	new_listeners = (struct listener **)malloc(sizeof(struct listener *)*this->config->bind_count);
+	if (!new_listeners) {
 		fprintf(stderr, "Can't allocate listeners\n");
+		if (this->listeners)
+			caster_free_listeners(this);
+		P_RWLOCK_UNLOCK(&this->configlock);
 		return -1;
 	}
 
@@ -273,33 +308,77 @@ static int caster_listen(struct caster_state *this) {
 	 * Create listening socket addresses.
 	 * Create a libevent listener for each.
 	 */
-	int err = 0;
-	for (int i = 0; i < this->config->bind_count; i++) {
-		int r, port;
-		union sock *sin = this->socks+i;
+	int current_dir = open(".", O_DIRECTORY);
+	chdir(this->config_dir);
 
-		port = htons(this->config->bind[i].port);
-		r = ip_convert(this->config->bind[i].ip, sin);
+	int nlisteners = 0;
+
+	for (i = 0; i < this->config->bind_count; i++) {
+		struct config_bind *config = this->config->bind + i;
+		port = htons(config->port);
+		r = ip_convert(config->ip, &sin);
 		if (!r) {
 			fprintf(stderr, "Invalid IP %s\n", this->config->bind[i].ip);
-			err = 1;
 			continue;
 		}
-		if (sin->generic.sa_family == AF_INET)
-			sin->v4.sin_port = port;
+		if (sin.generic.sa_family == AF_INET)
+			sin.v4.sin_port = port;
 		else
-			sin->v6.sin6_port = port;
-		this->listeners[i] = evconnlistener_new_bind(this->base, listener_cb, this,
-			LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, this->config->bind[i].queue_size,
-			(struct sockaddr *)sin, sin->generic.sa_len);
-		if (!this->listeners[i]) {
-			fprintf(stderr, "Could not create a listener for %s:%d!\n", this->config->bind[i].ip, this->config->bind[i].port);
-			err = 1;
+			sin.v6.sin6_port = port;
+
+		/*
+		 * Try to find and recycle an existing listener entry
+		 */
+		struct listener *recycled_listener = NULL;
+		for (int j = 0; j < this->listeners_count; j++) {
+			if (this->listeners[j] && !ip_cmp(&sin, &this->listeners[j]->sockaddr)) {
+				recycled_listener = this->listeners[j];
+				this->listeners[j] = NULL;
+				break;
+			}
+		}
+		if (recycled_listener) {
+			fprintf(stderr, "Reusing listener %s:%d\n", ip_str(&sin, ip, sizeof ip), ntohs(port));
+			new_listeners[nlisteners++] = recycled_listener;
+
+		/*
+		 * None found, start a new listener instance.
+		 */
+		} else {
+			struct listener *new_listener = (struct listener *)malloc(sizeof(struct listener));
+			if (new_listener) {
+				if (caster_start_listener(this, this->config->bind+i, &sin, new_listener) >= 0) {
+					new_listeners[nlisteners++] = new_listener;
+					fprintf(stderr, "Opening listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+				} else {
+					fprintf(stderr, "Unable to open listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+					caster_free_listener(new_listener);
+				}
+			}
 		}
 	}
+	fchdir(current_dir);
+	close(current_dir);
 
-	if (err)
+	/*
+	 * Drop remaining listening sockets we haven't reused.
+	 */
+	for (int j = 0; j < this->listeners_count; j++)
+		if (this->listeners[j]) {
+			fprintf(stderr, "Closing listener %s\n", ip_str_port(&this->listeners[j]->sockaddr, ip, sizeof ip));
+			caster_free_listener(this->listeners[j]);
+		}
+
+	free(this->listeners);
+	this->listeners = new_listeners;
+	this->listeners_count = nlisteners;
+
+	P_RWLOCK_UNLOCK(&this->configlock);
+
+	if (this->listeners_count == 0) {
+		fprintf(stderr, "No configured ports to listen to, aborting.\n");
 		return -1;
+	}
 	return 0;
 }
 
@@ -418,7 +497,8 @@ static void
 listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
     struct sockaddr *sa, int socklen, void *arg)
 {
-	struct caster_state *caster = arg;
+	struct listener *listener_conf = arg;
+	struct caster_state *caster = listener_conf->caster;
 	struct event_base *base = caster->base;
 	struct bufferevent *bev;
 
@@ -484,9 +564,7 @@ signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
 	printf("Reloading configuration\n");
 	caster_reload_config(caster);
-	/*
-	 * TBD: listeners reload.
-	 */
+	caster_reload_listeners(caster);
 	caster_reload_fetchers(caster);
 	caster_chdir_reload(caster, 1);
 }
@@ -663,8 +741,7 @@ int caster_main(char *config_file) {
 	// setsockopt(0, IPV6CTL_V6ONLY, IPV6CTL_V6ONLY, &v6only, sizeof v6only);
 #endif
 
-
-	if (caster_listen(caster) < 0) {
+	if (caster_reload_listeners(caster) < 0) {
 		caster_free(caster);
 		return 1;
 	}
