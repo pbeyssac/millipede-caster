@@ -16,6 +16,15 @@ listen:
     ip:			::1
 
 #
+# Example configuration for a TLS IPv6 port
+#
+# - port:			2443
+#   ip:				::0
+#   tls:			true
+#   tls_full_certificate_chain:	fullchain.pem
+#   tls_private_key:		privkey.pem
+
+#
 # Optional caster from which we can get and announce sources.
 #
 #proxy:

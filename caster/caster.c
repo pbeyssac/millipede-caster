@@ -18,10 +18,14 @@
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <event2/bufferevent_ssl.h>
 #include <event2/dns.h>
 #include <event2/listener.h>
 #include <event2/event.h>
 #include <event2/thread.h>
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #include "caster.h"
 #include "config.h"
@@ -113,6 +117,17 @@ caster_log(void *arg, const char *fmt, va_list ap) {
 	_caster_log(this->flog.logfile, fmt, ap);
 }
 
+/*
+ * Callback for OpenSSL's ERR_print_errors_cb()
+ */
+
+static int
+caster_tls_log_cb(const char *str, size_t len, void *u) {
+	logfmt(&((struct caster_state *)u)->flog, "%s\n", str);
+	// Undocumentend OpenSSL API: return >0 if ok, <=0 if failed
+	return 1;
+}
+
 static struct caster_state *
 caster_new(struct config *config, const char *config_file) {
 	struct caster_state *this = (struct caster_state *)calloc(1, sizeof(struct caster_state));
@@ -138,7 +153,6 @@ caster_new(struct config *config, const char *config_file) {
 	this->sourcetable_fetchers = NULL;
 	this->sourcetable_fetchers_count = 0;
 	this->blocklist = NULL;
-
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
 	P_MUTEX_INIT(&this->livesources.delete_lock, NULL);
@@ -200,6 +214,8 @@ caster_new(struct config *config, const char *config_file) {
 static void caster_free_listener(struct listener *this) {
 	if (this->listener)
 		evconnlistener_free(this->listener);
+	if (this->tls && this->ssl_server_ctx)
+		SSL_CTX_free(this->ssl_server_ctx);
 	free(this);
 }
 
@@ -259,12 +275,55 @@ void caster_free(struct caster_state *this) {
 }
 
 /*
+ * Load TLS certificates from file paths.
+ */
+static int listener_load_certs(SSL_CTX *ctx, char *tls_full_certificate_chain, char *tls_private_key) {
+	if (SSL_CTX_use_certificate_chain_file(ctx, tls_full_certificate_chain) <= 0)
+		return -1;
+	if (SSL_CTX_use_PrivateKey_file(ctx, tls_private_key, SSL_FILETYPE_PEM) <= 0)
+		return -1;
+	if (!SSL_CTX_check_private_key(ctx)) {
+		fprintf(stderr, "Private key does not match the certificate public key\n");
+		return -1;
+	}
+	return 0;
+}
+
+/*
+ * Set-up or update TLS server configuration.
+ */
+static int listener_setup_tls(struct listener *this, struct config_bind *config) {
+	if (!this->ssl_server_ctx) {
+		this->ssl_server_ctx = SSL_CTX_new(TLS_server_method());
+		if (this->ssl_server_ctx == NULL) {
+			ERR_print_errors_cb(caster_tls_log_cb, this->caster);
+			return -1;
+		}
+	}
+	if (listener_load_certs(this->ssl_server_ctx, config->tls_full_certificate_chain, config->tls_private_key) < 0) {
+		ERR_print_errors_cb(caster_tls_log_cb, this->caster);
+		SSL_CTX_free(this->ssl_server_ctx);
+		this->ssl_server_ctx = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+/*
  * Configure a listening port for libevent.
  */
 static int caster_start_listener(struct caster_state *this, struct config_bind *config, union sock *sin, struct listener *listener) {
 	listener->listener = NULL;
 	listener->sockaddr = *sin;
 	listener->caster = this;
+	int tls = config->tls;
+	listener->tls = tls;
+	listener->ssl_server_ctx = NULL;
+
+	if (config->tls && config->tls_full_certificate_chain && config->tls_private_key) {
+		if (listener_setup_tls(listener, config) < 0)
+			return -1;
+	}
 
 	listener->listener = evconnlistener_new_bind(this->base, listener_cb, listener,
 		LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, config->queue_size,
@@ -330,21 +389,31 @@ static int caster_reload_listeners(struct caster_state *this) {
 		 * Try to find and recycle an existing listener entry
 		 */
 		struct listener *recycled_listener = NULL;
-		for (int j = 0; j < this->listeners_count; j++) {
+		int j;
+		for (j = 0; j < this->listeners_count; j++) {
 			if (this->listeners[j] && !ip_cmp(&sin, &this->listeners[j]->sockaddr)) {
 				recycled_listener = this->listeners[j];
-				this->listeners[j] = NULL;
 				break;
 			}
 		}
 		if (recycled_listener) {
-			fprintf(stderr, "Reusing listener %s:%d\n", ip_str(&sin, ip, sizeof ip), ntohs(port));
-			new_listeners[nlisteners++] = recycled_listener;
-
-		/*
-		 * None found, start a new listener instance.
-		 */
-		} else {
+			if (config->tls && listener_setup_tls(recycled_listener, config) < 0) {
+				fprintf(stderr, "Can't reuse listener %s: TLS setup failed\n", ip_str_port(&sin, ip, sizeof ip));
+				recycled_listener = NULL;
+			} else {
+				if (recycled_listener->tls && !config->tls) {
+					recycled_listener->tls = 0;
+					SSL_CTX_free(recycled_listener->ssl_server_ctx);
+				}
+				fprintf(stderr, "Reusing listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+				new_listeners[nlisteners++] = recycled_listener;
+				this->listeners[j] = NULL;
+			}
+		}
+		if (!recycled_listener) {
+			/*
+			 * No reusable listener found, or reuse failed, start a new listener instance.
+			 */
 			struct listener *new_listener = (struct listener *)malloc(sizeof(struct listener));
 			if (new_listener) {
 				if (caster_start_listener(this, this->config->bind+i, &sin, new_listener) >= 0) {
@@ -502,10 +571,27 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct event_base *base = caster->base;
 	struct bufferevent *bev;
 
-	if (threads)
-		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
-	else
-		bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
+	P_RWLOCK_RDLOCK(&listener_conf->caster->configlock);
+	if (listener_conf->tls) {
+		SSL *ssl = SSL_new(listener_conf->ssl_server_ctx);
+		if (ssl == NULL) {
+			P_RWLOCK_UNLOCK(&listener_conf->caster->configlock);
+			ERR_print_errors_cb(caster_tls_log_cb, caster);
+			close(fd);
+			return;
+		}
+
+		if (threads)
+			bev = bufferevent_openssl_socket_new(caster->base, fd, ssl, BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+		else
+			bev = bufferevent_openssl_socket_new(caster->base, fd, ssl, BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE);
+	} else {
+		if (threads)
+			bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+		else
+			bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
+	}
+	P_RWLOCK_UNLOCK(&listener_conf->caster->configlock);
 
 	if (bev == NULL) {
 		logfmt(&caster->flog, "Error constructing bufferevent!\n");

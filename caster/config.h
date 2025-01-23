@@ -17,6 +17,9 @@ struct config_bind {
 	 * Set to -1 to use system default.
 	 */
 	int queue_size;
+	int tls;
+	char *tls_full_certificate_chain;
+	char *tls_private_key;
 };
 
 struct config_proxy {

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <openssl/ssl.h>
+
 #include "conf.h"
 #include "caster.h"
 #include "config.h"
@@ -60,6 +62,9 @@ main(int argc, char **argv) {
 		usage(argv);
 		exit(1);
 	}
+
+	SSL_library_init();
+	OpenSSL_add_all_algorithms();
 
 	if (start_daemon) {
 		int pid = fork();

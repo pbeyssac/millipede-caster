@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <pthread.h>
 
+#include <openssl/ssl.h>
+
 #include "conf.h"
 #include "config.h"
 #include "hash.h"
@@ -23,6 +25,9 @@ struct listener {
 	union sock sockaddr;			// Listening address
 	struct evconnlistener *listener;	// libevent structure
 	struct caster_state *caster;
+
+	int tls;			// is TLS activated?
+	SSL_CTX *ssl_server_ctx;	// TLS context, certs etc.
 };
 
 /*
