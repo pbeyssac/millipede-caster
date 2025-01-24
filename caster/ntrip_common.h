@@ -23,6 +23,7 @@ enum ntrip_session_state {
 	NTRIP_WAIT_STREAM_SOURCE,	// Source connected, receive data (server)
 	NTRIP_WAIT_SOURCETABLE_LINE,	// Client waiting for the next sourcetable line
 	NTRIP_WAIT_CLIENT_INPUT,	// Server waiting for GGA lines from client
+	NTRIP_WAIT_CLIENT_CONTENT,	// Server waiting for content
 	NTRIP_WAIT_CLOSE,		// End of connection, drain output then close
 	NTRIP_FORCE_CLOSE,		// End of connection, force close now
 	NTRIP_END			// Ready for ntrip_free
@@ -171,6 +172,9 @@ struct ntrip_state {
 	const char *user_agent;			// User-Agent header, if present
 	char wildcard;				// Flag: set for a source if the mountpoint is unregistered (wildcard entry)
 
+	unsigned long content_length;		// Content-Length received from the client, if any
+	unsigned long content_done;
+	char *content, *content_type;
 	char *query_string;			// HTTP GET query string, if any.
 
 	/*
@@ -210,6 +214,8 @@ void ntrip_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this);
 struct mime_content *ntrip_list_json(struct caster_state *caster);
+struct mime_content *ntrip_mem_json(struct caster_state *caster);
+struct mime_content *ntrip_reload_json(struct caster_state *caster);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, struct livesource **existing);
 void ntrip_unregister_livesource(struct ntrip_state *this);
 char *ntrip_peer_ipstr(struct ntrip_state *this);

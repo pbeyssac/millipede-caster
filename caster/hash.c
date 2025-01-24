@@ -253,3 +253,35 @@ struct element **hash_array(struct hash_table *this, int *pn) {
 void hash_array_free(struct element **ep) {
 	free(ep);
 }
+
+struct hash_table *hash_from_urlencoding(char *urlencoding) {
+	struct hash_table *h = hash_table_new(37, strfree);
+
+	if (h == NULL)
+		return NULL;
+
+	char *s = urlencoding;
+	char *keyval;
+	while ((keyval = strsep(&s, "&;")) != NULL) {
+		char *eq = strchr(keyval, '=');
+		char *eq2;
+		if (eq) {
+			*eq++ = '\0';
+			percent_decode(keyval);
+			percent_decode(eq);
+			eq2 = mystrdup(eq);
+		} else {
+			percent_decode(keyval);
+			eq2 = mystrdup("");
+		}
+		if (eq2 == NULL) {
+			hash_table_free(h);
+			return NULL;
+		}
+		if (hash_table_add(h, keyval, eq2) < 0) {
+			hash_table_free(h);
+			return NULL;
+		}
+	}
+	return h;
+}

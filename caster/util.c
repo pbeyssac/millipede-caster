@@ -32,6 +32,25 @@ float distance(pos_t *p1, pos_t *p2) {
 	return R*c;
 }
 
+/*
+ * %-decode a string in place.
+ * Return the same string pointer.
+ */
+char *percent_decode(char *s) {
+	char *percent;
+	percent = s;
+	while ((percent = strchr(percent, '%'))) {
+		if (isxdigit(percent[1]) && isxdigit(percent[2])) {
+			int d1 = tolower(percent[1]) - (isdigit(percent[1]) ? '0':('a'-10));
+			int d2 = tolower(percent[2]) - (isdigit(percent[2]) ? '0':('a'-10));
+			char c = d1*16+d2;
+			*percent++ = c;
+			memmove(percent, percent+2, strlen(percent+2)+1);
+		}
+	}
+	return s;
+}
+
 static const char base64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /*

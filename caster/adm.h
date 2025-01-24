@@ -5,6 +5,6 @@
 
 #include "ntrip_common.h"
 
-int admsrv(struct ntrip_state *st, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers);
+int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers);
 
 #endif
