@@ -130,6 +130,7 @@ caster_tls_log_cb(const char *str, size_t len, void *u) {
 
 static struct caster_state *
 caster_new(struct config *config, const char *config_file) {
+	int err = 0;
 	struct caster_state *this = (struct caster_state *)calloc(1, sizeof(struct caster_state));
 	if (this == NULL)
 		return this;
@@ -170,15 +171,22 @@ caster_new(struct config *config, const char *config_file) {
 	this->config = config;
 	this->config_file = config_file;
 
-	char *last_slash = strrchr(config_file, '/');
-	if (last_slash) {
-		this->config_dir = (char *)strmalloc(last_slash - config_file + 1);
-		if (this->config_dir) {
-			memcpy(this->config_dir, config_file, last_slash - config_file);
-			this->config_dir[last_slash - config_file] = '\0';
-		}
-	} else
-		this->config_dir = mystrdup(".");
+	char *abs_config_path = realpath(config_file, NULL);
+	if (abs_config_path == NULL) {
+		fprintf(stderr, "Error: can't determine absolute path for config file %s\n", config_file);
+		err = 1;
+		this->config_dir = NULL;
+	} else {
+		char *last_slash = strrchr(abs_config_path, '/');
+		if (last_slash) {
+			if (last_slash == abs_config_path)
+				last_slash[1] = '\0';
+			else
+				last_slash[0] = '\0';
+			this->config_dir = abs_config_path;
+		} else
+			this->config_dir = mystrdup(".");
+	}
 
 	int current_dir = open(".", O_DIRECTORY);
 	if (this->config_dir) chdir(this->config_dir);
@@ -190,7 +198,7 @@ caster_new(struct config *config, const char *config_file) {
 	fchdir(current_dir);
 	close(current_dir);
 
-	if (r1 < 0 || r2 < 0 || !this->config_dir || (threads && this->joblist == NULL) || this->ntrips.ipcount == NULL) {
+	if (err || r1 < 0 || r2 < 0 || !this->config_dir || (threads && this->joblist == NULL) || this->ntrips.ipcount == NULL) {
 		if (this->joblist) joblist_free(this->joblist);
 		if (r1 < 0) log_free(&this->flog);
 		if (r2 < 0) log_free(&this->alog);
