@@ -294,8 +294,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (!strcasecmp(value, "ntrip/2.0"))
 						st->client_version = 2;
 				} else if (!strcasecmp(key, "user-agent") || !strcasecmp(key, "source-agent")) {
-					if (mystrcasestr(value, "ntrip"))
+					if (mystrcasestr(value, "ntrip")) {
 						st->user_agent_ntrip = 1;
+						// Set NTRIP version to 1, unless it is already known to be 2.
+						if (!st->client_version) st->client_version = 1;
+					}
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_DEBUG, "Header %s: *****\n", key);

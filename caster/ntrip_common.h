@@ -150,7 +150,7 @@ struct ntrip_state {
 	 * NTRIP client state
 	 */
 	short status_code;			// HTTP status code received (client)
-	short client_version;			// NTRIP version in use
+	short client_version;			// NTRIP version in use: 0=plain HTTP, 1=NTRIP 1, 2=NTRIP 2
 	char *host;				// host to connect to
 	unsigned short port;			// port to connect to
 	struct sourcetable *tmp_sourcetable;	// sourcetable we are currently downloading
