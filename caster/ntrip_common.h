@@ -168,6 +168,8 @@ struct ntrip_state {
 	const char *user_agent;			// User-Agent header, if present
 	char wildcard;				// Flag: set for a source if the mountpoint is unregistered (wildcard entry)
 
+	char *query_string;			// HTTP GET query string, if any.
+
 	/*
 	 * Relevant sourceline if the connection is from a source.
 	 */

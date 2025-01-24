@@ -321,6 +321,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					/* Don't log the password */
 					ntrip_alog(st, "%s *** %s\n", st->http_args[0], st->http_args[2]);
 				} else {
+					// Copy query string if any, clear from the request
+					char *querystring = strchr(st->http_args[1], '?');
+					if (querystring) {
+						st->query_string = mystrdup(querystring+1);
+						*querystring = '\0';
+					}
 					ntrip_alog(st, "%s %s %s\n", st->http_args[0], st->http_args[1], st->http_args[2]);
 				}
 				if (!strcmp(st->http_args[0], "GET")) {
@@ -328,10 +334,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 400;
 						break;
 					}
-					char *querystring = strchr(st->http_args[1], '?');
-					if (querystring)
-						// Ignore query string
-						*querystring = '\0';
 					if (strlen(st->http_args[1]) >= 5 && !memcmp(st->http_args[1], "/adm/", 5)) {
 						st->type = "adm";
 						admsrv(st, "/adm", st->http_args[1] + 4, &err, &opt_headers);

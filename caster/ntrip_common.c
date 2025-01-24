@@ -89,6 +89,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->remote = 0;
 	memset(&this->peeraddr, 0, sizeof(this->peeraddr));
 	this->counted = 0;
+	this->query_string = NULL;
 	return this;
 }
 
@@ -203,6 +204,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	strfree(this->mountpoint);
 	strfree(this->virtual_mountpoint);
 	strfree(this->host);
+	strfree(this->query_string);
 
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
 		if (this->http_args[i])
