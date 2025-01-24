@@ -94,5 +94,6 @@ void caster_log_error(struct caster_state *this, char *orig);
 void caster_del_livesource(struct caster_state *this, struct livesource *livesource);
 int caster_main(char *config_file);
 void free_callback(const void *data, size_t datalen, void *extra);
+int caster_reload(struct caster_state *this);
 
 #endif

@@ -48,7 +48,7 @@
 static void caster_log(void *arg, const char *fmt, va_list ap);
 static void caster_alog(void *arg, const char *fmt, va_list ap);
 static int caster_start_fetchers(struct caster_state *this);
-static void caster_reload_fetchers(struct caster_state *this);
+static int caster_reload_fetchers(struct caster_state *this);
 static void caster_free_fetchers(struct caster_state *this);
 static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *sa, int socklen, void *arg);
 
@@ -470,13 +470,17 @@ void caster_del_livesource(struct caster_state *this, struct livesource *livesou
 	P_MUTEX_UNLOCK(&this->livesources.delete_lock);
 }
 
-static void
+static int
 caster_reload_sourcetables(struct caster_state *caster) {
+	int r = 0;
 	struct sourcetable *s;
 	struct sourcetable *stmp;
 
 	struct sourcetable *local_table
 		= sourcetable_read(caster->config->sourcetable_filename, caster->config->sourcetable_priority);
+
+	if (local_table == NULL)
+		r = -1;
 
 	P_RWLOCK_WRLOCK(&caster->sourcetablestack.lock);
 
@@ -496,16 +500,23 @@ caster_reload_sourcetables(struct caster_state *caster) {
 	TAILQ_INSERT_TAIL(&caster->sourcetablestack.list, local_table, next);
 
 	P_RWLOCK_UNLOCK(&caster->sourcetablestack.lock);
+
+	return r;
 }
 
-static void
+static int
 caster_reopen_logs(struct caster_state *this) {
-	log_reopen(&this->flog, this->config->log);
-	log_reopen(&this->alog, this->config->access_log);
+	int r = 0;
+	if (log_reopen(&this->flog, this->config->log) < 0)
+		r = -1;
+	if (log_reopen(&this->alog, this->config->access_log) < 0)
+		r = -1;
+	return r;
 }
 
-static void
+static int
 caster_reload_auth(struct caster_state *caster) {
+	int r = 0;
 	logfmt(&caster->flog, "Reloading %s and %s\n", caster->config->host_auth_filename, caster->config->source_auth_filename);
 
 	P_RWLOCK_WRLOCK(&caster->configlock);
@@ -515,21 +526,25 @@ caster_reload_auth(struct caster_state *caster) {
 		if (tmp != NULL) {
 			auth_free(caster->host_auth);
 			caster->host_auth = tmp;
-		}
+		} else
+			r = -1;
 	}
 	if (caster->config->source_auth_filename) {
 		struct auth_entry *tmp = auth_parse(caster, caster->config->source_auth_filename);
 		if (tmp != NULL) {
 			auth_free(caster->source_auth);
 			caster->source_auth = tmp;
-		}
+		} else
+			r = -1;
 	}
 
 	P_RWLOCK_UNLOCK(&caster->configlock);
+	return r;
 }
 
-static void
+static int
 caster_reload_blocklist(struct caster_state *caster) {
+	int r = 0;
 	P_RWLOCK_WRLOCK(&caster->configlock);
 	struct prefix_table *p;
 	if (caster->blocklist) {
@@ -541,33 +556,42 @@ caster_reload_blocklist(struct caster_state *caster) {
 		logfmt(&caster->flog, "Reloading %s\n", caster->config->blocklist_filename);
 		p = prefix_table_new(caster->config->blocklist_filename);
 		caster->blocklist = p;
+		if (p == NULL)
+			r = -1;
 	}
 	P_RWLOCK_UNLOCK(&caster->configlock);
+	return r;
 }
 
-static void caster_reload_config(struct caster_state *this) {
+static int caster_reload_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
 		logfmt(&this->flog, "Can't parse configuration from %s\n", this->config_file);
-		return;
+		return -1;
 	}
 	config_free(this->config);
 	this->config = config;
+	return 0;
 }
 
 /*
  * reload with chdir to allow relative paths in the configuration.
  */
-static void caster_chdir_reload(struct caster_state *this, int reopen_logs) {
+static int caster_chdir_reload(struct caster_state *this, int reopen_logs) {
+	int r = 0;
 	int current_dir = open(".", O_DIRECTORY);
 	chdir(this->config_dir);
-	if (reopen_logs)
-		caster_reopen_logs(this);
-	caster_reload_sourcetables(this);
-	caster_reload_auth(this);
-	caster_reload_blocklist(this);
+	if (reopen_logs && caster_reopen_logs(this) < 0)
+		r = -1;
+	if (caster_reload_sourcetables(this) < 0)
+		r = -1;
+	if (caster_reload_auth(this) < 0)
+		r = -1;
+	if (caster_reload_blocklist(this) < 0)
+		r = -1;
 	fchdir(current_dir);
 	close(current_dir);
+	return r;
 }
 
 static void
@@ -655,14 +679,24 @@ signalpipe_cb(evutil_socket_t sig, short events, void *user_data) {
 	printf("Caught SIGPIPE\n");
 }
 
+int caster_reload(struct caster_state *this) {
+	int r = 0;
+	if (caster_reload_config(this) < 0)
+		r = -1;
+	if (caster_reload_listeners(this) < 0)
+		r = -1;
+	if (caster_reload_fetchers(this) < 0)
+		r = -1;
+	if (caster_chdir_reload(this, 1) < 0)
+		r = -1;
+	return r;
+}
+
 static void
 signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
 	printf("Reloading configuration\n");
-	caster_reload_config(caster);
-	caster_reload_listeners(caster);
-	caster_reload_fetchers(caster);
-	caster_chdir_reload(caster, 1);
+	caster_reload(caster);
 }
 
 static struct caster_state *caster = NULL;
@@ -721,10 +755,11 @@ static int caster_start_fetchers(struct caster_state *this) {
 	return 0;
 }
 
-static void caster_reload_fetchers(struct caster_state *this) {
+static int caster_reload_fetchers(struct caster_state *this) {
+	int r = 0;
 	if (!this->config->proxy_count) {
 		caster_free_fetchers(this);
-		return;
+		return 0;
 	}
 	struct sourcetable_fetch_args **new_fetchers = (struct sourcetable_fetch_args **)malloc(sizeof(struct sourcetable_fetch_args *)*this->config->proxy_count);
 
@@ -753,8 +788,10 @@ static void caster_reload_fetchers(struct caster_state *this) {
 				this->config->proxy[i].priority);
 			if (p)
 				logfmt(&this->flog, "New fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
-			else
+			else {
 				logfmt(&this->flog, "Can't start fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
+				r = -1;
+			}
 		} else {
 			fetcher_sourcetable_reload(p,
 				this->config->proxy[i].table_refresh_delay,
@@ -774,6 +811,7 @@ static void caster_reload_fetchers(struct caster_state *this) {
 	free(this->sourcetable_fetchers);
 	this->sourcetable_fetchers_count = this->config->proxy_count;
 	this->sourcetable_fetchers = new_fetchers;
+	return r;
 }
 
 static void caster_free_fetchers(struct caster_state *this) {
