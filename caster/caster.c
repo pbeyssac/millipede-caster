@@ -355,7 +355,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 
 	P_RWLOCK_WRLOCK(&this->configlock);
 	if (this->config->bind_count == 0) {
-		fprintf(stderr, "No configured ports to listen to, aborting.\n");
+		logfmt(&this->flog, "No configured ports to listen to, aborting.\n");
 		if (this->listeners)
 			caster_free_listeners(this);
 		P_RWLOCK_UNLOCK(&this->configlock);
@@ -364,7 +364,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 
 	new_listeners = (struct listener **)malloc(sizeof(struct listener *)*this->config->bind_count);
 	if (!new_listeners) {
-		fprintf(stderr, "Can't allocate listeners\n");
+		logfmt(&this->flog, "Can't allocate listeners\n");
 		if (this->listeners)
 			caster_free_listeners(this);
 		P_RWLOCK_UNLOCK(&this->configlock);
@@ -385,7 +385,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 		port = htons(config->port);
 		r = ip_convert(config->ip, &sin);
 		if (!r) {
-			fprintf(stderr, "Invalid IP %s\n", this->config->bind[i].ip);
+			logfmt(&this->flog, "Invalid IP %s\n", this->config->bind[i].ip);
 			continue;
 		}
 		if (sin.generic.sa_family == AF_INET)
@@ -406,14 +406,14 @@ static int caster_reload_listeners(struct caster_state *this) {
 		}
 		if (recycled_listener) {
 			if (config->tls && listener_setup_tls(recycled_listener, config) < 0) {
-				fprintf(stderr, "Can't reuse listener %s: TLS setup failed\n", ip_str_port(&sin, ip, sizeof ip));
+				logfmt(&this->flog, "Can't reuse listener %s: TLS setup failed\n", ip_str_port(&sin, ip, sizeof ip));
 				recycled_listener = NULL;
 			} else {
 				if (recycled_listener->tls && !config->tls) {
 					recycled_listener->tls = 0;
 					SSL_CTX_free(recycled_listener->ssl_server_ctx);
 				}
-				fprintf(stderr, "Reusing listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+				logfmt(&this->flog, "Reusing listener %s\n", ip_str_port(&sin, ip, sizeof ip));
 				new_listeners[nlisteners++] = recycled_listener;
 				this->listeners[j] = NULL;
 			}
@@ -426,9 +426,9 @@ static int caster_reload_listeners(struct caster_state *this) {
 			if (new_listener) {
 				if (caster_start_listener(this, this->config->bind+i, &sin, new_listener) >= 0) {
 					new_listeners[nlisteners++] = new_listener;
-					fprintf(stderr, "Opening listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+					logfmt(&this->flog, "Opening listener %s\n", ip_str_port(&sin, ip, sizeof ip));
 				} else {
-					fprintf(stderr, "Unable to open listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+					logfmt(&this->flog, "Unable to open listener %s\n", ip_str_port(&sin, ip, sizeof ip));
 					caster_free_listener(new_listener);
 				}
 			}
@@ -442,7 +442,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 	 */
 	for (int j = 0; j < this->listeners_count; j++)
 		if (this->listeners[j]) {
-			fprintf(stderr, "Closing listener %s\n", ip_str_port(&this->listeners[j]->sockaddr, ip, sizeof ip));
+			logfmt(&this->flog, "Closing listener %s\n", ip_str_port(&this->listeners[j]->sockaddr, ip, sizeof ip));
 			caster_free_listener(this->listeners[j]);
 		}
 
@@ -548,7 +548,7 @@ caster_reload_blocklist(struct caster_state *caster) {
 static void caster_reload_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
-		fprintf(stderr, "Can't parse configuration from %s\n", this->config_file);
+		logfmt(&this->flog, "Can't parse configuration from %s\n", this->config_file);
 		return;
 	}
 	config_free(this->config);
@@ -751,12 +751,15 @@ static void caster_reload_fetchers(struct caster_state *this) {
 				this->config->proxy[i].host, this->config->proxy[i].port,
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
-			fprintf(stderr, "New fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
+			if (p)
+				logfmt(&this->flog, "New fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
+			else
+				logfmt(&this->flog, "Can't start fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
 		} else {
 			fetcher_sourcetable_reload(p,
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
-			fprintf(stderr, "Reusing fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
+			logfmt(&this->flog, "Reusing fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
 		}
 		new_fetchers[i] = p;
 	}
@@ -765,7 +768,7 @@ static void caster_reload_fetchers(struct caster_state *this) {
 	 */
 	for (int j = 0; j < this->sourcetable_fetchers_count; j++)
 		if (this->sourcetable_fetchers[j]) {
-			fprintf(stderr, "Stopping fetcher %s:%d\n", this->sourcetable_fetchers[j]->host, this->sourcetable_fetchers[j]->port);
+			logfmt(&this->flog, "Stopping fetcher %s:%d\n", this->sourcetable_fetchers[j]->host, this->sourcetable_fetchers[j]->port);
 			fetcher_sourcetable_free(this->sourcetable_fetchers[j]);
 		}
 	free(this->sourcetable_fetchers);
