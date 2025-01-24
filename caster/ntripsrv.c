@@ -30,8 +30,10 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 	evbuffer_add_printf(ev, "%s %d %s\r\n%sDate: %s\r\n", firstword, status_code, status, server_headers, date);
 	if (this->server_version == 2)
 		evbuffer_add_reference(ev, "Ntrip-Version: Ntrip/2.0\r\n", 26, NULL, NULL);
-	if (m)
+	if (m && m->mime_type)
 		evbuffer_add_printf(ev, "Content-Length: %lu\r\nContent-Type: %s\r\n", m->len, m->mime_type);
+	else if (m)
+		evbuffer_add_printf(ev, "Content-Length: %lu\r\n", m->len);
 	evbuffer_add_reference(ev, "Connection: close\r\n", 19, NULL, NULL);
 	if (headers) {
 		struct evkeyval *np;
