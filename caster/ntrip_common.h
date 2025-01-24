@@ -3,6 +3,8 @@
 
 #include <netinet/in.h>
 
+#include <openssl/ssl.h>
+
 #include "conf.h"
 #include "caster.h"
 #include "ip.h"
@@ -118,6 +120,7 @@ struct ntrip_state {
 	char bev_freed;				// has it been freed already?
 	struct evbuffer *input;
 	int fd;					// file descriptor for the bufferevent
+	SSL *ssl;				// TLS state
 
 	struct {
 		struct evbuffer *raw_input;

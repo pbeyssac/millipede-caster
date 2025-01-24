@@ -5,6 +5,8 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 
+#include <openssl/ssl.h>
+
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 
@@ -89,6 +91,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->remote = 0;
 	memset(&this->peeraddr, 0, sizeof(this->peeraddr));
 	this->counted = 0;
+	this->ssl = NULL;
 	this->query_string = NULL;
 	return this;
 }
@@ -205,6 +208,8 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	strfree(this->virtual_mountpoint);
 	strfree(this->host);
 	strfree(this->query_string);
+
+	// this->ssl is freed by the bufferevent.
 
 	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
 		if (this->http_args[i])

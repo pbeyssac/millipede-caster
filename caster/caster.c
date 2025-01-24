@@ -570,10 +570,11 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct caster_state *caster = listener_conf->caster;
 	struct event_base *base = caster->base;
 	struct bufferevent *bev;
+	SSL *ssl = NULL;
 
 	P_RWLOCK_RDLOCK(&listener_conf->caster->configlock);
 	if (listener_conf->tls) {
-		SSL *ssl = SSL_new(listener_conf->ssl_server_ctx);
+		ssl = SSL_new(listener_conf->ssl_server_ctx);
 		if (ssl == NULL) {
 			P_RWLOCK_UNLOCK(&listener_conf->caster->configlock);
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
@@ -607,6 +608,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		return;
 	}
 
+	st->ssl = ssl;
 	ntrip_set_peeraddr(st, sa, socklen);
 
 	st->state = NTRIP_WAIT_HTTP_METHOD;
