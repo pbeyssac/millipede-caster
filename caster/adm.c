@@ -15,7 +15,6 @@
 int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	struct hash_table *h = NULL;
-	json_object *j;
 
 	st->client_version = 0;		// force a straight HTTP reply regardless of client headers
 
