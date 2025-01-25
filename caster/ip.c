@@ -333,7 +333,7 @@ struct prefix_table *prefix_table_new(const char *filename, struct log *log) {
 	p = file_parse(filename, 2, "\t ", 1, log);
 
         if (p == NULL) {
-                logfmt(log, "Can't read or parse %s\n", filename);
+                logfmt(log, LOG_ERR, "Can't read or parse %s\n", filename);
 		free(this);
                 return NULL;
 	}
@@ -351,7 +351,7 @@ struct prefix_table *prefix_table_new(const char *filename, struct log *log) {
 		if (pq != NULL)
 			_prefix_table_add(this, pq);
 		else
-			logfmt(log, "Can't parse %s %s, skipping\n", p->pls[n][0], p->pls[n][1]);
+			logfmt(log, LOG_ERR, "Can't parse %s %s, skipping\n", p->pls[n][0], p->pls[n][1]);
         }
         file_free(p);
 	_prefix_table_sort(this);

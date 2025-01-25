@@ -551,7 +551,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	FILE *fp = fopen(filename, "r+");
 
 	if (fp == NULL) {
-		logfmt(log, "Can't open %s\n", filename);
+		logfmt(log, LOG_ERR, "Can't open %s\n", filename);
 		return NULL;
 	}
 
@@ -560,7 +560,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	pf->filename = mystrdup(filename);
 	if (pf->filename == NULL) {
 		fclose(fp);
-		logfmt(log, "Can't read %s\n", filename);
+		logfmt(log, LOG_ERR, "Can't read %s\n", filename);
 		return NULL;
 	}
 
@@ -606,7 +606,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 			}
 		}
 		if (n != nfields) {
-			logfmt(log, "Invalid line %d in %s\n", nlines+1, filename);
+			logfmt(log, LOG_ERR, "Invalid line %d in %s\n", nlines+1, filename);
 			break;
 		}
 	}

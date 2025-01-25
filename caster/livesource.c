@@ -231,14 +231,14 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	if (nbacklogged) {
 		int found_backlogs = livesource_kill_subscribers_unlocked(this, 1);
 		if (found_backlogs == nbacklogged)
-			logfmt(&caster->flog, "RTCM: %d backlogged clients dropped from %s\n", nbacklogged, this->mountpoint);
+			logfmt(&caster->flog, LOG_INFO, "RTCM: %d backlogged clients dropped from %s\n", nbacklogged, this->mountpoint);
 		else
-			logfmt(&caster->flog, "RTCM: %d (expected %d) backlogged clients dropped from %s\n", found_backlogs, nbacklogged, this->mountpoint);
+			logfmt(&caster->flog, LOG_INFO, "RTCM: %d (expected %d) backlogged clients dropped from %s\n", found_backlogs, nbacklogged, this->mountpoint);
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
 
 	if (n && (this->npackets == 1 || (this->npackets % 100 == 0)))
-		logfmt(&caster->flog, "RTCM: %d packets sent, current one to %d subscribers for %s\n", this->npackets, n, this->mountpoint);
+		logfmt(&caster->flog, LOG_INFO, "RTCM: %d packets sent, current one to %d subscribers for %s\n", this->npackets, n, this->mountpoint);
 	return n;
 }
 
@@ -251,14 +251,14 @@ static void livesource_list(struct caster_state *caster) {
 	P_RWLOCK_RDLOCK(&caster->livesources.lock);
 
 	TAILQ_FOREACH(np, &caster->livesources.queue, next) {
-		logfmt(&caster->flog, "Live:");
+		logfmt(&caster->flog, LOG_INFO, "Live:");
 		break;
 	}
 	TAILQ_FOREACH(np, &caster->livesources.queue, next) {
-		logfmt(&caster->flog, " %s", np->mountpoint);
+		logfmt(&caster->flog, LOG_INFO, " %s", np->mountpoint);
 	}
 	TAILQ_FOREACH(np, &caster->livesources.queue, next) {
-		logfmt(&caster->flog, "\n");
+		logfmt(&caster->flog, LOG_INFO, "\n");
 		break;
 	}
 

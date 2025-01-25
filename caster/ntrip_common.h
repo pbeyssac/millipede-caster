@@ -42,18 +42,6 @@ enum ntrip_chunk_state {
 	CHUNK_END		// finished, ready to be freed
 };
 
-/* Log levels, same as syslog and GEF + LOG_EDEBUG */
-
-#define	LOG_EMERG	0	/* system is unusable */
-#define	LOG_ALERT	1	/* action must be taken immediately */
-#define	LOG_CRIT	2	/* critical conditions */
-#define	LOG_ERR		3	/* error conditions */
-#define	LOG_WARNING	4	/* warning conditions */
-#define	LOG_NOTICE	5	/* normal but significant condition */
-#define	LOG_INFO	6	/* informational */
-#define	LOG_DEBUG	7	/* debug-level messages */
-#define	LOG_EDEBUG	8	/* extended debug messages */
-
 /*
  * Number of HTTP args.
  * This works both for a NTRIP request:

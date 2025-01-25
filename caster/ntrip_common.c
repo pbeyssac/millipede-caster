@@ -25,7 +25,7 @@
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint) {
 	struct ntrip_state *this = (struct ntrip_state *)malloc(sizeof(struct ntrip_state));
 	if (this == NULL) {
-		logfmt(&caster->flog, "ntrip_new failed: out of memory\n");
+		logfmt(&caster->flog, LOG_CRIT, "ntrip_new failed: out of memory\n");
 		return NULL;
 	}
 	this->mountpoint = mystrdup(mountpoint?mountpoint:"");
@@ -385,7 +385,7 @@ void ntrip_deferred_run(struct caster_state *this) {
 	}
 	P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
 	if (n)
-		logfmt(&this->flog, "ntrip_deferred_run did %d ntrip_free\n", n);
+		logfmt(&this->flog, LOG_INFO, "ntrip_deferred_run did %d ntrip_free\n", n);
 }
 
 static json_object *ntrip_json(struct ntrip_state *st) {

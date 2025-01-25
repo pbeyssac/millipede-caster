@@ -218,12 +218,12 @@ void sourcetable_diff(struct caster_state *caster, struct sourcetable *t1, struc
 	while (i1 < n1 && i2 < n2) {
 		c = strcmp(keys1[i1]->key, keys2[i2]->key);
 		if (c < 0) {
-			logfmt(&caster->flog, "%s:%d Removed source %s\n", t1->caster, t1->port, keys1[i1]->key);
+			logfmt(&caster->flog, LOG_INFO, "%s:%d Removed source %s\n", t1->caster, t1->port, keys1[i1]->key);
 			i1++;
 			continue;
 		}
 		if (c > 0) {
-			logfmt(&caster->flog, "%s:%d Added source %s\n", t2->caster, t2->port, keys2[i2]->key);
+			logfmt(&caster->flog, LOG_INFO, "%s:%d Added source %s\n", t2->caster, t2->port, keys2[i2]->key);
 			i2++;
 			continue;
 		}
@@ -231,11 +231,11 @@ void sourcetable_diff(struct caster_state *caster, struct sourcetable *t1, struc
 		i2++;
 	}
 	while (i1 < n1) {
-		logfmt(&caster->flog, "%s:%d Removed source %s\n", t1->caster, t1->port, keys1[i1]->key);
+		logfmt(&caster->flog, LOG_INFO, "%s:%d Removed source %s\n", t1->caster, t1->port, keys1[i1]->key);
 		i1++;
 	}
 	while (i2 < n2) {
-		logfmt(&caster->flog, "%s:%d Added source %s\n", t2->caster, t2->port, keys2[i2]->key);
+		logfmt(&caster->flog, LOG_INFO, "%s:%d Added source %s\n", t2->caster, t2->port, keys2[i2]->key);
 		i2++;
 	}
 	hash_array_free(keys1);

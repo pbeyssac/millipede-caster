@@ -521,7 +521,7 @@ void jobs_stop_threads(struct joblist *this) {
 				nlive++;
 		}
 		if (nlive != 0) {
-			logfmt(&this->caster->flog, "%d thread(s) still active, waiting\n", nlive);
+			logfmt(&this->caster->flog, LOG_INFO, "%d thread(s) still active, waiting\n", nlive);
 			sleep(1);
 		}
 	} while (nlive);

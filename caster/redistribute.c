@@ -100,7 +100,7 @@ void
 redistribute_cb(evutil_socket_t fd, short what, void *cbarg) {
 	struct redistribute_cb_args *redis_args = (struct redistribute_cb_args *)cbarg;
 	struct caster_state *caster = redis_args->caster;
-	logfmt(&caster->flog, "Trying to restart source %s\n", redis_args->mountpoint);
+	logfmt(&caster->flog, LOG_INFO, "Trying to restart source %s\n", redis_args->mountpoint);
 	event_del(redis_args->ev);
 	redis_args->ev = NULL;
 	joblist_append_redistribute(redis_args->caster->joblist, redistribute_source_stream, redis_args);
@@ -122,7 +122,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 		bev = bufferevent_socket_new(redis_args->caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
 
 	if (bev == NULL) {
-		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
+		logfmt(&redis_args->caster->flog, LOG_CRIT, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
 	}
 
@@ -130,7 +130,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 
 	struct sourceline *s = stack_find_pullable(&redis_args->caster->sourcetablestack, redis_args->mountpoint, &sp);
 	if (s == NULL) {
-		logfmt(&redis_args->caster->flog, "Can't find pullable mountpoint %s\n", redis_args->mountpoint);
+		logfmt(&redis_args->caster->flog, LOG_WARNING, "Can't find pullable mountpoint %s\n", redis_args->mountpoint);
 		return;
 	}
 
@@ -139,7 +139,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 	 */
 	struct ntrip_state *st = ntrip_new(redis_args->caster, bev, sp->caster, sp->port, redis_args->mountpoint);
 	if (st == NULL) {
-		logfmt(&redis_args->caster->flog, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
+		logfmt(&redis_args->caster->flog, LOG_CRIT, "Out of memory, cannot redistribute %s\n", redis_args->mountpoint);
 		return;
 	}
 	st->own_livesource = redis_args->livesource;
@@ -149,7 +149,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 	redis_args->source_st = st;
 	ntrip_register(st);
 
-	logfmt(&redis_args->caster->flog, "Starting socket connect to %s:%d for /%s\n", st->host, st->port, redis_args->mountpoint);
+	logfmt(&redis_args->caster->flog, LOG_INFO, "Starting socket connect to %s:%d for /%s\n", st->host, st->port, redis_args->mountpoint);
 
 	if (threads)
 		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
