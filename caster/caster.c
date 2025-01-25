@@ -122,7 +122,7 @@ caster_log(void *arg, const char *fmt, va_list ap) {
  * Callback for OpenSSL's ERR_print_errors_cb()
  */
 
-static int
+int
 caster_tls_log_cb(const char *str, size_t len, void *u) {
 	logfmt(&((struct caster_state *)u)->flog, "%s\n", str);
 	// Undocumentend OpenSSL API: return >0 if ok, <=0 if failed
@@ -155,6 +155,17 @@ caster_new(struct config *config, const char *config_file) {
 	this->sourcetable_fetchers = NULL;
 	this->sourcetable_fetchers_count = 0;
 	this->blocklist = NULL;
+
+	this->ssl_client_ctx = SSL_CTX_new(TLS_client_method());
+	if (this->ssl_client_ctx == NULL) {
+		ERR_print_errors_cb(caster_tls_log_cb, this);
+		return NULL;
+	}
+	SSL_CTX_set_verify(this->ssl_client_ctx, SSL_VERIFY_PEER, NULL);
+	if (SSL_CTX_set_default_verify_paths(this->ssl_client_ctx) != 1) {
+		ERR_print_errors_cb(caster_tls_log_cb, this);
+		return NULL;
+	}
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
 	P_MUTEX_INIT(&this->livesources.delete_lock, NULL);
@@ -748,6 +759,7 @@ static int caster_start_fetchers(struct caster_state *this) {
 		fetchers[i] = fetcher_sourcetable_new(this,
 			this->config->proxy[i].host,
 			this->config->proxy[i].port,
+			this->config->proxy[i].tls,
 			this->config->proxy[i].table_refresh_delay,
 			this->config->proxy[i].priority);
 		if (fetchers[i])
@@ -786,6 +798,7 @@ static int caster_reload_fetchers(struct caster_state *this) {
 			/* Not found, create */
 			p = fetcher_sourcetable_new(this,
 				this->config->proxy[i].host, this->config->proxy[i].port,
+				this->config->proxy[i].tls,
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
 			if (p)

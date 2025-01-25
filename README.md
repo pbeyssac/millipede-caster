@@ -17,7 +17,7 @@ Features:
  * Low memory footprint
  * Supports IPv6 and IPv4
  * NTRIP proxy to fetch from an external caster
- * TLS/SSL server support
+ * TLS/SSL server and client support
  * "blocklist" with quotas per IP prefix
  * On-demand stream subscription
  * "wildcard" base configuration to allow unregistered sources to send hidden streams

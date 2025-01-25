@@ -40,6 +40,7 @@ struct config_proxy {
 	 * Higher = better priority
 	 */
 	int priority;
+	int tls;
 };
 
 struct config_threads {

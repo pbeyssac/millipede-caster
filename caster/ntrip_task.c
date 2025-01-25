@@ -16,7 +16,7 @@ _ntrip_task_restart_cb(int fd, short what, void *arg) {
  * Don't start it.
  */
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
-	const char *host, unsigned short port, int refresh_delay, const char *type) {
+	const char *host, unsigned short port, int tls, int refresh_delay, const char *type) {
 	struct ntrip_task *this = (struct ntrip_task *)malloc(sizeof(struct ntrip_task));
 	if (this == NULL)
 		return NULL;
@@ -33,6 +33,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->caster = caster;
 	this->ev = NULL;
 	this->type = type;
+	this->tls = tls;
 	return this;
 }
 

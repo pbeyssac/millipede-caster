@@ -114,6 +114,8 @@ static const cyaml_schema_field_t proxy_fields_schema[] = {
 		"port", CYAML_FLAG_DEFAULT, struct config_proxy, port),
 	CYAML_FIELD_INT(
 		"priority", CYAML_FLAG_OPTIONAL, struct config_proxy, priority),
+	CYAML_FIELD_BOOL(
+		"tls", CYAML_FLAG_OPTIONAL, struct config_proxy, tls),
 	CYAML_FIELD_END
 };
 

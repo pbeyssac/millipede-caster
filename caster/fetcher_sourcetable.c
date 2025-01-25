@@ -14,11 +14,11 @@
  * Initialize, but don't start, a sourcetable fetcher.
  */
 struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *caster,
-	const char *host, unsigned short port, int refresh_delay, int priority) {
+	const char *host, unsigned short port, int tls, int refresh_delay, int priority) {
 	struct sourcetable_fetch_args *this = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args));
 	if (this == NULL)
 		return NULL;
-	this->task = ntrip_task_new(caster, host, port, refresh_delay, "sourcetable_fetcher");
+	this->task = ntrip_task_new(caster, host, port, tls, refresh_delay, "sourcetable_fetcher");
 	if (this->task == NULL) {
 		free(this);
 		return NULL;
@@ -122,5 +122,5 @@ fetcher_sourcetable_start(void *arg_cb) {
 	a->task->restart_cb = fetcher_sourcetable_start;
 	a->task->restart_cb_arg = arg_cb;
 	a->sourcetable = sourcetable_new(a->task->host, a->task->port);
-	ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->type, a->task);
+	ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->type, a->task);
 }

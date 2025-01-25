@@ -7,9 +7,10 @@
  * Descriptor for a regularly scheduled outgoing connection task.
  */
 struct ntrip_task {
-	/* Host, port */
+	/* Host, port, whether to use TLS */
 	char *host;
 	unsigned short port;
+	int tls;
 	/* Task type string */
 	const char *type;
 
@@ -40,7 +41,7 @@ struct ntrip_task {
 };
 
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
-	const char *host, unsigned short port, int refresh_delay, const char *type);
+	const char *host, unsigned short port, int tls, int refresh_delay, const char *type);
 void ntrip_task_free(struct ntrip_task *this);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);

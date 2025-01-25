@@ -2,6 +2,10 @@
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <event2/bufferevent_ssl.h>
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #include "conf.h"
 #include "caster.h"
@@ -311,13 +315,40 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 }
 
 void
-ntripcli_start(struct caster_state *caster, char *host, unsigned short port, const char *type, struct ntrip_task *task) {
+ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *type, struct ntrip_task *task) {
 	struct bufferevent *bev;
 
-	if (threads)
-		bev = bufferevent_socket_new(caster->base, -1, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
-	else
-		bev = bufferevent_socket_new(caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
+	SSL *ssl = NULL;
+	if (tls) {
+		ssl = SSL_new(caster->ssl_client_ctx);
+		if (ssl == NULL) {
+			ERR_print_errors_cb(caster_tls_log_cb, caster);
+			return;
+		}
+
+		/* Set the Server Name Indication TLS extension, for virtual server handling */
+		if (SSL_set_tlsext_host_name(ssl, host) < 0) {
+			ERR_print_errors_cb(caster_tls_log_cb, caster);
+			return;
+		}
+		/* Set hostname for certificate verification. */
+		if (SSL_set1_host(ssl, host) != 1) {
+			ERR_print_errors_cb(caster_tls_log_cb, caster);
+			return;
+		}
+		SSL_set_verify(ssl, SSL_VERIFY_PEER, NULL);
+
+		if (threads)
+			bev = bufferevent_openssl_socket_new(caster->base, -1, ssl, BUFFEREVENT_SSL_CONNECTING, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+		else
+			bev = bufferevent_openssl_socket_new(caster->base, -1, ssl, BUFFEREVENT_SSL_CONNECTING, BEV_OPT_CLOSE_ON_FREE);
+
+	} else {
+		if (threads)
+			bev = bufferevent_socket_new(caster->base, -1, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+		else
+			bev = bufferevent_socket_new(caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
+	}
 
 	if (bev == NULL) {
 		logfmt(&caster->flog, "Error constructing bufferevent in fetcher_sourcetable_start!");
@@ -331,6 +362,8 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, con
 	}
 	st->type = type;
 	st->task = task;
+	st->ssl = ssl;
+
 	ntrip_register(st);
 	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d\n", type, host, port);
 	if (task) task->st = st;
