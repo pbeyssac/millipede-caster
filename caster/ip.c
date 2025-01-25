@@ -1,5 +1,4 @@
 #include <ctype.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -324,17 +323,17 @@ int prefix_table_get_quota(struct prefix_table *this, union sock *addr) {
 /*
  * Return a new prefix table, filled from the provided file name.
  */
-struct prefix_table *prefix_table_new(const char *filename) {
+struct prefix_table *prefix_table_new(const char *filename, struct log *log) {
 	struct parsed_file *p;
 	struct prefix_table *this = (struct prefix_table *)malloc(sizeof(struct prefix_table));
 
 	if (this == NULL)
 		return NULL;
 
-	p = file_parse(filename, 2, "\t ", 1);
+	p = file_parse(filename, 2, "\t ", 1, log);
 
         if (p == NULL) {
-                fprintf(stderr, "Can't read or parse %s\n", filename);
+                logfmt(log, "Can't read or parse %s\n", filename);
 		free(this);
                 return NULL;
 	}
@@ -352,7 +351,7 @@ struct prefix_table *prefix_table_new(const char *filename) {
 		if (pq != NULL)
 			_prefix_table_add(this, pq);
 		else
-			fprintf(stderr, "Can't parse %s %s, skipping\n", p->pls[n][0], p->pls[n][1]);
+			logfmt(log, "Can't parse %s %s, skipping\n", p->pls[n][0], p->pls[n][1]);
         }
         file_free(p);
 	_prefix_table_sort(this);

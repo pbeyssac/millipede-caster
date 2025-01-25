@@ -1,6 +1,5 @@
 #include <arpa/inet.h>
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/cdefs.h>
@@ -13,6 +12,7 @@
 #endif
 
 #include "conf.h"
+#include "log.h"
 #include "util.h"
 
 /*
@@ -540,7 +540,7 @@ static string_array_t *split(const char *s, char sep, int maxsplits) {
  * Read a file with fields separated by characters in seps.
  * Skip empty fields if skipempty is not 0.
  */
-struct parsed_file *file_parse(const char *filename, int nfields, const char *seps, const int skipempty) {
+struct parsed_file *file_parse(const char *filename, int nfields, const char *seps, const int skipempty, struct log *log) {
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
@@ -551,7 +551,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	FILE *fp = fopen(filename, "r+");
 
 	if (fp == NULL) {
-		fprintf(stderr, "Can't open %s\n", filename);
+		logfmt(log, "Can't open %s\n", filename);
 		return NULL;
 	}
 
@@ -560,7 +560,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	pf->filename = mystrdup(filename);
 	if (pf->filename == NULL) {
 		fclose(fp);
-		fprintf(stderr, "Can't read %s\n", filename);
+		logfmt(log, "Can't read %s\n", filename);
 		return NULL;
 	}
 
@@ -606,7 +606,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 			}
 		}
 		if (n != nfields) {
-			fprintf(stderr, "Invalid line %d in %s\n", nlines+1, filename);
+			logfmt(log, "Invalid line %d in %s\n", nlines+1, filename);
 			break;
 		}
 	}

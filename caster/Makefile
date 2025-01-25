@@ -13,7 +13,7 @@ SRCS	=	adm.c caster.c conf.c config.c fetcher_sourcetable.c hash.c http.c ip.c j
 OBJS	=	adm.o caster.o conf.o config.o fetcher_sourcetable.o hash.o http.o ip.o jobs.o livesource.o log.o main.o ntrip_common.o ntripcli.o ntripsrv.o packet.o redistribute.o sourceline.o sourcetable.o util.o
 BINS	=	tests caster
 
-TESTOBJS	=	conf.o tests.o util.o ip.o
+TESTOBJS	=	conf.o log.o tests.o util.o ip.o
 
 all:	$(BINS)
 

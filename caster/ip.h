@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include "log.h"
+
 /*
  * Generic socket address type to encapsulate both IPv6 and IPv4.
  */
@@ -48,7 +50,7 @@ int ip_convert(char *ipstr, union sock *sock);
 struct prefix_quota *prefix_quota_parse(char *ip_prefix, const char *quota_str);
 char *prefix_quota_str(struct prefix_quota *ppq);
 int prefix_table_get_quota(struct prefix_table *this, union sock *addr);
-struct prefix_table *prefix_table_new(const char *filename);
+struct prefix_table *prefix_table_new(const char *filename, struct log *log);
 void prefix_table_free(struct prefix_table *this);
 
 #endif

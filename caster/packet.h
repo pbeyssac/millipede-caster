@@ -1,8 +1,6 @@
 #ifndef __PACKET_H__
 #define __PACKET_H__
 
-#include <stdio.h>
-
 #include "conf.h"
 
 /*

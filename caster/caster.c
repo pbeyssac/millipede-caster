@@ -57,7 +57,7 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, str
  */
 static struct auth_entry *auth_parse(struct caster_state *caster, const char *filename) {
 	struct parsed_file *p;
-	p = file_parse(filename, 3, ":", 0);
+	p = file_parse(filename, 3, ":", 0, &caster->flog);
 
 	if (p == NULL) {
 		logfmt(&caster->flog, "Can't read or parse %s\n", filename);
@@ -338,7 +338,7 @@ static int caster_start_listener(struct caster_state *this, struct config_bind *
 		LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, config->queue_size,
 		(struct sockaddr *)sin, sin->generic.sa_len);
 	if (!listener->listener) {
-		fprintf(stderr, "Could not create a listener for %s:%d!\n", config->ip, config->port);
+		logfmt(&this->flog, "Could not create a listener for %s:%d!\n", config->ip, config->port);
 		return -1;
 	}
 	return 0;
@@ -454,7 +454,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 	P_RWLOCK_UNLOCK(&this->configlock);
 
 	if (this->listeners_count == 0) {
-		fprintf(stderr, "No configured ports to listen to, aborting.\n");
+		logfmt(&this->flog, "No configured ports to listen to, aborting.\n");
 		return -1;
 	}
 	return 0;
@@ -555,7 +555,7 @@ caster_reload_blocklist(struct caster_state *caster) {
 
 	if (caster->config->blocklist_filename) {
 		logfmt(&caster->flog, "Reloading %s\n", caster->config->blocklist_filename);
-		p = prefix_table_new(caster->config->blocklist_filename);
+		p = prefix_table_new(caster->config->blocklist_filename, &caster->flog);
 		caster->blocklist = p;
 		if (p == NULL)
 			r = -1;
@@ -696,7 +696,7 @@ int caster_reload(struct caster_state *this) {
 static void
 signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
-	printf("Reloading configuration\n");
+	logfmt(&caster->flog, "Reloading configuration\n");
 	caster_reload(caster);
 }
 
@@ -871,7 +871,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 	if (evutil_make_socket_nonblocking(fds) < 0) {
-		fprintf(stderr, "Can't make socket non-blocking\n");
+		logfmt(&caster->flog, "Can't make socket non-blocking\n");
 		return 1;
 	}
 	// evutil_socket_t s = event_get_fd(listener);
@@ -890,8 +890,8 @@ int caster_main(char *config_file) {
 	}
 
 	if (threads && jobs_start_threads(caster->joblist, nthreads) < 0) {
+		logfmt(&caster->flog, "Could not create threads!\n");
 		caster_free(caster);
-		fprintf(stderr, "Could not create threads!\n");
 		return 1;
 	}
 
