@@ -9,8 +9,8 @@ OPT	=
 CFLAGS	=	-g $(OPT) -I/usr/local/include -Wall
 LDFLAGS	=	-L/usr/local/lib -levent_core -levent_extra -levent_pthreads -levent_openssl -lcyaml -lssl -lcrypto -ljson-c -lpthread -lm
 
-SRCS	=	adm.c caster.c conf.c config.c fetcher_sourcetable.c hash.c http.c ip.c jobs.c livesource.c log.c main.c ntrip_common.c ntripcli.c ntripsrv.c packet.c redistribute.c sourceline.c sourcetable.c util.c
-OBJS	=	adm.o caster.o conf.o config.o fetcher_sourcetable.o hash.o http.o ip.o jobs.o livesource.o log.o main.o ntrip_common.o ntripcli.o ntripsrv.o packet.o redistribute.o sourceline.o sourcetable.o util.o
+SRCS	=	adm.c caster.c conf.c config.c fetcher_sourcetable.c hash.c http.c ip.c jobs.c livesource.c log.c main.c ntrip_common.c ntrip_task.c ntripcli.c ntripsrv.c packet.c redistribute.c sourceline.c sourcetable.c util.c
+OBJS	=	adm.o caster.o conf.o config.o fetcher_sourcetable.o hash.o http.o ip.o jobs.o livesource.o log.o main.o ntrip_common.o ntrip_task.o ntripcli.o ntripsrv.o packet.o redistribute.o sourceline.o sourcetable.o util.o
 BINS	=	tests caster
 
 TESTOBJS	=	conf.o log.o tests.o util.o ip.o

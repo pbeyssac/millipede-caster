@@ -9,6 +9,7 @@
 #include "jobs.h"
 #include "ntripcli.h"
 #include "ntrip_common.h"
+#include "ntrip_task.h"
 #include "redistribute.h"
 #include "util.h"
 #include "fetcher_sourcetable.h"
@@ -177,15 +178,10 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					st->state = NTRIP_REGISTER_SOURCE;
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
-				} else {
-					st->tmp_sourcetable = sourcetable_new(st->host, st->port);
-					if (st->tmp_sourcetable == NULL) {
-						end =1;
-						ntrip_log(st, LOG_CRIT, "Out of memory when allocating sourcetable\n");
-					} else {
-						st->state = NTRIP_WAIT_SOURCETABLE_LINE;
-					}
-				}
+				} else if (st->task)
+					st->state = NTRIP_WAIT_CALLBACK_LINE;
+				else
+					end = 1;
 			} else {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
@@ -201,29 +197,16 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				}
 			}
 			free(line);
-		} else if (st->state == NTRIP_WAIT_SOURCETABLE_LINE) {
+		} else if (st->state == NTRIP_WAIT_CALLBACK_LINE) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
 			st->received_bytes += len + 1;
-			if (!strcmp(line, "ENDSOURCETABLE")) {
-				ntrip_log(st, LOG_INFO, "Complete sourcetable, %d entries\n", sourcetable_nentries(st->tmp_sourcetable, 0));
-				st->tmp_sourcetable->pullable = 1;
-				gettimeofday(&st->tmp_sourcetable->fetch_time, NULL);
-				if (st->sourcetable_cb_arg) {
-					st->sourcetable_cb_arg->sourcetable = st->tmp_sourcetable;
-					st->sourcetable_cb_arg->sourcetable_cb(-1, 0, st->sourcetable_cb_arg);
-					st->sourcetable_cb_arg = NULL;
-				} else
-					sourcetable_free(st->tmp_sourcetable);
-				st->tmp_sourcetable = NULL;
+
+			if (st->task && st->task->line_cb(st, st->task->line_cb_arg, line)) {
+				st->task = NULL;
 				end = 1;
-			} else {
-				if (sourcetable_add(st->tmp_sourcetable, line, 1) < 0) {
-					ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d\n", st->tmp_sourcetable->caster, st->tmp_sourcetable->port);
-					end = 1;
-				}
 			}
 			free(line);
 		} else if (st->state == NTRIP_REGISTER_SOURCE) {
@@ -245,12 +228,10 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 		}
 	}
 	if (end || st->state == NTRIP_FORCE_CLOSE) {
-		if (st->sourcetable_cb_arg != NULL) {
+		if (st->task != NULL) {
 			/* Notify the callback the transfer is over, and failed. */
-			ntrip_log(st, LOG_DEBUG, "sourcetable loading failed\n");
-			st->sourcetable_cb_arg->sourcetable = NULL;
-			st->sourcetable_cb_arg->sourcetable_cb(-1, 0, st->sourcetable_cb_arg);
-			st->sourcetable_cb_arg = NULL;
+			st->task->end_cb(0, st->task->end_cb_arg);
+			st->task = NULL;
 		}
 		ntrip_deferred_free(st, "ntripcli_readcb/sourcetable");
 	}
@@ -318,11 +299,10 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		} else
 			ntrip_unregister_livesource(st);
 	}
-	if (st->sourcetable_cb_arg != NULL) {
+	if (st->task != NULL) {
 		/* Notify the callback the transfer is over, and failed. */
-		st->sourcetable_cb_arg->sourcetable = NULL;
-		st->sourcetable_cb_arg->sourcetable_cb(-1, 0, st->sourcetable_cb_arg);
-		st->sourcetable_cb_arg = NULL;
+		st->task->end_cb(0, st->task->end_cb_arg);
+		st->task = NULL;
 	}
 	int bytes_left = evbuffer_get_length(st->input);
 	ntrip_log(st, bytes_left ? LOG_NOTICE:LOG_INFO, "Connection closed, %zu bytes left.\n", evbuffer_get_length(st->input));
@@ -331,7 +311,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 }
 
 void
-ntripcli_start(struct caster_state *caster, char *host, unsigned short port, const char *type, struct sourcetable_fetch_args *arg_cb) {
+ntripcli_start(struct caster_state *caster, char *host, unsigned short port, const char *type, struct ntrip_task *task) {
 	struct bufferevent *bev;
 
 	if (threads)
@@ -350,10 +330,10 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, con
 		return;
 	}
 	st->type = type;
-	st->sourcetable_cb_arg = arg_cb;
+	st->task = task;
 	ntrip_register(st);
 	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d\n", type, host, port);
-	if (arg_cb) arg_cb->st = st;
+	if (task) task->st = st;
 
 	if (threads)
 		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);

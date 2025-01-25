@@ -34,6 +34,7 @@
 #include "livesource.h"
 #include "log.h"
 #include "ntrip_common.h"
+#include "ntrip_task.h"
 #include "ntripsrv.h"
 #include "util.h"
 #include "sourcetable.h"
@@ -773,8 +774,8 @@ static int caster_reload_fetchers(struct caster_state *this) {
 			if (this->sourcetable_fetchers[j] == NULL)
 				/* Already cleared */
 				continue;
-			if (!strcmp(this->sourcetable_fetchers[j]->host, this->config->proxy[i].host)
-			&& this->sourcetable_fetchers[j]->port == this->config->proxy[i].port) {
+			if (!strcmp(this->sourcetable_fetchers[j]->task->host, this->config->proxy[i].host)
+			&& this->sourcetable_fetchers[j]->task->port == this->config->proxy[i].port) {
 				p = this->sourcetable_fetchers[j];
 				/* Found, clear in the old table */
 				this->sourcetable_fetchers[j] = NULL;
@@ -806,7 +807,7 @@ static int caster_reload_fetchers(struct caster_state *this) {
 	 */
 	for (int j = 0; j < this->sourcetable_fetchers_count; j++)
 		if (this->sourcetable_fetchers[j]) {
-			logfmt(&this->flog, "Stopping fetcher %s:%d\n", this->sourcetable_fetchers[j]->host, this->sourcetable_fetchers[j]->port);
+			logfmt(&this->flog, "Stopping fetcher %s:%d\n", this->sourcetable_fetchers[j]->task->host, this->sourcetable_fetchers[j]->task->port);
 			fetcher_sourcetable_free(this->sourcetable_fetchers[j]);
 		}
 	free(this->sourcetable_fetchers);

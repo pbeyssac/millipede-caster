@@ -1,18 +1,14 @@
+#include <assert.h>
+
 #include <event2/event.h>
 #include <event2/bufferevent.h>
 
 #include "conf.h"
-#include "ntripcli.h"
 #include "ntrip_common.h"
+#include "ntrip_task.h"
+#include "ntripcli.h"
 #include "fetcher_sourcetable.h"
 
-static void
-get_sourcetable_cb(int fd, short what, void *arg) {
-	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg;
-	event_free(a->ev);
-	a->ev = NULL;
-	fetcher_sourcetable_start(arg);
-}
 
 /*
  * Initialize, but don't start, a sourcetable fetcher.
@@ -22,98 +18,109 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 	struct sourcetable_fetch_args *this = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args));
 	if (this == NULL)
 		return NULL;
-	this->host = mystrdup(host);
-	if (this->host == NULL) {
+	this->task = ntrip_task_new(caster, host, port, refresh_delay, "sourcetable_fetcher");
+	if (this->task == NULL) {
 		free(this);
 		return NULL;
 	}
-	this->port = port;
-	this->refresh_delay = refresh_delay;
-	this->caster = caster;
 	this->sourcetable = NULL;
-	this->sourcetable_cb = NULL;
-	this->ev = NULL;
-	this->st = NULL;
 	this->priority = priority;
 	return this;
 }
 
-/*
- * Stop fetcher.
- */
-static void _fetcher_sourcetable_stop(struct sourcetable_fetch_args *this, int keep_sourcetable) {
-	logfmt(&this->caster->flog, "Stopping sourcetable fetch from %s:%d\n", this->host, this->port);
-	if (this->ev) {
-		event_free(this->ev);
-		this->ev = NULL;
-	}
-	if (this->st && this->st->state != NTRIP_END) {
-		bufferevent_lock(this->st->bev);
-		ntrip_deferred_free(this->st, "fetcher_sourcetable_stop");
-		this->st = NULL;
-	}
-	if (!keep_sourcetable)
-		stack_replace_host(this->st, &this->caster->sourcetablestack, this->host, this->port, NULL);
-}
-
 void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
-	_fetcher_sourcetable_stop(this, 0);
-	strfree(this->host);
+	ntrip_task_stop(this->task);
+	stack_replace_host(this->task->caster, &this->task->caster->sourcetablestack, this->task->host, this->task->port, NULL);
+	ntrip_task_free(this->task);
 	free(this);
 }
 
 void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this) {
-	_fetcher_sourcetable_stop(this, 0);
+	ntrip_task_stop(this->task);
+	stack_replace_host(this->task->caster, &this->task->caster->sourcetablestack, this->task->host, this->task->port, NULL);
 }
 
 /*
- * Reload fetcher.
+ * Reload fetcher, possibly modifying the refresh_delay and priority.
  *
  * Same as a stop/start, except we keep the sourcetable during the reload.
  */
-void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay, int priority) {
-	_fetcher_sourcetable_stop(this, 1);
-	this->refresh_delay = refresh_delay;
-	this->priority = priority;
+void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay, int sourcetable_priority) {
+	ntrip_task_stop(this->task);
+	this->task->refresh_delay = refresh_delay;
+	this->priority = sourcetable_priority;
 	fetcher_sourcetable_start(this);
 }
 
+/*
+ * Callback called at the end of the ntrip session.
+ */
 static void
-sourcetable_cb(int fd, short what, void *arg) {
+sourcetable_end_cb(int ok, void *arg) {
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg;
-	struct caster_state *caster = a->caster;
-	struct sourcetable *sourcetable = a->sourcetable;
 	struct timeval t1;
-	gettimeofday(&t1, NULL);
-	timersub(&t1, &a->st->start, &t1);
 
-	if (sourcetable != NULL) {
-		ntrip_log(a->st, LOG_NOTICE, "sourcetable loaded, %d entries, %.3f ms\n",
+	if (!ok) {
+		gettimeofday(&t1, NULL);
+		timersub(&t1, &a->task->st->start, &t1);
+		if (a->sourcetable) {
+			sourcetable_free(a->sourcetable);
+			a->sourcetable = NULL;
+		}
+		ntrip_log(a->task->st, LOG_NOTICE, "sourcetable load failed, %.3f ms\n",
+			t1.tv_sec*1000 + t1.tv_usec/1000.);
+	}
+	a->task->st = NULL;
+
+	ntrip_task_reschedule(a->task, a);
+}
+
+static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char *line) {
+	struct timeval t1;
+	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
+
+	if (!strcmp(line, "ENDSOURCETABLE")) {
+		ntrip_log(st, LOG_INFO, "Complete sourcetable, %d entries\n", sourcetable_nentries(a->sourcetable, 0));
+		struct sourcetable *sourcetable = a->sourcetable;
+
+		gettimeofday(&t1, NULL);
+		timersub(&t1, &a->task->st->start, &t1);
+		gettimeofday(&sourcetable->fetch_time, NULL);
+
+		sourcetable->pullable = 1;
+		sourcetable->priority = a->priority;
+		ntrip_log(st, LOG_NOTICE, "sourcetable loaded, %d entries, %.3f ms\n",
 			sourcetable_nentries(sourcetable, 0),
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
-		sourcetable->priority = a->priority;
-		stack_replace_host(a->st, &a->caster->sourcetablestack, a->host, a->port, sourcetable);
+		stack_replace_host(a->task->caster, &a->task->caster->sourcetablestack, a->task->host, a->task->port, sourcetable);
 		a->sourcetable = NULL;
-	} else {
-		ntrip_log(a->st, LOG_NOTICE, "sourcetable load failed, %.3f ms\n",
-			t1.tv_sec*1000 + t1.tv_usec/1000.);
+		sourcetable_end_cb(1, a);
+		return 1;
 	}
-	a->st = NULL;
 
-	if (a->refresh_delay) {
-		struct timeval timeout_interval = { a->refresh_delay, 0 };
-		logfmt(&caster->flog, "Starting refresh callback for sourcetable %s:%d in %d seconds\n", a->host, a->port, a->refresh_delay);
-		a->ev = event_new(caster->base, -1, 0, get_sourcetable_cb, a);
-		event_add(a->ev, &timeout_interval);
+	if (sourcetable_add(a->sourcetable, line, 1) < 0) {
+		ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d\n", a->sourcetable->caster, a->sourcetable->port);
+		sourcetable_free(a->sourcetable);
+		a->sourcetable = NULL;
+		sourcetable_end_cb(0, a);
+		return 1;
 	}
+	return 0;
 }
 
 /*
  * Start a sourcetable fetcher.
  */
 void
-fetcher_sourcetable_start(struct sourcetable_fetch_args *arg_cb) {
-	arg_cb->sourcetable_cb = sourcetable_cb;
-
-	ntripcli_start(arg_cb->caster, arg_cb->host, arg_cb->port, "sourcetable_fetcher", arg_cb);
+fetcher_sourcetable_start(void *arg_cb) {
+	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
+	assert(a->sourcetable == NULL);
+	a->task->end_cb = sourcetable_end_cb;
+	a->task->end_cb_arg = arg_cb;
+	a->task->line_cb = sourcetable_line_cb;
+	a->task->line_cb_arg = arg_cb;
+	a->task->restart_cb = fetcher_sourcetable_start;
+	a->task->restart_cb_arg = arg_cb;
+	a->sourcetable = sourcetable_new(a->task->host, a->task->port);
+	ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->type, a->task);
 }

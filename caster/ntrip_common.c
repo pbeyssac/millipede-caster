@@ -79,8 +79,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->filter.raw_input = this->input;
 	this->redistribute = 0;
 	this->persistent = 0;
-	this->tmp_sourcetable = NULL;
-	this->sourcetable_cb_arg = NULL;
+	this->task = NULL;
 	this->subscription = NULL;
 	this->sourceline = NULL;
 	this->virtual_mountpoint = NULL;
@@ -233,9 +232,6 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 
 	if (this->subscription)
 		livesource_del_subscriber(this);
-
-	if (this->tmp_sourcetable)
-		sourcetable_free(this->tmp_sourcetable);
 
 	if (unlink) {
 		P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);

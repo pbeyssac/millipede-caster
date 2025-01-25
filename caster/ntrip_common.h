@@ -21,7 +21,7 @@ enum ntrip_session_state {
 					// Ephemeral, immediately followed by NTRIP_WAIT_STREAM_GET
 	NTRIP_WAIT_STREAM_GET,		// Source connected, get data (client)
 	NTRIP_WAIT_STREAM_SOURCE,	// Source connected, receive data (server)
-	NTRIP_WAIT_SOURCETABLE_LINE,	// Client waiting for the next sourcetable line
+	NTRIP_WAIT_CALLBACK_LINE,	// Client waiting for the next callback line
 	NTRIP_WAIT_CLIENT_INPUT,	// Server waiting for GGA lines from client
 	NTRIP_WAIT_CLIENT_CONTENT,	// Server waiting for content
 	NTRIP_WAIT_CLOSE,		// End of connection, drain output then close
@@ -157,8 +157,7 @@ struct ntrip_state {
 	short client_version;			// NTRIP version in use: 0=plain HTTP, 1=NTRIP 1, 2=NTRIP 2
 	char *host;				// host to connect to
 	unsigned short port;			// port to connect to
-	struct sourcetable *tmp_sourcetable;	// sourcetable we are currently downloading
-	struct sourcetable_fetch_args *sourcetable_cb_arg;	// sourcetable download callback
+	struct ntrip_task *task;		// descriptor and callbacks for the current task
 	struct subscriber *subscription;	// current source subscription
 
 	/*
