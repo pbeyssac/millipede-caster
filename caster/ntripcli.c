@@ -16,7 +16,6 @@
 #include "ntrip_task.h"
 #include "redistribute.h"
 #include "util.h"
-#include "fetcher_sourcetable.h"
 
 const char *client_ntrip_version = "Ntrip/2.0";
 const char *client_user_agent = "NTRIP " CLIENT_VERSION_STRING;
