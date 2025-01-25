@@ -285,13 +285,14 @@ void caster_free(struct caster_state *this) {
 /*
  * Load TLS certificates from file paths.
  */
-static int listener_load_certs(SSL_CTX *ctx, char *tls_full_certificate_chain, char *tls_private_key) {
-	if (SSL_CTX_use_certificate_chain_file(ctx, tls_full_certificate_chain) <= 0)
+static int listener_load_certs(struct listener *this, char *tls_full_certificate_chain, char *tls_private_key) {
+	if (SSL_CTX_use_certificate_chain_file(this->ssl_server_ctx, tls_full_certificate_chain) <= 0)
 		return -1;
-	if (SSL_CTX_use_PrivateKey_file(ctx, tls_private_key, SSL_FILETYPE_PEM) <= 0)
+	if (SSL_CTX_use_PrivateKey_file(this->ssl_server_ctx, tls_private_key, SSL_FILETYPE_PEM) <= 0)
 		return -1;
-	if (!SSL_CTX_check_private_key(ctx)) {
-		fprintf(stderr, "Private key does not match the certificate public key\n");
+	if (!SSL_CTX_check_private_key(this->ssl_server_ctx)) {
+		char ip[64];
+		logfmt(&this->caster->flog, "Private key for %s does not match the certificate public key\n", ip_str_port(&this->sockaddr, ip, sizeof ip));
 		return -1;
 	}
 	return 0;
@@ -308,7 +309,7 @@ static int listener_setup_tls(struct listener *this, struct config_bind *config)
 			return -1;
 		}
 	}
-	if (listener_load_certs(this->ssl_server_ctx, config->tls_full_certificate_chain, config->tls_private_key) < 0) {
+	if (listener_load_certs(this, config->tls_full_certificate_chain, config->tls_private_key) < 0) {
 		ERR_print_errors_cb(caster_tls_log_cb, this->caster);
 		SSL_CTX_free(this->ssl_server_ctx);
 		this->ssl_server_ctx = NULL;
