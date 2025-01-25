@@ -330,6 +330,44 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
 
+void
+ntripcli_start(struct caster_state *caster, char *host, unsigned short port, const char *type, struct sourcetable_fetch_args *arg_cb) {
+	struct bufferevent *bev;
+
+	if (threads)
+		bev = bufferevent_socket_new(caster->base, -1, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+	else
+		bev = bufferevent_socket_new(caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
+
+	if (bev == NULL) {
+		logfmt(&caster->flog, "Error constructing bufferevent in fetcher_sourcetable_start!");
+		return;
+	}
+	struct ntrip_state *st = ntrip_new(caster, bev, host, port, NULL);
+	if (st == NULL) {
+		bufferevent_free(bev);
+		logfmt(&caster->flog, "Error constructing ntrip_state in fetcher_sourcetable_start!");
+		return;
+	}
+	st->type = type;
+	st->sourcetable_cb_arg = arg_cb;
+	ntrip_register(st);
+	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d\n", type, host, port);
+	if (arg_cb) arg_cb->st = st;
+
+	if (threads)
+		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
+	else
+		bufferevent_setcb(bev, ntripcli_readcb, ntripcli_writecb, ntripcli_eventcb, st);
+
+	bufferevent_enable(bev, EV_READ|EV_WRITE);
+
+	struct timeval timeout = { caster->config->sourcetable_fetch_timeout, 0 };
+	bufferevent_set_timeouts(bev, &timeout, &timeout);
+
+	bufferevent_socket_connect_hostname(bev, caster->dns_base, AF_UNSPEC, host, port);
+}
+
 void ntripcli_workers_readcb(struct bufferevent *bev, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	joblist_append(st->caster->joblist, ntripcli_readcb, NULL, bev, arg, 0);

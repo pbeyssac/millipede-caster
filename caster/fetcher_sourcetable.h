@@ -11,7 +11,6 @@ struct sourcetable_fetch_args {
 	unsigned short port;
 	int refresh_delay;
 	int priority;			// priority in a sourcetable stack
-	struct timeval t0;
 	void (*sourcetable_cb)(int, short, void *);
 	struct event *ev;
 	struct ntrip_state *st;

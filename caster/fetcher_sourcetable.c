@@ -85,7 +85,7 @@ sourcetable_cb(int fd, short what, void *arg) {
 	struct sourcetable *sourcetable = a->sourcetable;
 	struct timeval t1;
 	gettimeofday(&t1, NULL);
-	timersub(&t1, &a->t0, &t1);
+	timersub(&t1, &a->st->start, &t1);
 
 	if (sourcetable != NULL) {
 		ntrip_log(a->st, LOG_NOTICE, "sourcetable loaded, %d entries, %.3f ms\n",
@@ -113,40 +113,7 @@ sourcetable_cb(int fd, short what, void *arg) {
  */
 void
 fetcher_sourcetable_start(struct sourcetable_fetch_args *arg_cb) {
-	struct bufferevent *bev;
 	arg_cb->sourcetable_cb = sourcetable_cb;
 
-	if (threads)
-		bev = bufferevent_socket_new(arg_cb->caster->base, -1, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
-	else
-		bev = bufferevent_socket_new(arg_cb->caster->base, -1, BEV_OPT_CLOSE_ON_FREE);
-
-	if (bev == NULL) {
-		logfmt(&arg_cb->caster->flog, "Error constructing bufferevent in fetcher_sourcetable_start!");
-		return;
-	}
-	struct ntrip_state *st = ntrip_new(arg_cb->caster, bev, arg_cb->host, arg_cb->port, NULL);
-	if (st == NULL) {
-		bufferevent_free(bev);
-		logfmt(&arg_cb->caster->flog, "Error constructing ntrip_state in fetcher_sourcetable_start!");
-		return;
-	}
-	st->type = "sourcetable_fetcher";
-	st->sourcetable_cb_arg = arg_cb;
-	ntrip_register(st);
-	ntrip_log(st, LOG_NOTICE, "Starting sourcetable fetch from %s:%d\n", arg_cb->host, arg_cb->port);
-	arg_cb->st = st;
-
-	if (threads)
-		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
-	else
-		bufferevent_setcb(bev, ntripcli_readcb, ntripcli_writecb, ntripcli_eventcb, st);
-
-	bufferevent_enable(bev, EV_READ|EV_WRITE);
-
-        struct timeval timeout = { arg_cb->caster->config->sourcetable_fetch_timeout, 0 };
-        bufferevent_set_timeouts(bev, &timeout, &timeout);
-
-	gettimeofday(&arg_cb->t0, NULL);
-	bufferevent_socket_connect_hostname(bev, arg_cb->caster->dns_base, AF_UNSPEC, arg_cb->host, arg_cb->port);
+	ntripcli_start(arg_cb->caster, arg_cb->host, arg_cb->port, "sourcetable_fetcher", arg_cb);
 }
