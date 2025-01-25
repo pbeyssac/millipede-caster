@@ -350,14 +350,14 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 	}
 
 	if (bev == NULL) {
-		logfmt(&caster->flog, "Error constructing bufferevent in fetcher_sourcetable_start!");
-		return;
+		logfmt(&caster->flog, "Error constructing bufferevent in ntripcli_start!");
+		return -1;
 	}
 	struct ntrip_state *st = ntrip_new(caster, bev, host, port, NULL);
 	if (st == NULL) {
 		bufferevent_free(bev);
-		logfmt(&caster->flog, "Error constructing ntrip_state in fetcher_sourcetable_start!");
-		return;
+		logfmt(&caster->flog, "Error constructing ntrip_state in ntripcli_start!");
+		return -1;
 	}
 	st->type = type;
 	st->task = task;
