@@ -1,4 +1,5 @@
 #include <event2/event.h>
+#include <event2/http.h>
 
 #include "conf.h"
 #include "ntrip_task.h"
@@ -34,10 +35,12 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->ev = NULL;
 	this->type = type;
 	this->tls = tls;
+	TAILQ_INIT(&this->headers);
 	return this;
 }
 
 void ntrip_task_free(struct ntrip_task *this) {
+	evhttp_clear_headers(&this->headers);
 	strfree(this->host);
 	free(this);
 }

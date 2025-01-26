@@ -24,9 +24,9 @@ static void display_headers(struct ntrip_state *st, struct evkeyvalq *headers) {
 	struct evkeyval *np;
 	TAILQ_FOREACH(np, headers, next) {
 		if (!strcasecmp(np->key, "authorization"))
-			ntrip_log(st, LOG_DEBUG, "%s: *****", np->key);
+			ntrip_log(st, LOG_DEBUG, "Request header %s: *****", np->key);
 		else
-			ntrip_log(st, LOG_DEBUG, "%s: %s", np->key, np->value);
+			ntrip_log(st, LOG_DEBUG, "Request header %s: %s", np->key, np->value);
 	}
 }
 
@@ -77,13 +77,14 @@ static char *ntripcli_http_request_str(struct ntrip_state *st, const char *metho
 
 	P_RWLOCK_UNLOCK(&st->caster->configlock);
 
-	display_headers(st, &headers);
-
 	int hlen = 0;
 	TAILQ_FOREACH(np, &headers, next) {
 		// lengths of key + value + " " + "\r\n"
 		hlen += strlen(np->key) + strlen(np->value) + 4;
 	}
+	if (st->task)
+		TAILQ_FOREACH(np, &st->task->headers, next)
+			hlen += strlen(np->key) + strlen(np->value) + 4;
 
 	char *format = "%s %s HTTP/1.1\r\n";
 	size_t s = strlen(format) + strlen(method) + strlen(uri) + hlen + 2;
@@ -94,12 +95,25 @@ static char *ntripcli_http_request_str(struct ntrip_state *st, const char *metho
 		return NULL;
 	}
 	sprintf(r, format, method, uri);
+
+	ntrip_log(st, LOG_DEBUG, "Request method %s", r);
+	display_headers(st, &headers);
+	display_headers(st, &st->task->headers);
+
 	TAILQ_FOREACH(np, &headers, next) {
 		strcat(r, np->key);
 		strcat(r, ": ");
 		strcat(r, np->value);
 		strcat(r, "\r\n");
 	}
+	if (st->task)
+		TAILQ_FOREACH(np, &st->task->headers, next) {
+			strcat(r, np->key);
+			strcat(r, ": ");
+			strcat(r, np->value);
+			strcat(r, "\r\n");
+		}
+
 	strcat(r, "\r\n");
 	evhttp_clear_headers(&headers);
 	strfree(host_port);

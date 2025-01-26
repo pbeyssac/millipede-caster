@@ -1,6 +1,8 @@
 #ifndef __NTRIP_TASK_H__
 #define __NTRIP_TASK_H__
 
+#include <event2/event_struct.h>
+
 #include "ntrip_common.h"
 
 /*
@@ -18,6 +20,9 @@ struct ntrip_task {
 	int refresh_delay;
 
 	struct caster_state *caster;
+
+	/* Additional headers */
+	struct evkeyvalq headers;
 
 	/*
 	 * Callbacks
