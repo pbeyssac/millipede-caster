@@ -251,6 +251,26 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 	}
 }
 
+static void ntripcli_send_request(struct ntrip_state *st, struct bufferevent *bev) {
+	char *uri = (char *)strmalloc(strlen(st->mountpoint) + 3);
+	if (uri == NULL) {
+		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
+		ntrip_deferred_free(st, "ntripcli_send_request");
+		return;
+	}
+	sprintf(uri, "/%s", st->mountpoint);
+	char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, uri, 2, NULL);
+	strfree(uri);
+	if (s == NULL) {
+		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d", st->host, st->port);
+		ntrip_deferred_free(st, "ntripcli_send_request");
+		return;
+	}
+	bufferevent_write(bev, s, strlen(s));
+	strfree(s);
+	st->state = NTRIP_WAIT_HTTP_STATUS;
+}
+
 void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
@@ -260,25 +280,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 
 		ntrip_set_peeraddr(st, NULL, 0);
 		ntrip_log(st, LOG_INFO, "Connected to %s:%d for /%s", st->host, st->port, st->mountpoint);
-		char *uri = (char *)strmalloc(strlen(st->mountpoint) + 3);
-		if (uri == NULL) {
-			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
-			ntrip_deferred_free(st, "ntripcli_eventcb");
-
-			return;
-		}
-		sprintf(uri, "/%s", st->mountpoint);
-		char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, uri, 2, NULL);
-		strfree(uri);
-		if (s == NULL) {
-			ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d", st->host, st->port);
-			ntrip_deferred_free(st, "ntripcli_eventcb");
-
-			return;
-		}
-		bufferevent_write(bev, s, strlen(s));
-		strfree(s);
-		st->state = NTRIP_WAIT_HTTP_STATUS;
+		ntripcli_send_request(st, bev);
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
