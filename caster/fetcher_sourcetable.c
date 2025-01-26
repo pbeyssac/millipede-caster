@@ -67,7 +67,7 @@ sourcetable_end_cb(int ok, void *arg) {
 			sourcetable_free(a->sourcetable);
 			a->sourcetable = NULL;
 		}
-		ntrip_log(a->task->st, LOG_NOTICE, "sourcetable load failed, %.3f ms\n",
+		ntrip_log(a->task->st, LOG_NOTICE, "sourcetable load failed, %.3f ms",
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 	}
 	a->task->st = NULL;
@@ -80,7 +80,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
 
 	if (!strcmp(line, "ENDSOURCETABLE")) {
-		ntrip_log(st, LOG_INFO, "Complete sourcetable, %d entries\n", sourcetable_nentries(a->sourcetable, 0));
+		ntrip_log(st, LOG_INFO, "Complete sourcetable, %d entries", sourcetable_nentries(a->sourcetable, 0));
 		struct sourcetable *sourcetable = a->sourcetable;
 
 		gettimeofday(&t1, NULL);
@@ -89,7 +89,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 
 		sourcetable->pullable = 1;
 		sourcetable->priority = a->priority;
-		ntrip_log(st, LOG_NOTICE, "sourcetable loaded, %d entries, %.3f ms\n",
+		ntrip_log(st, LOG_NOTICE, "sourcetable loaded, %d entries, %.3f ms",
 			sourcetable_nentries(sourcetable, 0),
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 		stack_replace_host(a->task->caster, &a->task->caster->sourcetablestack, a->task->host, a->task->port, sourcetable);
@@ -99,7 +99,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 	}
 
 	if (sourcetable_add(a->sourcetable, line, 1) < 0) {
-		ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d\n", a->sourcetable->caster, a->sourcetable->port);
+		ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d", a->sourcetable->caster, a->sourcetable->port);
 		sourcetable_free(a->sourcetable);
 		a->sourcetable = NULL;
 		sourcetable_end_cb(0, a);

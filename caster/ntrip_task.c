@@ -46,7 +46,7 @@ void ntrip_task_free(struct ntrip_task *this) {
  * Clear associated rescheduling event for a task.
  */
 void ntrip_task_stop(struct ntrip_task *this) {
-	logfmt(&this->caster->flog, LOG_INFO, "Stopping %s from %s:%d\n", this->type, this->host, this->port);
+	logfmt(&this->caster->flog, LOG_INFO, "Stopping %s from %s:%d", this->type, this->host, this->port);
 	if (this->ev) {
 		event_free(this->ev);
 		this->ev = NULL;
@@ -61,7 +61,7 @@ void ntrip_task_stop(struct ntrip_task *this) {
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
 	if (this->refresh_delay) {
 		struct timeval timeout_interval = { this->refresh_delay, 0 };
-		logfmt(&this->caster->flog, LOG_INFO, "Starting refresh callback for %s %s:%d in %d seconds\n", this->type, this->host, this->port, this->refresh_delay);
+		logfmt(&this->caster->flog, LOG_INFO, "Starting refresh callback for %s %s:%d in %d seconds", this->type, this->host, this->port, this->refresh_delay);
 		this->ev = event_new(this->caster->base, -1, 0, _ntrip_task_restart_cb, this);
 		event_add(this->ev, &timeout_interval);
 	}

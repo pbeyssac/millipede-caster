@@ -259,7 +259,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 		P_MUTEX_LOCK(&this->append_mutex);
 		j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
-			//ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.\n");
+			//ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
 			return;
 		}
 		memcpy(j, tmpj, sizeof(*j));
@@ -307,7 +307,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	if (lastj == NULL || !job_equal(lastj, tmpj)) {
 		j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
-			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.\n");
+			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
 			P_MUTEX_UNLOCK(&this->append_mutex);
 			return;
 		}
@@ -332,13 +332,13 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 		 * Insertion needed in the main job queue.
 		 */
 		assert(st->newjobs != -1);
-		ntrip_log(st, LOG_EDEBUG, "job appended, inserting in joblist ntrip_queue njobs %d newjobs %d\n", st->njobs, st->newjobs);
+		ntrip_log(st, LOG_EDEBUG, "job appended, inserting in joblist ntrip_queue njobs %d newjobs %d", st->njobs, st->newjobs);
 		STAILQ_INSERT_TAIL(&this->append_queue, st, next);
 		this->append_ntrip_njobs++;
 		st->newjobs = -1;
 	} else {
 		assert(st->newjobs == -1);
-		ntrip_log(st, LOG_EDEBUG, "job appended, ntrip already in job list, njobs %d newjobs %d\n", st->njobs, st->newjobs);
+		ntrip_log(st, LOG_EDEBUG, "job appended, ntrip already in job list, njobs %d newjobs %d", st->njobs, st->newjobs);
 	}
 
 	/*
@@ -521,7 +521,7 @@ void jobs_stop_threads(struct joblist *this) {
 				nlive++;
 		}
 		if (nlive != 0) {
-			logfmt(&this->caster->flog, LOG_INFO, "%d thread(s) still active, waiting\n", nlive);
+			logfmt(&this->caster->flog, LOG_INFO, "%d thread(s) still active, waiting", nlive);
 			sleep(1);
 		}
 	} while (nlive);

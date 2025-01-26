@@ -92,7 +92,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		char *www_auth_value = (char *)strmalloc(www_auth_value_len);
 
 		if (!www_auth_value) {
-			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory\n");
+			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory");
 			*err = 500;
 			evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
 			return -1;
@@ -113,7 +113,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		if (m) {
 			ntripsrv_send_result_ok(st, output, m, NULL);
 		} else {
-			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory\n");
+			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory");
 			*err = 500;
 			evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
 			return -1;

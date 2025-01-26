@@ -54,7 +54,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 		bufferevent_lock(bev);
 
 		if (kill_backlogged ? np->backlogged : !np->virtual) {
-			ntrip_log(np->ntrip_state, LOG_NOTICE, "dropping due to %s\n", kill_backlogged?"backlog":"closed source");
+			ntrip_log(np->ntrip_state, LOG_NOTICE, "dropping due to %s", kill_backlogged?"backlog":"closed source");
 			killed++;
 		} else if (kill_backlogged == 0 && np->virtual) {
 			/*
@@ -107,7 +107,7 @@ struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntr
 		st->subscription = sub;
 		P_RWLOCK_UNLOCK(&this->lock);
 
-		ntrip_log(st, LOG_INFO, "subscription done to %s\n", this->mountpoint);
+		ntrip_log(st, LOG_INFO, "subscription done to %s", this->mountpoint);
 	}
 	return sub;
 }
@@ -185,7 +185,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		bufferevent_lock(bev);
 		if (st->state == NTRIP_END) {
 			/* Subscriber currently closing, skip */
-			ntrip_log(st, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d\n", st->state);
+			ntrip_log(st, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d", st->state);
 			bufferevent_unlock(bev);
 			ns++;
 			n++;
@@ -193,12 +193,12 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		}
 		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(st->bev));
 		if (backlog_len > caster->config->backlog_evbuffer) {
-			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s\n", backlog_len, this->mountpoint);
+			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
 		} else if (packet->caster->config->zero_copy) {
 			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
-				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed\n");
+				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed");
 				ns++;
 			} else
 				st->sent_bytes += packet->datalen;
@@ -231,14 +231,14 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	if (nbacklogged) {
 		int found_backlogs = livesource_kill_subscribers_unlocked(this, 1);
 		if (found_backlogs == nbacklogged)
-			logfmt(&caster->flog, LOG_INFO, "RTCM: %d backlogged clients dropped from %s\n", nbacklogged, this->mountpoint);
+			logfmt(&caster->flog, LOG_INFO, "RTCM: %d backlogged clients dropped from %s", nbacklogged, this->mountpoint);
 		else
-			logfmt(&caster->flog, LOG_INFO, "RTCM: %d (expected %d) backlogged clients dropped from %s\n", found_backlogs, nbacklogged, this->mountpoint);
+			logfmt(&caster->flog, LOG_INFO, "RTCM: %d (expected %d) backlogged clients dropped from %s", found_backlogs, nbacklogged, this->mountpoint);
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
 
 	if (n && (this->npackets == 1 || (this->npackets % 100 == 0)))
-		logfmt(&caster->flog, LOG_INFO, "RTCM: %d packets sent, current one to %d subscribers for %s\n", this->npackets, n, this->mountpoint);
+		logfmt(&caster->flog, LOG_INFO, "RTCM: %d packets sent, current one to %d subscribers for %s", this->npackets, n, this->mountpoint);
 	return n;
 }
 
@@ -258,7 +258,7 @@ static void livesource_list(struct caster_state *caster) {
 		logfmt(&caster->flog, LOG_INFO, " %s", np->mountpoint);
 	}
 	TAILQ_FOREACH(np, &caster->livesources.queue, next) {
-		logfmt(&caster->flog, LOG_INFO, "\n");
+		logfmt(&caster->flog, LOG_INFO, "");
 		break;
 	}
 
@@ -289,7 +289,7 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, struct nt
 			return NULL;
 		}
 		TAILQ_INSERT_TAIL(&this->livesources.queue, np, next);
-		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s\n", mountpoint);
+		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s", mountpoint);
 		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
 		joblist_append_redistribute(this->joblist, redistribute_source_stream, redis_args);
 		result = np;

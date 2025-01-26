@@ -25,7 +25,7 @@
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint) {
 	struct ntrip_state *this = (struct ntrip_state *)malloc(sizeof(struct ntrip_state));
 	if (this == NULL) {
-		logfmt(&caster->flog, LOG_CRIT, "ntrip_new failed: out of memory\n");
+		logfmt(&caster->flog, LOG_CRIT, "ntrip_new failed: out of memory");
 		return NULL;
 	}
 	this->mountpoint = mystrdup(mountpoint?mountpoint:"");
@@ -148,7 +148,7 @@ static int _ntrip_register(struct ntrip_state *this, int quota_check) {
 	}
 
 	if (quota >= 0 && ipcount > quota) {
-		ntrip_log(this, LOG_WARNING, "over quota (%d connections, max %d), dropping\n", ipcount, quota);
+		ntrip_log(this, LOG_WARNING, "over quota (%d connections, max %d), dropping", ipcount, quota);
 		r = -1;
 		// ntrip_quota_decr(this) will be called later, when we remove the state from ntrips.queue
 	}
@@ -181,7 +181,7 @@ void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t so
 	if (sa == NULL) {
 		socklen_t psocklen = sizeof(this->peeraddr);
 		if (getpeername(this->fd, &this->peeraddr.generic, &psocklen) < 0) {
-			ntrip_log(this, LOG_NOTICE, "getpeername failed: %s\n", strerror(errno));
+			ntrip_log(this, LOG_NOTICE, "getpeername failed: %s", strerror(errno));
 			return;
 		}
 	} else
@@ -192,11 +192,11 @@ void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t so
 
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 	if (!this->bev_freed) {
-		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p\n", bev);
+		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p", bev);
 		bufferevent_free(bev);
 		this->bev_freed = 1;
 	} else
-		ntrip_log(this, LOG_DEBUG, "double free for bufferevent %p\n", bev);
+		ntrip_log(this, LOG_DEBUG, "double free for bufferevent %p", bev);
 }
 
 /*
@@ -205,7 +205,7 @@ static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *be
  * Required lock: ntrip_state
  */
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
-	ntrip_log(this, LOG_DEBUG, "FREE %s\n", orig);
+	ntrip_log(this, LOG_DEBUG, "FREE %s", orig);
 
 	strfree(this->mountpoint);
 	strfree(this->virtual_mountpoint);
@@ -245,7 +245,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	 * This will prevent any further locking on the ntrip_state, so we do
 	 * it only once it is removed from ntrips.queue.
 	 */
-	ntrip_log(this, LOG_EDEBUG, "freeing bev %p\n", this->bev);
+	ntrip_log(this, LOG_EDEBUG, "freeing bev %p", this->bev);
 	my_bufferevent_free(this, this->bev);
 	free(this);
 }
@@ -256,7 +256,7 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 
 static void ntrip_deferred_free2(struct ntrip_state *this) {
 	struct caster_state *caster = this->caster;
-	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2\n");
+	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2");
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
 	bufferevent_lock(this->bev);
@@ -279,7 +279,7 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
  */
 void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 	if (this->state == NTRIP_END) {
-		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free from %s\n", orig);
+		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free from %s", orig);
 		return;
 	}
 
@@ -302,7 +302,7 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 
 	size_t remain = evbuffer_get_length(bufferevent_get_output(bev));
 	if (remain) {
-		ntrip_log(this, LOG_DEBUG, "Warning: potentiel evbuffer leak, %ld bytes remaining\n", remain);
+		ntrip_log(this, LOG_DEBUG, "Warning: potentiel evbuffer leak, %ld bytes remaining", remain);
 		evbuffer_drain(bufferevent_get_output(bev), remain);
 	}
 
@@ -320,7 +320,7 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 
 	joblist_drain(this);
 
-	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free njobs %d newjobs %d\n", this->njobs, this->newjobs);
+	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free njobs %d newjobs %d", this->njobs, this->newjobs);
 	joblist_append_ntrip_unlocked(this->caster->joblist, &ntrip_deferred_free2, this);
 }
 
@@ -354,7 +354,7 @@ void ntrip_deferred_run(struct caster_state *this) {
 			 * just give up for the moment.
 			 */
 			P_RWLOCK_WRLOCK(&this->ntrips.free_lock);
-			ntrip_log(st, LOG_DEBUG, "ntrip_deferred_run njobs %d newjobs %d, deferring more\n", st->njobs, st->newjobs);
+			ntrip_log(st, LOG_DEBUG, "ntrip_deferred_run njobs %d newjobs %d, deferring more", st->njobs, st->newjobs);
 			TAILQ_INSERT_TAIL(&this->ntrips.free_queue, st, nextf);
 			this->ntrips.nfree++;
 			bufferevent_unlock(bev);
@@ -363,7 +363,7 @@ void ntrip_deferred_run(struct caster_state *this) {
 		}
 
 		assert(st->newjobs != -1);
-		ntrip_log(st, LOG_EDEBUG, "ntrip_deferred_run njobs %d newjobs %d\n", st->njobs, st->newjobs);
+		ntrip_log(st, LOG_EDEBUG, "ntrip_deferred_run njobs %d newjobs %d", st->njobs, st->newjobs);
 
 		assert(st->njobs == 0);
 
@@ -385,7 +385,7 @@ void ntrip_deferred_run(struct caster_state *this) {
 	}
 	P_RWLOCK_UNLOCK(&this->ntrips.free_lock);
 	if (n)
-		logfmt(&this->flog, LOG_INFO, "ntrip_deferred_run did %d ntrip_free\n", n);
+		logfmt(&this->flog, LOG_INFO, "ntrip_deferred_run did %d ntrip_free", n);
 }
 
 static json_object *ntrip_json(struct ntrip_state *st) {
@@ -518,7 +518,7 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 	TAILQ_INSERT_TAIL(&this->caster->livesources.queue, np, next);
 	this->own_livesource = np;
 	P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
-	ntrip_log(this, LOG_INFO, "livesource %s created RUNNING\n", mountpoint);
+	ntrip_log(this, LOG_INFO, "livesource %s created RUNNING", mountpoint);
 	return np;
 }
 
@@ -528,7 +528,7 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 void ntrip_unregister_livesource(struct ntrip_state *this) {
 	if (!this->own_livesource)
 		return;
-	ntrip_log(this, LOG_INFO, "Unregister livesource %s\n", this->mountpoint);
+	ntrip_log(this, LOG_INFO, "Unregister livesource %s", this->mountpoint);
 	caster_del_livesource(this->caster, this->own_livesource);
 	this->own_livesource = NULL;
 }
@@ -582,6 +582,7 @@ _ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list a
 		fprintf(log->logfile, "[%lu] ", (long)pthread_getspecific(this->caster->thread_id));
 
 	vfprintf(log->logfile, fmt, ap);
+	fputs("\n", log->logfile);
 	P_RWLOCK_UNLOCK(&log->lock);
 }
 
@@ -609,7 +610,7 @@ int ntrip_handle_raw(struct ntrip_state *st) {
 	while (1) {
 
 		unsigned long len_raw = evbuffer_get_length(input);
-		ntrip_log(st, LOG_EDEBUG, "ntrip_handle_raw ready to get %d bytes\n", len_raw);
+		ntrip_log(st, LOG_EDEBUG, "ntrip_handle_raw ready to get %d bytes", len_raw);
 		if (len_raw < st->caster->config->min_raw_packet)
 			return 0;
 		if (len_raw > st->caster->config->max_raw_packet)
@@ -618,12 +619,12 @@ int ntrip_handle_raw(struct ntrip_state *st) {
 		st->received_bytes += len_raw;
 		if (rawp == NULL) {
 			evbuffer_drain(input, len_raw);
-			ntrip_log(st, LOG_CRIT, "Raw: Not enough memory, dropping %d bytes\n", len_raw);
+			ntrip_log(st, LOG_CRIT, "Raw: Not enough memory, dropping %d bytes", len_raw);
 			return 1;
 		}
 		evbuffer_remove(input, &rawp->data[0], len_raw);
 
-		//ntrip_log(st, LOG_DEBUG, "Raw: packet source %s size %d\n", st->mountpoint, len_raw);
+		//ntrip_log(st, LOG_DEBUG, "Raw: packet source %s size %d", st->mountpoint, len_raw);
 		if (livesource_send_subscribers(st->own_livesource, rawp, st->caster))
 			st->last_send = time(NULL);
 		packet_free(rawp);
@@ -662,18 +663,18 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 	unsigned long len_raw;
 	int len_done = 0;
 
-	ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode len %d limit %d flush_mode %d\n", evbuffer_get_length(input), dst_limit, mode);
+	ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode len %d limit %d flush_mode %d", evbuffer_get_length(input), dst_limit, mode);
 	while (1) {
 		len_raw = evbuffer_get_length(input);
 		if (len_raw <= 0) {
-			ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d\n", len_done);
+			ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d", len_done);
 			return len_done?BEV_OK:BEV_NEED_MORE;
 		}
 
 		if (st->chunk_state == CHUNK_WAIT_LEN) {
 			char *line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF_STRICT);
 			if (line == NULL) {
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode readln failed, OK/MORE done %d\n", len_done);
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode readln failed, OK/MORE done %d", len_done);
 				return len_done?BEV_OK:BEV_NEED_MORE;
 			}
 
@@ -682,11 +683,11 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 			*p = '\0';
 
 			if (sscanf(line, "%zx", &chunk_len) != 1) {
-				ntrip_log(st, LOG_INFO, "failed chunk_len: \"%s\"\n", line);
+				ntrip_log(st, LOG_INFO, "failed chunk_len: \"%s\"", line);
 				free(line);
 				st->state = NTRIP_FORCE_CLOSE;
 				st->chunk_state = CHUNK_NONE;
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/ERROR done %d\n", len_done);
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/ERROR done %d", len_done);
 				return len_done?BEV_OK:BEV_ERROR;
 			}
 			free(line);
@@ -716,18 +717,18 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 		} else if (st->chunk_state == CHUNK_WAITING_TRAILER || st->chunk_state == CHUNK_LAST) {
 			char data[2];
 			if (len_raw < 2) {
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d\n", len_done);
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d", len_done);
 				return len_done?BEV_OK:BEV_NEED_MORE;
 			}
 			// skip trailing CR LF
 			evbuffer_remove(input, data, 2);
 			if (data[0] != '\r' || data[1] != '\n')
-				ntrip_log(st, LOG_INFO, "Wrong chunk trailer 0x%02x 0x%02x\n", data[0], data[1]);
+				ntrip_log(st, LOG_INFO, "Wrong chunk trailer 0x%02x 0x%02x", data[0], data[1]);
 
 			if (st->chunk_state == CHUNK_LAST) {
 				st->state = NTRIP_FORCE_CLOSE;
 				st->chunk_state = CHUNK_END;
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode 0-length done %d, closing\n", len_done);
+				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode 0-length done %d, closing", len_done);
 				return BEV_OK;
 			}
 			st->chunk_state = CHUNK_WAIT_LEN;
@@ -746,7 +747,7 @@ int ntrip_chunk_decode_init(struct ntrip_state *st) {
 
 	st->input = st->chunk_buf;
 	if (evbuffer_get_length(st->filter.raw_input) > 0) {
-		ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode_init for %d bytes\n", evbuffer_get_length(st->filter.raw_input));
+		ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode_init for %d bytes", evbuffer_get_length(st->filter.raw_input));
 		ntrip_chunk_decode(st->filter.raw_input, st->input, -1, BEV_NORMAL, st);
 	}
 	return 0;
@@ -772,24 +773,24 @@ static int ntrip_handle_rtcm(struct ntrip_state *st) {
 		if (drain != NULL) {
 			evbuffer_remove(input, drain, len);
 			drain[len] = '\0';
-			ntrip_log(st, LOG_INFO, "RTCM: draining %zd bytes: \"%s\"\n", len, drain);
+			ntrip_log(st, LOG_INFO, "RTCM: draining %zd bytes: \"%s\"", len, drain);
 			free(drain);
 		} else
 #endif
 		{
-			ntrip_log(st, LOG_INFO, "draining %zd bytes\n", len);
+			ntrip_log(st, LOG_INFO, "draining %zd bytes", len);
 			evbuffer_drain(input, len);
 		}
 		return 0;
 	}
 	if (p.pos > 0) {
-		ntrip_log(st, LOG_DEBUG, "RTCM: found packet start, draining %zd bytes\n", p.pos);
+		ntrip_log(st, LOG_DEBUG, "RTCM: found packet start, draining %zd bytes", p.pos);
 		evbuffer_drain(input, p.pos);
 	}
 
 	unsigned char *mem = evbuffer_pullup(input, 3);
 	if (mem == NULL) {
-		ntrip_log(st, LOG_DEBUG, "RTCM: not enough data, waiting\n");
+		ntrip_log(st, LOG_DEBUG, "RTCM: not enough data, waiting");
 		return 0;
 	}
 
@@ -804,7 +805,7 @@ static int ntrip_handle_rtcm(struct ntrip_state *st) {
 	struct packet *rtcmp = packet_new(len_rtcm, st->caster);
 	if (rtcmp == NULL) {
 		evbuffer_drain(input, len_rtcm);
-		ntrip_log(st, LOG_CRIT, "RTCM: Not enough memory, dropping packet\n");
+		ntrip_log(st, LOG_CRIT, "RTCM: Not enough memory, dropping packet");
 		return 1;
 	}
 
@@ -812,9 +813,9 @@ static int ntrip_handle_rtcm(struct ntrip_state *st) {
 	unsigned long crc = crc24q_hash(&rtcmp->data[0], len_rtcm-3);
 	if (crc == (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]) {
 		unsigned short type = rtcmp->data[3]*16 + rtcmp->data[4]/16;
-		ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d\n", st->mountpoint, len_rtcm, type);
+		ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len_rtcm, type);
 	} else {
-		ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x\n", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
+		ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
 	}
 
 	if (livesource_send_subscribers(st->own_livesource, rtcmp, st->caster))

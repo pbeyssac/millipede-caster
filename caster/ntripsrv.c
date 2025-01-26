@@ -130,7 +130,7 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 		return CHECKPW_MOUNTPOINT_INVALID;
 	}
 
-	ntrip_log(this, LOG_DEBUG, "mountpoint %s user %s\n", mountpoint, user);
+	ntrip_log(this, LOG_DEBUG, "mountpoint %s user %s", mountpoint, user);
 	for (; auth->key != NULL; auth++) {
 		if (!strcmp(auth->key, "*")) {
 			wildcard_entry = auth;
@@ -138,12 +138,12 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 		}
 		if (!strcmp(auth->key, mountpoint)) {
 			explicit_mountpoint = 1;
-			ntrip_log(this, LOG_DEBUG, "mountpoint %s found\n", mountpoint);
+			ntrip_log(this, LOG_DEBUG, "mountpoint %s found", mountpoint);
 			if (user && strcmp(auth->user, user))
 				break;
 
 			if (!strcmp(auth->password, passwd)) {
-				ntrip_log(this, LOG_DEBUG, "source %s auth ok\n", mountpoint);
+				ntrip_log(this, LOG_DEBUG, "source %s auth ok", mountpoint);
 				r = CHECKPW_MOUNTPOINT_VALID;
 				break;
 			}
@@ -154,7 +154,7 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 	if (explicit_mountpoint == 0 && wildcard_entry) {
 		/* Mountpoint entry not found, use the wildcard instead */
 		if (!strcmp(wildcard_entry->password, passwd)) {
-			ntrip_log(this, LOG_DEBUG, "source %s auth ok using wildcard\n", mountpoint);
+			ntrip_log(this, LOG_DEBUG, "source %s auth ok using wildcard", mountpoint);
 			r = CHECKPW_MOUNTPOINT_WILDCARD;
 		}
 	}
@@ -182,15 +182,15 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *arg) {
 		return;
 	}
 
-	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d\n", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
+	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
 	dist_table_display(st, s, 10);
 
 	if (st->source_virtual) {
 		if (s->dist_array[0].dist > st->max_min_dist) {
 			st->max_min_dist = s->dist_array[0].dist;
-			ntrip_log(st, LOG_DEBUG, "New maximum distance to source: %.2f\n", st->max_min_dist);
+			ntrip_log(st, LOG_DEBUG, "New maximum distance to source: %.2f", st->max_min_dist);
 		} else
-			ntrip_log(st, LOG_DEBUG, "Current maximum distance to source: %.2f\n", st->max_min_dist);
+			ntrip_log(st, LOG_DEBUG, "Current maximum distance to source: %.2f", st->max_min_dist);
 
 		char *m = s->dist_array[0].mountpoint;
 
@@ -207,13 +207,13 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *arg) {
 			float current_dist = st->virtual_mountpoint ? (distance(&st->mountpoint_pos, &st->last_pos)-st->caster->config->hysteresis_m) : 1e10;
 
 			if (current_dist < s->dist_array[0].dist) {
-				ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis\n", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
+				ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
 			} else {
 				enum livesource_state source_state;
 				struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, s->dist_array[0].on_demand, &source_state);
 				if (l && (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING))) {
 					if (redistribute_switch_source(st, m, &s->dist_array[0].pos, l) < 0)
-						ntrip_log(st, LOG_NOTICE, "Unable to switch source from %s to %s\n", st->virtual_mountpoint, m);
+						ntrip_log(st, LOG_NOTICE, "Unable to switch source from %s to %s", st->virtual_mountpoint, m);
 				}
 			}
 		}
@@ -239,7 +239,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 	TAILQ_INIT(&opt_headers);
 
-	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d\n", st->state, evbuffer_get_length(st->filter.raw_input));
+	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
 
 	if (ntrip_filter_run_input(st) < 0)
 		return;
@@ -254,11 +254,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes\n", line, len);
+			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes", line, len);
 			int i = 0;
 			char *septmp = line;
 			while ((token = strsep(&septmp, " \t")) != NULL && i < SIZE_HTTP_ARGS) {
-				//ntrip_log(st, LOG_DEBUG, "TOKEN %s\n", token);
+				//ntrip_log(st, LOG_DEBUG, "TOKEN %s", token);
 				st->http_args[i] = mystrdup(token);
 				if (st->http_args[i] == NULL) {
 					err = 503;
@@ -276,11 +276,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes\n", line, len);
+			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes", line, len);
 			if (strlen(line) != 0) {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
-					ntrip_log(st, LOG_DEBUG, "parse_header failed\n");
+					ntrip_log(st, LOG_DEBUG, "parse_header failed");
 					err = 1;
 					break;
 				}
@@ -308,28 +308,28 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					}
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
-					ntrip_log(st, LOG_DEBUG, "Header %s: *****\n", key);
+					ntrip_log(st, LOG_DEBUG, "Header %s: *****", key);
 					if (http_decode_auth(value, &st->user, &st->password) >= 0)
-						ntrip_log(st, LOG_DEBUG, "Decoded auth: %s, %s\n", st->user, st->password);
+						ntrip_log(st, LOG_DEBUG, "Decoded auth: %s, %s", st->user, st->password);
 					else {
 						if (st->caster->config->log_level >= LOG_DEBUG) {
-							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"\n", value);
+							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"", value);
 						} else {
-							ntrip_log(st, LOG_INFO, "Can't decode Authorization\n");
+							ntrip_log(st, LOG_INFO, "Can't decode Authorization");
 						}
 					}
 				} else {
-					ntrip_log(st, LOG_DEBUG, "Header %s: %s\n", key, value);
+					ntrip_log(st, LOG_DEBUG, "Header %s: %s", key, value);
 				}
 			} else {
-				ntrip_log(st, LOG_DEBUG, "[End headers]\n");
+				ntrip_log(st, LOG_DEBUG, "[End headers]");
 				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
 					err = 503;
 					break;
 				}
 				if (!strcmp(st->http_args[0], "SOURCE")) {
 					/* Don't log the password */
-					ntrip_alog(st, "%s *** %s\n", st->http_args[0], st->http_args[2]);
+					ntrip_alog(st, "%s *** %s", st->http_args[0], st->http_args[2]);
 				} else {
 					// Copy query string if any, clear from the request
 					char *querystring = strchr(st->http_args[1], '?');
@@ -337,7 +337,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						st->query_string = mystrdup(querystring+1);
 						*querystring = '\0';
 					}
-					ntrip_alog(st, "%s %s %s\n", st->http_args[0], st->http_args[1], st->http_args[2]);
+					ntrip_alog(st, "%s %s %s", st->http_args[0], st->http_args[1], st->http_args[2]);
 				}
 				if (!strcmp(st->http_args[0], "GET")) {
 					if (st->http_args[1] == NULL || st->http_args[1][0] != '/') {
@@ -378,7 +378,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						P_MUTEX_LOCK(&st->caster->livesources.delete_lock);
 						struct livesource *l = livesource_find_on_demand(st->caster, st, mountpoint, &sourceline->pos, st->source_on_demand, NULL);
 						if (l) {
-							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d\n", mountpoint, st->source_on_demand);
+							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d", mountpoint, st->source_on_demand);
 							ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 							st->state = NTRIP_WAIT_CLIENT_INPUT;
 
@@ -408,7 +408,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					 */
 					int sndbuf = st->caster->config->backlog_socket;
 					if (setsockopt(st->fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof sndbuf) < 0)
-						ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed\n", sndbuf);
+						ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed", sndbuf);
 				} else if (!strcmp(st->http_args[0], "POST") || !strcmp(st->http_args[0], "SOURCE")) {
 					char *password;
 					char *user;
@@ -491,7 +491,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
 			st->received_bytes += len + 1;
 			pos_t pos;
-			ntrip_log(st, LOG_DEBUG, "GGA? \"%s\", %zd bytes\n", line, len);
+			ntrip_log(st, LOG_DEBUG, "GGA? \"%s\", %zd bytes", line, len);
 			if (parse_gga(line, &pos) >= 0) {
 				st->last_pos = pos;
 				st->last_pos_valid = 1;
@@ -572,7 +572,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 		if (len == 0)
 			ntrip_deferred_free(st, "ntripsrv_writecb");
 		else
-			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb remaining len %d\n", len);
+			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb remaining len %d", len);
 	}
 }
 
@@ -582,25 +582,25 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
 	if (events & BEV_EVENT_CONNECTED) {
-		ntrip_log(st, LOG_INFO, "Connected srv\n");
+		ntrip_log(st, LOG_INFO, "Connected srv");
 		return;
 	}
 
 	if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_EOF)
-			ntrip_log(st, LOG_INFO, "Connection closed (EOF)\n");
+			ntrip_log(st, LOG_INFO, "Connection closed (EOF)");
 		else {
 			char err[256];
-			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s\n", strerror_r(initial_errno, err, sizeof err));
+			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s", strerror_r(initial_errno, err, sizeof err));
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING)
-			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout\n");
+			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout");
 		if (events & BEV_EVENT_WRITING)
-			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout\n");
+			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout");
 	}
 
-	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb bev %p\n", bev);
+	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb bev %p", bev);
 	ntrip_deferred_free(st, "ntripsrv_eventcb");
 }
 

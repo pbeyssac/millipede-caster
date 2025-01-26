@@ -61,7 +61,7 @@ static struct auth_entry *auth_parse(struct caster_state *caster, const char *fi
 	p = file_parse(filename, 3, ":", 0, &caster->flog);
 
 	if (p == NULL) {
-		logfmt(&caster->flog, LOG_ERR, "Can't read or parse %s\n", filename);
+		logfmt(&caster->flog, LOG_ERR, "Can't read or parse %s", filename);
 		return NULL;
 	}
 	struct auth_entry *auth = (struct auth_entry *)malloc(sizeof(struct auth_entry)*(p->nlines+1));
@@ -95,7 +95,7 @@ static void auth_free(struct auth_entry *this) {
 void caster_log_error(struct caster_state *this, char *orig) {
 	char s[256];
 	strerror_r(errno, s, sizeof s);
-	logfmt(&this->flog, LOG_ERR, "%s: %s (%d)\n", orig, s, errno);
+	logfmt(&this->flog, LOG_ERR, "%s: %s (%d)", orig, s, errno);
 }
 
 static void
@@ -104,6 +104,7 @@ _caster_log(FILE *log, int level, const char *fmt, va_list ap) {
 	logdate(date, sizeof date);
 	fputs(date, log);
 	vfprintf(log, fmt, ap);
+	fputs("\n", log);
 }
 
 static void
@@ -126,7 +127,7 @@ caster_log(void *arg, int level, const char *fmt, va_list ap) {
 
 int
 caster_tls_log_cb(const char *str, size_t len, void *u) {
-	logfmt(&((struct caster_state *)u)->flog, LOG_ERR, "%s\n", str);
+	logfmt(&((struct caster_state *)u)->flog, LOG_ERR, "%s", str);
 	// Undocumentend OpenSSL API: return >0 if ok, <=0 if failed
 	return 1;
 }
@@ -306,7 +307,7 @@ static int listener_load_certs(struct listener *this, char *tls_full_certificate
 		return -1;
 	if (!SSL_CTX_check_private_key(this->ssl_server_ctx)) {
 		char ip[64];
-		logfmt(&this->caster->flog, LOG_ERR, "Private key for %s does not match the certificate public key\n", ip_str_port(&this->sockaddr, ip, sizeof ip));
+		logfmt(&this->caster->flog, LOG_ERR, "Private key for %s does not match the certificate public key", ip_str_port(&this->sockaddr, ip, sizeof ip));
 		return -1;
 	}
 	return 0;
@@ -352,7 +353,7 @@ static int caster_start_listener(struct caster_state *this, struct config_bind *
 		LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, config->queue_size,
 		(struct sockaddr *)sin, sin->generic.sa_len);
 	if (!listener->listener) {
-		logfmt(&this->flog, LOG_ERR, "Could not create a listener for %s:%d!\n", config->ip, config->port);
+		logfmt(&this->flog, LOG_ERR, "Could not create a listener for %s:%d!", config->ip, config->port);
 		return -1;
 	}
 	return 0;
@@ -370,7 +371,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 
 	P_RWLOCK_WRLOCK(&this->configlock);
 	if (this->config->bind_count == 0) {
-		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.\n");
+		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
 		if (this->listeners)
 			caster_free_listeners(this);
 		P_RWLOCK_UNLOCK(&this->configlock);
@@ -379,7 +380,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 
 	new_listeners = (struct listener **)malloc(sizeof(struct listener *)*this->config->bind_count);
 	if (!new_listeners) {
-		logfmt(&this->flog, LOG_CRIT, "Can't allocate listeners\n");
+		logfmt(&this->flog, LOG_CRIT, "Can't allocate listeners");
 		if (this->listeners)
 			caster_free_listeners(this);
 		P_RWLOCK_UNLOCK(&this->configlock);
@@ -400,7 +401,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 		port = htons(config->port);
 		r = ip_convert(config->ip, &sin);
 		if (!r) {
-			logfmt(&this->flog, LOG_ERR, "Invalid IP %s\n", this->config->bind[i].ip);
+			logfmt(&this->flog, LOG_ERR, "Invalid IP %s", this->config->bind[i].ip);
 			continue;
 		}
 		if (sin.generic.sa_family == AF_INET)
@@ -421,14 +422,14 @@ static int caster_reload_listeners(struct caster_state *this) {
 		}
 		if (recycled_listener) {
 			if (config->tls && listener_setup_tls(recycled_listener, config) < 0) {
-				logfmt(&this->flog, LOG_ERR, "Can't reuse listener %s: TLS setup failed\n", ip_str_port(&sin, ip, sizeof ip));
+				logfmt(&this->flog, LOG_ERR, "Can't reuse listener %s: TLS setup failed", ip_str_port(&sin, ip, sizeof ip));
 				recycled_listener = NULL;
 			} else {
 				if (recycled_listener->tls && !config->tls) {
 					recycled_listener->tls = 0;
 					SSL_CTX_free(recycled_listener->ssl_server_ctx);
 				}
-				logfmt(&this->flog, LOG_INFO, "Reusing listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+				logfmt(&this->flog, LOG_INFO, "Reusing listener %s", ip_str_port(&sin, ip, sizeof ip));
 				new_listeners[nlisteners++] = recycled_listener;
 				this->listeners[j] = NULL;
 			}
@@ -441,9 +442,9 @@ static int caster_reload_listeners(struct caster_state *this) {
 			if (new_listener) {
 				if (caster_start_listener(this, this->config->bind+i, &sin, new_listener) >= 0) {
 					new_listeners[nlisteners++] = new_listener;
-					logfmt(&this->flog, LOG_INFO, "Opening listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+					logfmt(&this->flog, LOG_INFO, "Opening listener %s", ip_str_port(&sin, ip, sizeof ip));
 				} else {
-					logfmt(&this->flog, LOG_ERR, "Unable to open listener %s\n", ip_str_port(&sin, ip, sizeof ip));
+					logfmt(&this->flog, LOG_ERR, "Unable to open listener %s", ip_str_port(&sin, ip, sizeof ip));
 					caster_free_listener(new_listener);
 				}
 			}
@@ -457,7 +458,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 	 */
 	for (int j = 0; j < this->listeners_count; j++)
 		if (this->listeners[j]) {
-			logfmt(&this->flog, LOG_INFO, "Closing listener %s\n", ip_str_port(&this->listeners[j]->sockaddr, ip, sizeof ip));
+			logfmt(&this->flog, LOG_INFO, "Closing listener %s", ip_str_port(&this->listeners[j]->sockaddr, ip, sizeof ip));
 			caster_free_listener(this->listeners[j]);
 		}
 
@@ -468,7 +469,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 	P_RWLOCK_UNLOCK(&this->configlock);
 
 	if (this->listeners_count == 0) {
-		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.\n");
+		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
 		return -1;
 	}
 	return 0;
@@ -502,7 +503,7 @@ caster_reload_sourcetables(struct caster_state *caster) {
 	TAILQ_FOREACH_SAFE(s, &caster->sourcetablestack.list, next, stmp) {
 		P_RWLOCK_WRLOCK(&s->lock);
 		if (s->local && s->filename) {
-			logfmt(&caster->flog, LOG_INFO, "Removing %s\n", s->filename);
+			logfmt(&caster->flog, LOG_INFO, "Removing %s", s->filename);
 			TAILQ_REMOVE(&caster->sourcetablestack.list, s, next);
 			sourcetable_free_unlocked(s);
 			/* Skip the unlock below! */
@@ -511,7 +512,7 @@ caster_reload_sourcetables(struct caster_state *caster) {
 		P_RWLOCK_UNLOCK(&s->lock);
 	}
 
-	logfmt(&caster->flog, LOG_INFO, "Reloading %s\n", caster->config->sourcetable_filename);
+	logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->sourcetable_filename);
 	TAILQ_INSERT_TAIL(&caster->sourcetablestack.list, local_table, next);
 
 	P_RWLOCK_UNLOCK(&caster->sourcetablestack.lock);
@@ -532,7 +533,7 @@ caster_reopen_logs(struct caster_state *this) {
 static int
 caster_reload_auth(struct caster_state *caster) {
 	int r = 0;
-	logfmt(&caster->flog, LOG_INFO, "Reloading %s and %s\n", caster->config->host_auth_filename, caster->config->source_auth_filename);
+	logfmt(&caster->flog, LOG_INFO, "Reloading %s and %s", caster->config->host_auth_filename, caster->config->source_auth_filename);
 
 	P_RWLOCK_WRLOCK(&caster->configlock);
 
@@ -568,7 +569,7 @@ caster_reload_blocklist(struct caster_state *caster) {
 	}
 
 	if (caster->config->blocklist_filename) {
-		logfmt(&caster->flog, LOG_INFO, "Reloading %s\n", caster->config->blocklist_filename);
+		logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->blocklist_filename);
 		p = prefix_table_new(caster->config->blocklist_filename, &caster->flog);
 		caster->blocklist = p;
 		if (p == NULL)
@@ -581,7 +582,7 @@ caster_reload_blocklist(struct caster_state *caster) {
 static int caster_reload_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
-		logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s\n", this->config_file);
+		logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s", this->config_file);
 		return -1;
 	}
 	config_free(this->config);
@@ -642,14 +643,14 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	P_RWLOCK_UNLOCK(&listener_conf->caster->configlock);
 
 	if (bev == NULL) {
-		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent!\n");
+		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent!");
 		close(fd);
 		return;
 	}
 
 	struct ntrip_state *st = ntrip_new(caster, bev, NULL, 0, NULL);
 	if (st == NULL) {
-		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state for a new connection!\n");
+		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state for a new connection!");
 		bufferevent_free(bev);
 		close(fd);
 		return;
@@ -665,7 +666,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		return;
 	}
 
-	ntrip_log(st, LOG_INFO, "New connection\n");
+	ntrip_log(st, LOG_INFO, "New connection");
 
 	// evbuffer_defer_callbacks(bufferevent_get_output(bev), st->caster->base);
 
@@ -710,7 +711,7 @@ int caster_reload(struct caster_state *this) {
 static void
 signalhup_cb(evutil_socket_t sig, short events, void *arg) {
 	struct caster_state *caster = (struct caster_state *)arg;
-	logfmt(&caster->flog, LOG_INFO, "Reloading configuration\n");
+	logfmt(&caster->flog, LOG_INFO, "Reloading configuration");
 	caster_reload(caster);
 }
 
@@ -719,7 +720,7 @@ static struct caster_state *caster = NULL;
 static
 void event_log_redirect(int severity, const char *msg) {
 	if (caster != NULL)
-		logfmt(&caster->flog, LOG_INFO, "%s\n", msg);
+		logfmt(&caster->flog, LOG_INFO, "%s", msg);
 	else
 		fprintf(stderr, "%s\n", msg);
 }
@@ -804,16 +805,16 @@ static int caster_reload_fetchers(struct caster_state *this) {
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
 			if (p)
-				logfmt(&this->flog, LOG_INFO, "New fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
+				logfmt(&this->flog, LOG_INFO, "New fetcher %s:%d", this->config->proxy[i].host, this->config->proxy[i].port);
 			else {
-				logfmt(&this->flog, LOG_ERR, "Can't start fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
+				logfmt(&this->flog, LOG_ERR, "Can't start fetcher %s:%d", this->config->proxy[i].host, this->config->proxy[i].port);
 				r = -1;
 			}
 		} else {
 			fetcher_sourcetable_reload(p,
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
-			logfmt(&this->flog, LOG_INFO, "Reusing fetcher %s:%d\n", this->config->proxy[i].host, this->config->proxy[i].port);
+			logfmt(&this->flog, LOG_INFO, "Reusing fetcher %s:%d", this->config->proxy[i].host, this->config->proxy[i].port);
 		}
 		new_fetchers[i] = p;
 	}
@@ -822,7 +823,7 @@ static int caster_reload_fetchers(struct caster_state *this) {
 	 */
 	for (int j = 0; j < this->sourcetable_fetchers_count; j++)
 		if (this->sourcetable_fetchers[j]) {
-			logfmt(&this->flog, LOG_INFO, "Stopping fetcher %s:%d\n", this->sourcetable_fetchers[j]->task->host, this->sourcetable_fetchers[j]->task->port);
+			logfmt(&this->flog, LOG_INFO, "Stopping fetcher %s:%d", this->sourcetable_fetchers[j]->task->host, this->sourcetable_fetchers[j]->task->port);
 			fetcher_sourcetable_free(this->sourcetable_fetchers[j]);
 		}
 	free(this->sourcetable_fetchers);
@@ -887,7 +888,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 	if (evutil_make_socket_nonblocking(fds) < 0) {
-		logfmt(&caster->flog, LOG_ERR, "Can't make socket non-blocking\n");
+		logfmt(&caster->flog, LOG_ERR, "Can't make socket non-blocking");
 		return 1;
 	}
 	// evutil_socket_t s = event_get_fd(listener);
@@ -906,7 +907,7 @@ int caster_main(char *config_file) {
 	}
 
 	if (threads && jobs_start_threads(caster->joblist, nthreads) < 0) {
-		logfmt(&caster->flog, LOG_CRIT, "Could not create threads!\n");
+		logfmt(&caster->flog, LOG_CRIT, "Could not create threads!");
 		caster_free(caster);
 		return 1;
 	}

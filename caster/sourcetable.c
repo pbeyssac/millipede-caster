@@ -218,12 +218,12 @@ void sourcetable_diff(struct caster_state *caster, struct sourcetable *t1, struc
 	while (i1 < n1 && i2 < n2) {
 		c = strcmp(keys1[i1]->key, keys2[i2]->key);
 		if (c < 0) {
-			logfmt(&caster->flog, LOG_INFO, "%s:%d Removed source %s\n", t1->caster, t1->port, keys1[i1]->key);
+			logfmt(&caster->flog, LOG_INFO, "%s:%d Removed source %s", t1->caster, t1->port, keys1[i1]->key);
 			i1++;
 			continue;
 		}
 		if (c > 0) {
-			logfmt(&caster->flog, LOG_INFO, "%s:%d Added source %s\n", t2->caster, t2->port, keys2[i2]->key);
+			logfmt(&caster->flog, LOG_INFO, "%s:%d Added source %s", t2->caster, t2->port, keys2[i2]->key);
 			i2++;
 			continue;
 		}
@@ -231,11 +231,11 @@ void sourcetable_diff(struct caster_state *caster, struct sourcetable *t1, struc
 		i2++;
 	}
 	while (i1 < n1) {
-		logfmt(&caster->flog, LOG_INFO, "%s:%d Removed source %s\n", t1->caster, t1->port, keys1[i1]->key);
+		logfmt(&caster->flog, LOG_INFO, "%s:%d Removed source %s", t1->caster, t1->port, keys1[i1]->key);
 		i1++;
 	}
 	while (i2 < n2) {
-		logfmt(&caster->flog, LOG_INFO, "%s:%d Added source %s\n", t2->caster, t2->port, keys2[i2]->key);
+		logfmt(&caster->flog, LOG_INFO, "%s:%d Added source %s", t2->caster, t2->port, keys2[i2]->key);
 		i2++;
 	}
 	hash_array_free(keys1);
@@ -349,9 +349,9 @@ void dist_table_free(struct dist_table *this) {
 void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max) {
 	float max_dist = this->size_dist_array ? this->dist_array[this->size_dist_array-1].dist : 40000;
 
-	ntrip_log(st, LOG_INFO, "dist_table from (%f, %f) %s:%d, furthest base dist %.2f:\n", this->pos.lat, this->pos.lon, this->sourcetable->caster, this->sourcetable->port, max_dist);
+	ntrip_log(st, LOG_INFO, "dist_table from (%f, %f) %s:%d, furthest base dist %.2f:", this->pos.lat, this->pos.lon, this->sourcetable->caster, this->sourcetable->port, max_dist);
 	for (int i = 0; i < max && i < this->size_dist_array; i++) {
-		ntrip_log(st, LOG_INFO, "%.2f: %s\n", this->dist_array[i].dist, this->dist_array[i].mountpoint);
+		ntrip_log(st, LOG_INFO, "%.2f: %s", this->dist_array[i].dist, this->dist_array[i].mountpoint);
 	}
 }
 
