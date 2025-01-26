@@ -16,6 +16,9 @@ struct ntrip_task {
 	/* Task type string */
 	const char *type;
 
+	/* HTTP method to use */
+	const char *method;
+
 	/* How often to runs, in seconds. 0 = one shot. */
 	int refresh_delay;
 

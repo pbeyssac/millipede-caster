@@ -273,7 +273,7 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 }
 
 static void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m) {
-	char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, st->uri, 2, NULL, m);
+	char *s = ntripcli_http_request_str(st, st->task?st->task->method:"GET", st->host, st->port, st->uri, 2, NULL, m);
 	if (s == NULL) {
 		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d", st->host, st->port);
 		ntrip_deferred_free(st, "ntripcli_send_request");

@@ -35,6 +35,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->ev = NULL;
 	this->type = type;
 	this->tls = tls;
+	this->method = "GET";
 	TAILQ_INIT(&this->headers);
 	return this;
 }
