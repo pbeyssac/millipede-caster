@@ -33,7 +33,7 @@ static void display_headers(struct ntrip_state *st, struct evkeyvalq *headers) {
 /*
  * Build a full HTTP request, including headers.
  */
-static char *ntripcli_http_request_str(struct ntrip_state *st, const char *method, char *host, unsigned short port, char *uri, int version, struct evkeyvalq *opt_headers) {
+static char *ntripcli_http_request_str(struct ntrip_state *st, const char *method, char *host, unsigned short port, char *uri, int version, struct evkeyvalq *opt_headers, struct mime_content *m) {
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 
@@ -41,11 +41,18 @@ static char *ntripcli_http_request_str(struct ntrip_state *st, const char *metho
 	if (host_port == NULL) {
 		return NULL;
 	}
+	unsigned long long content_len = 0;
+	char content_len_str[20];
+	if (m)
+		content_len = m->len;
+	snprintf(content_len_str, sizeof content_len_str, "%lld", content_len);
 
 	TAILQ_INIT(&headers);
 	if (evhttp_add_header(&headers, "Host", host_port) < 0
 	 || evhttp_add_header(&headers, "User-Agent", client_user_agent) < 0
 	 || evhttp_add_header(&headers, "Connection", "close") < 0
+	 || evhttp_add_header(&headers, "Content-Length", content_len_str) < 0
+	 || (m && evhttp_add_header(&headers, "Content-Type", m->mime_type) < 0)
 	 || (version == 2 && evhttp_add_header(&headers, "Ntrip-Version", client_ntrip_version) < 0)) {
 		evhttp_clear_headers(&headers);
 		strfree(host_port);
@@ -251,14 +258,14 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 	}
 }
 
-static void ntripcli_send_request(struct ntrip_state *st, struct bufferevent *bev) {
-	char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, st->uri, 2, NULL);
+static void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m) {
+	char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, st->uri, 2, NULL, m);
 	if (s == NULL) {
 		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d", st->host, st->port);
 		ntrip_deferred_free(st, "ntripcli_send_request");
 		return;
 	}
-	bufferevent_write(bev, s, strlen(s));
+	bufferevent_write(st->bev, s, strlen(s));
 	strfree(s);
 	st->state = NTRIP_WAIT_HTTP_STATUS;
 }
@@ -272,7 +279,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 
 		ntrip_set_peeraddr(st, NULL, 0);
 		ntrip_log(st, LOG_INFO, "Connected to %s:%d for %s", st->host, st->port, st->uri);
-		ntripcli_send_request(st, bev);
+		ntripcli_send_request(st, NULL);
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
