@@ -123,7 +123,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes on /%s", line, len, st->mountpoint);
+			ntrip_log(st, LOG_DEBUG, "Got \"%s\" on %s", line, st->uri);
 
 			char *septmp = line;
 			for (arg = &st->http_args[0];
@@ -164,7 +164,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			if (status_code == 200)
 				st->state = NTRIP_WAIT_HTTP_HEADER;
 			else {
-				ntrip_log(st, LOG_NOTICE, "failed request on /%s, status_code %d", st->mountpoint, st->status_code);
+				ntrip_log(st, LOG_NOTICE, "failed request on %s, status_code %d", st->uri, st->status_code);
 				end = 1;
 			}
 
@@ -252,15 +252,7 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 }
 
 static void ntripcli_send_request(struct ntrip_state *st, struct bufferevent *bev) {
-	char *uri = (char *)strmalloc(strlen(st->mountpoint) + 3);
-	if (uri == NULL) {
-		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
-		ntrip_deferred_free(st, "ntripcli_send_request");
-		return;
-	}
-	sprintf(uri, "/%s", st->mountpoint);
-	char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, uri, 2, NULL);
-	strfree(uri);
+	char *s = ntripcli_http_request_str(st, "GET", st->host, st->port, st->uri, 2, NULL);
 	if (s == NULL) {
 		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d", st->host, st->port);
 		ntrip_deferred_free(st, "ntripcli_send_request");
@@ -279,7 +271,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		ntrip_set_fd(st);
 
 		ntrip_set_peeraddr(st, NULL, 0);
-		ntrip_log(st, LOG_INFO, "Connected to %s:%d for /%s", st->host, st->port, st->mountpoint);
+		ntrip_log(st, LOG_INFO, "Connected to %s:%d for %s", st->host, st->port, st->uri);
 		ntripcli_send_request(st, bev);
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
@@ -316,7 +308,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 }
 
 int
-ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *type, struct ntrip_task *task) {
+ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri, const char *type, struct ntrip_task *task) {
 	struct bufferevent *bev;
 
 	SSL *ssl = NULL;
@@ -355,7 +347,7 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent in ntripcli_start!");
 		return -1;
 	}
-	struct ntrip_state *st = ntrip_new(caster, bev, host, port, NULL);
+	struct ntrip_state *st = ntrip_new(caster, bev, host, port, uri, NULL);
 	if (st == NULL) {
 		bufferevent_free(bev);
 		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state in ntripcli_start!");

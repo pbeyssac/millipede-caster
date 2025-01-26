@@ -22,20 +22,20 @@
 /*
  * Create a NTRIP session state for a client or a server connection.
  */
-struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint) {
+struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev,
+		char *host, unsigned short port, const char *uri, char *mountpoint) {
 	struct ntrip_state *this = (struct ntrip_state *)malloc(sizeof(struct ntrip_state));
 	if (this == NULL) {
 		logfmt(&caster->flog, LOG_CRIT, "ntrip_new failed: out of memory");
 		return NULL;
 	}
 	this->mountpoint = mystrdup(mountpoint?mountpoint:"");
-	if (this->mountpoint == NULL) {
-		free(this);
-		return NULL;
-	}
-	this->host = NULL;
-	if (host && (this->host = mystrdup(host)) == NULL) {
+	this->uri = uri ? mystrdup(uri) : NULL;
+	this->host = host ? mystrdup(host) : NULL;
+	if ((host && (this->host = mystrdup(host)) == NULL) || this->mountpoint == NULL || (uri && this->uri == NULL)) {
 		strfree(this->mountpoint);
+		strfree(this->uri);
+		strfree(this->host);
 		free(this);
 		return NULL;
 	}
@@ -208,6 +208,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_DEBUG, "FREE %s", orig);
 
 	strfree(this->mountpoint);
+	strfree(this->uri);
 	strfree(this->virtual_mountpoint);
 	strfree(this->host);
 	strfree(this->content);

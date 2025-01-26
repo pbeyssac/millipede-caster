@@ -38,9 +38,11 @@ struct redistribute_cb_args *
 redistribute_args_new(struct caster_state *caster, struct livesource *livesource, char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent) {
 	struct redistribute_cb_args *redis_args;
 	redis_args = (struct redistribute_cb_args *)malloc(sizeof(struct redistribute_cb_args));
-	char *dup_mountpoint = mystrdup(mountpoint);
-	if (redis_args != NULL && dup_mountpoint != NULL) {
-		redis_args->mountpoint = dup_mountpoint;
+	char *uri = (char *)strmalloc(strlen(mountpoint)+2);
+	if (redis_args != NULL && uri != NULL) {
+		sprintf(uri, "/%s", mountpoint);
+		redis_args->mountpoint = uri+1;
+		redis_args->uri = uri;
 		if (mountpoint_pos)
 			redis_args->mountpoint_pos = *mountpoint_pos;
 		else {
@@ -56,8 +58,7 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 	} else {
 		if (redis_args)
 			free(redis_args);
-		if (dup_mountpoint)
-			strfree(dup_mountpoint);
+		strfree(uri);
 		return NULL;
 	}
 }
@@ -66,7 +67,7 @@ void
 redistribute_args_free(struct redistribute_cb_args *this) {
 	if (this->ev)
 		event_del(this->ev);
-	strfree(this->mountpoint);
+	strfree(this->uri);
 	free(this);
 }
 
@@ -137,7 +138,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 	/*
 	 * Create new client state.
 	 */
-	struct ntrip_state *st = ntrip_new(redis_args->caster, bev, sp->caster, sp->port, redis_args->mountpoint);
+	struct ntrip_state *st = ntrip_new(redis_args->caster, bev, sp->caster, sp->port, redis_args->uri, redis_args->mountpoint);
 	if (st == NULL) {
 		logfmt(&redis_args->caster->flog, LOG_CRIT, "Out of memory, cannot redistribute %s", redis_args->mountpoint);
 		return;

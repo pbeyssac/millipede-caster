@@ -147,6 +147,7 @@ struct ntrip_state {
 	unsigned short port;			// port to connect to
 	struct ntrip_task *task;		// descriptor and callbacks for the current task
 	struct subscriber *subscription;	// current source subscription
+	char *uri;				// URI for requests
 
 	/*
 	 * NTRIP server state
@@ -192,7 +193,8 @@ struct ntrip_state {
 	char *virtual_mountpoint;
 };
 
-struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev, char *host, unsigned short port, char *mountpoint);
+struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev,
+	char *host, unsigned short port, const char *uri, char *mountpoint);
 void ntrip_register(struct ntrip_state *this);
 int ntrip_register_check(struct ntrip_state *this);
 void ntrip_set_fd(struct ntrip_state *this);
