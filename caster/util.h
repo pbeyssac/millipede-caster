@@ -2,6 +2,7 @@
 #define __UTIL_H__
 
 #include <sys/types.h>
+#include <sys/queue.h>
 
 #include "conf.h"
 #include "log.h"
@@ -40,11 +41,13 @@ struct auth_entry {
  * Content with a MIME type
  */
 struct mime_content {
+	STAILQ_ENTRY(mime_content) next;	// optional queue
 	char *s;
 	const char *mime_type;
 	size_t len;
 	int use_strfree;
 };
+STAILQ_HEAD(mimeq, mime_content);
 
 #if !DEBUG
 #define strfree free

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <sys/queue.h>
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -33,7 +34,10 @@ static void display_headers(struct ntrip_state *st, struct evkeyvalq *headers) {
 /*
  * Build a full HTTP request, including headers.
  */
-static char *ntripcli_http_request_str(struct ntrip_state *st, const char *method, char *host, unsigned short port, char *uri, int version, struct evkeyvalq *opt_headers, struct mime_content *m) {
+static char *ntripcli_http_request_str(struct ntrip_state *st,
+	const char *method, char *host, unsigned short port, char *uri, int version,
+	struct evkeyvalq *opt_headers, struct mime_content *m) {
+
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 
@@ -50,9 +54,9 @@ static char *ntripcli_http_request_str(struct ntrip_state *st, const char *metho
 	TAILQ_INIT(&headers);
 	if (evhttp_add_header(&headers, "Host", host_port) < 0
 	 || evhttp_add_header(&headers, "User-Agent", client_user_agent) < 0
-	 || evhttp_add_header(&headers, "Connection", "close") < 0
 	 || evhttp_add_header(&headers, "Content-Length", content_len_str) < 0
 	 || (m && evhttp_add_header(&headers, "Content-Type", m->mime_type) < 0)
+	 || evhttp_add_header(&headers, "Connection", st->connection_keepalive?"keep-alive":"close") < 0
 	 || (version == 2 && evhttp_add_header(&headers, "Ntrip-Version", client_ntrip_version) < 0)) {
 		evhttp_clear_headers(&headers);
 		strfree(host_port);
@@ -131,7 +135,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	if (ntrip_filter_run_input(st) < 0)
 		return;
 
-	while (!end && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(st->input) > 5) {
+	while (!end && st->state != NTRIP_WAIT_CLOSE && (len = evbuffer_get_length(st->input)) > 0) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
@@ -182,6 +186,15 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 				bufferevent_set_timeouts(bev, &read_timeout, NULL);
 			}
+
+			st->received_keepalive = 0;
+			st->content_length = 0;
+			st->content_done = 0;
+			if (st->content_type) {
+				strfree(st->content_type);
+				st->content_type = NULL;
+			}
+
 			if (status_code == 200)
 				st->state = NTRIP_WAIT_HTTP_HEADER;
 			else {
@@ -202,9 +215,15 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					st->state = NTRIP_REGISTER_SOURCE;
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
-				} else if (st->task)
+				} else if (st->task && st->task->line_cb)
 					st->state = NTRIP_WAIT_CALLBACK_LINE;
-				else
+				else if (st->content_length)
+					st->state = NTRIP_WAIT_SERVER_CONTENT;
+				else if (st->connection_keepalive && st->received_keepalive) {
+					st->state = NTRIP_IDLE_CLIENT;
+					if (st->task)
+						ntrip_task_send_next_request(st);
+				} else
 					end = 1;
 			} else {
 				char *key, *value;
@@ -218,6 +237,17 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				if (!strcasecmp(key, "transfer-encoding")) {
 					if (!strcasecmp(value, "chunked"))
 						st->chunk_state = CHUNK_INIT;
+				} else if (!strcasecmp(key, "connection")) {
+					if (!strcasecmp(value, "keep-alive"))
+						st->received_keepalive = 1;
+				} else if (!strcasecmp(key, "content-length")) {
+					unsigned long content_length;
+					if (sscanf(value, "%lu", &content_length) == 1) {
+						st->content_length = content_length;
+						st->content_done = 0;
+					}
+				} else if (!strcasecmp(key, "content-type")) {
+					st->content_type = mystrdup(value);
 				}
 			}
 			free(line);
@@ -233,6 +263,24 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				end = 1;
 			}
 			free(line);
+		} else if (st->state == NTRIP_WAIT_SERVER_CONTENT) {
+			if (len > st->content_length - st->content_done)
+				len = st->content_length - st->content_done;
+			if (len) {
+				evbuffer_drain(st->input, len);
+				st->received_bytes += len;
+				st->content_done += len;
+			} else if (st->connection_keepalive && st->received_keepalive) {
+				st->state = NTRIP_IDLE_CLIENT;
+				if (st->task)
+					ntrip_task_send_next_request(st);
+			} else
+				end = 1;
+		} else if (st->state == NTRIP_IDLE_CLIENT) {
+			if (len) {
+				ntrip_log(st, LOG_INFO, "Server sent data on idle connection, closing");
+				end = 1;
+			}
 		} else if (st->state == NTRIP_REGISTER_SOURCE) {
 			if (st->own_livesource) {
 				livesource_set_state(st->own_livesource, LIVESOURCE_RUNNING);
@@ -272,12 +320,12 @@ void ntripcli_writecb(struct bufferevent *bev, void *arg)
 	}
 }
 
-static void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m) {
+void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m, int send_mime) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	char *s = ntripcli_http_request_str(st, st->task?st->task->method:"GET", st->host, st->port, st->uri, 2, NULL, m);
 	if (s == NULL
 	 || evbuffer_add_reference(output, s, strlen(s), strfree_callback, s) < 0
-	 || (m && evbuffer_add_reference(output, m->s, m->len, mime_free_callback, m) < 0)) {
+	 || (m && send_mime && evbuffer_add_reference(output, m->s, m->len, mime_free_callback, m) < 0)) {
 		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d", st->host, st->port);
 		ntrip_deferred_free(st, "ntripcli_send_request");
 		return;
@@ -294,7 +342,11 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 
 		ntrip_set_peeraddr(st, NULL, 0);
 		ntrip_log(st, LOG_INFO, "Connected to %s:%d for %s", st->host, st->port, st->uri);
-		ntripcli_send_request(st, NULL);
+		if (st->task && st->task->use_mimeq) {
+			st->state = NTRIP_IDLE_CLIENT;
+			ntrip_task_send_next_request(st);
+		} else
+			ntripcli_send_request(st, NULL, 0);
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
@@ -381,7 +433,10 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 
 	ntrip_register(st);
 	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d", type, host, port);
-	if (task) task->st = st;
+	if (task) {
+		task->st = st;
+		st->connection_keepalive = task->connection_keepalive;
+	}
 
 	if (threads)
 		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);

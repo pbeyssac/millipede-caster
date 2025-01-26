@@ -46,6 +46,18 @@ struct ntrip_task {
 
 	/* event structure for libevent */
 	struct event *ev;
+
+	/* try to negotiate Connection: keep-alive with the server */
+	char connection_keepalive;
+
+	/* MIME request queue */
+	struct mimeq mimeq;
+
+	/* Use the above queue instead of hardcoded requests */
+	char use_mimeq;
+
+	/* MIME type for bulk requests */
+	const char *bulk_content_type;
 };
 
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
@@ -53,5 +65,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 void ntrip_task_free(struct ntrip_task *this);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
+void ntrip_task_queue(struct ntrip_task *this, char *json);
+void ntrip_task_send_next_request(struct ntrip_state *st);
 
 #endif

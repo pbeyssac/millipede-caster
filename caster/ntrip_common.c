@@ -45,7 +45,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->sent_bytes = 0;
 
 	this->caster = caster;
-	this->state = NTRIP_WAIT_HTTP_STATUS;
+	this->state = NTRIP_INIT;
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
 	this->port = port;
@@ -53,6 +53,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->subscription = NULL;
 	this->server_version = 2;
 	this->client_version = 0;
+	this->connection_keepalive = 0;
+	this->received_keepalive = 0;
 	this->source_virtual = 0;
 	this->source_on_demand = 0;
 	this->last_pos_valid = 0;

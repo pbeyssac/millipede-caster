@@ -12,6 +12,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg);
 int ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri, const char *type, struct ntrip_task *task);
 void ntripcli_workers_readcb(struct bufferevent *bev, void *arg);
 void ntripcli_workers_writecb(struct bufferevent *bev, void *arg);
+void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m, int send_mime);
 void ntripcli_workers_eventcb(struct bufferevent *bev, short events, void *arg);
 
 #endif
