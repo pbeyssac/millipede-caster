@@ -122,5 +122,11 @@ fetcher_sourcetable_start(void *arg_cb) {
 	a->task->restart_cb = fetcher_sourcetable_start;
 	a->task->restart_cb_arg = arg_cb;
 	a->sourcetable = sourcetable_new(a->task->host, a->task->port);
-	ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->type, a->task);
+
+	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->type, a->task) < 0) {
+		sourcetable_free(a->sourcetable);
+		a->sourcetable = NULL;
+		a->task->st = NULL;
+		ntrip_task_reschedule(a->task, a);
+	}
 }

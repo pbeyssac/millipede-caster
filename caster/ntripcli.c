@@ -313,7 +313,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
 
-void
+int
 ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *type, struct ntrip_task *task) {
 	struct bufferevent *bev;
 
@@ -322,18 +322,18 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 		ssl = SSL_new(caster->ssl_client_ctx);
 		if (ssl == NULL) {
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
-			return;
+			return -1;
 		}
 
 		/* Set the Server Name Indication TLS extension, for virtual server handling */
 		if (SSL_set_tlsext_host_name(ssl, host) < 0) {
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
-			return;
+			return -1;
 		}
 		/* Set hostname for certificate verification. */
 		if (SSL_set1_host(ssl, host) != 1) {
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
-			return;
+			return -1;
 		}
 		SSL_set_verify(ssl, SSL_VERIFY_PEER, NULL);
 
@@ -351,13 +351,13 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 
 	if (bev == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent in ntripcli_start!");
-		return;
+		return -1;
 	}
 	struct ntrip_state *st = ntrip_new(caster, bev, host, port, NULL);
 	if (st == NULL) {
 		bufferevent_free(bev);
 		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state in ntripcli_start!");
-		return;
+		return -1;
 	}
 	st->type = type;
 	st->task = task;
@@ -378,6 +378,8 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 	bufferevent_set_timeouts(bev, &timeout, &timeout);
 
 	bufferevent_socket_connect_hostname(bev, caster->dns_base, AF_UNSPEC, host, port);
+
+	return 0;
 }
 
 void ntripcli_workers_readcb(struct bufferevent *bev, void *arg) {
