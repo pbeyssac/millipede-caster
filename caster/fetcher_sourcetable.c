@@ -1,10 +1,6 @@
 #include <assert.h>
 
-#include <event2/event.h>
-#include <event2/bufferevent.h>
-
 #include "conf.h"
-#include "ntrip_common.h"
 #include "ntrip_task.h"
 #include "ntripcli.h"
 #include "fetcher_sourcetable.h"
