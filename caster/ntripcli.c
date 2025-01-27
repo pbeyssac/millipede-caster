@@ -124,6 +124,18 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 	return r;
 }
 
+static void ntripcli_log_close(struct ntrip_state *st) {
+	struct timeval t1;
+
+	gettimeofday(&t1, NULL);
+	timersub(&t1, &st->start, &t1);
+	int bytes_left = evbuffer_get_length(st->input);
+	ntrip_log(st, bytes_left ? LOG_NOTICE:LOG_INFO,
+		"Connection closed, duration %.3f ms, bytes received %zu sent %zu left %zu.",
+		t1.tv_sec*1000 + t1.tv_usec/1000.,
+		st->received_bytes, st->sent_bytes, bytes_left);
+}
+
 void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	int end = 0;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
@@ -227,8 +239,11 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					st->state = NTRIP_IDLE_CLIENT;
 					if (st->task)
 						ntrip_task_send_next_request(st);
-				} else
+				} else {
+					ntrip_log(st, LOG_INFO, "closing connection due to connection_keepalive=%d received_keepalive=%d",
+						st->connection_keepalive, st->received_keepalive);
 					end = 1;
+				}
 			} else {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
@@ -310,6 +325,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			st->task->end_cb(0, st->task->end_cb_arg);
 			st->task = NULL;
 		}
+		ntripcli_log_close(st);
 		ntrip_deferred_free(st, "ntripcli_readcb/sourcetable");
 	}
 }
@@ -336,7 +352,8 @@ void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m, int s
 	if (s == NULL
 	 || evbuffer_add_reference(output, s, len, strfree_callback, s) < 0
 	 || (m && send_mime && evbuffer_add_reference(output, m->s, m->len, mime_free_callback, m) < 0)) {
-		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection from %s:%d", st->host, st->port);
+		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
+		ntripcli_log_close(st);
 		ntrip_deferred_free(st, "ntripcli_send_request");
 		return;
 	}
@@ -385,9 +402,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		st->task->end_cb(0, st->task->end_cb_arg);
 		st->task = NULL;
 	}
-	int bytes_left = evbuffer_get_length(st->input);
-	ntrip_log(st, bytes_left ? LOG_NOTICE:LOG_INFO, "Connection closed, %zu bytes left.", evbuffer_get_length(st->input));
-
+	ntripcli_log_close(st);
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
 
