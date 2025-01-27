@@ -46,7 +46,7 @@
   const char *malloc_conf = "retain:false";
 #endif
 
-static void caster_log(void *arg, int level, const char *fmt, va_list ap);
+static void caster_log_cb(void *arg, int level, const char *fmt, va_list ap);
 static void caster_alog(void *arg, int level, const char *fmt, va_list ap);
 static int caster_start_fetchers(struct caster_state *this);
 static int caster_reload_fetchers(struct caster_state *this);
@@ -114,7 +114,7 @@ caster_alog(void *arg, int dummy, const char *fmt, va_list ap) {
 }
 
 static void
-caster_log(void *arg, int level, const char *fmt, va_list ap) {
+caster_log_cb(void *arg, int level, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
 	if (level > this->config->log_level)
 		return;
@@ -207,7 +207,7 @@ caster_new(struct config *config, const char *config_file) {
 	if (this->config_dir) chdir(this->config_dir);
 
 	this->joblist = threads ? joblist_new(this) : NULL;
-	int r1 = log_init(&this->flog, this->config->log, &caster_log, this);
+	int r1 = log_init(&this->flog, this->config->log, &caster_log_cb, this);
 	int r2 = log_init(&this->alog, this->config->access_log, &caster_alog, this);
 
 	fchdir(current_dir);
