@@ -963,29 +963,6 @@ int caster_main(char *config_file) {
 
 	caster_chdir_reload(caster, 0);
 
-#if 0
-	/*** v4+v6 SOCKET NOT USED AT THIS TIME ***/
-
-	int fds = socket(AF_INET6, SOCK_STREAM, 0);
-	if (fds < 0) {
-		perror("Can't create socket");
-	}
-
-
-	int v4v6 = 0;
-	if (setsockopt(fds, IPPROTO_IPV6, IPV6_V6ONLY, &v4v6, sizeof v4v6) < 0) {
-		perror("Can't make v6+v4 socket");
-		return 1;
-	}
-	if (evutil_make_socket_nonblocking(fds) < 0) {
-		logfmt(&caster->flog, LOG_ERR, "Can't make socket non-blocking");
-		return 1;
-	}
-	// evutil_socket_t s = event_get_fd(listener);
-	// int v6only = 0;
-	// setsockopt(0, IPV6CTL_V6ONLY, IPV6CTL_V6ONLY, &v6only, sizeof v6only);
-#endif
-
 	if (caster_reload_listeners(caster) < 0) {
 		caster_free(caster);
 		return 1;

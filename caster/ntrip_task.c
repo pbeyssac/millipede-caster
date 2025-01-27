@@ -57,6 +57,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 
 /*
  * Clear associated rescheduling event for a task.
+ * Kill any associated TCP session.
  */
 void ntrip_task_stop(struct ntrip_task *this) {
 	logfmt(&this->caster->flog, LOG_INFO, "Stopping %s from %s:%d", this->type, this->host, this->port);
