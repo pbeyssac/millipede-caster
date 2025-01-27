@@ -33,6 +33,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->refresh_delay = refresh_delay;
 	this->end_cb = NULL;
 	this->line_cb = NULL;
+	this->status_cb = NULL;
 	this->st = NULL;
 	this->caster = caster;
 	this->ev = NULL;

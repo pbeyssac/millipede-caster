@@ -41,6 +41,10 @@ struct ntrip_task {
 	void (*restart_cb)(void *arg);
 	void *restart_cb_arg;
 
+	/* HTTP status callback, called as soon as it is received */
+	void (*status_cb)(void *arg, int status);
+	void *status_cb_arg;
+
 	/* Current ntrip_state, if any */
 	struct ntrip_state *st;
 

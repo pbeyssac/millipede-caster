@@ -187,6 +187,9 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				bufferevent_set_timeouts(bev, &read_timeout, NULL);
 			}
 
+			if (st->task && st->task->status_cb)
+				st->task->status_cb(st->task->status_cb_arg, status_code);
+
 			st->received_keepalive = 0;
 			st->content_length = 0;
 			st->content_done = 0;
@@ -195,7 +198,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				st->content_type = NULL;
 			}
 
-			if (status_code == 200)
+			if (st->status_code == 200)
 				st->state = NTRIP_WAIT_HTTP_HEADER;
 			else {
 				ntrip_log(st, LOG_NOTICE, "failed request on %s, status_code %d", st->uri, st->status_code);
