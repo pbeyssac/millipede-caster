@@ -71,7 +71,8 @@ struct ntrip_task {
 };
 
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
-	const char *host, unsigned short port, int tls, int refresh_delay, const char *type);
+	const char *host, unsigned short port, int tls, int retry_delay,
+	size_t bulk_max_size, const char *type);
 void ntrip_task_free(struct ntrip_task *this);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
