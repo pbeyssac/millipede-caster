@@ -1,5 +1,6 @@
 #include <assert.h>
 
+#include <stdio.h>
 #include <event2/http.h>
 #include <event2/buffer.h>
 
@@ -21,7 +22,7 @@ _ntrip_task_restart_cb(int fd, short what, void *arg) {
  */
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	const char *host, unsigned short port, int tls, int refresh_delay,
-	size_t bulk_max_size, const char *type) {
+	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename) {
 
 	struct ntrip_task *this = (struct ntrip_task *)malloc(sizeof(struct ntrip_task));
 	if (this == NULL)
@@ -47,6 +48,9 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	TAILQ_INIT(&this->headers);
 	STAILQ_INIT(&this->mimeq);
 	this->bulk_max_size = bulk_max_size;
+	this->queue_max_size = queue_max_size;
+	this->queue_size = 0;
+	this->drainfilename = drainfilename?mystrdup(drainfilename):NULL;
 	return this;
 }
 
@@ -81,19 +85,74 @@ void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
 	}
 }
 
-void ntrip_task_queue(struct ntrip_task *this, char *json) {
+/*
+ * Drain the queue, possibly storing the content in a file.
+ */
+static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
+	size_t r;
+	struct mimeq tmp_mimeq;
+	struct mime_content *m;
+
+	STAILQ_INIT(&tmp_mimeq);
 	if (this->st != NULL)
 		bufferevent_lock(this->st->bev);
+	STAILQ_SWAP(&this->mimeq, &tmp_mimeq, mime_content);
+	r = this->queue_size;
+	this->queue_size = 0;
+	if (this->st != NULL)
+		bufferevent_unlock(this->st->bev);
+
+	if (!this->drainfilename || !r)
+		return r;
+
+	char filename[PATH_MAX];
+	filedate(filename, sizeof filename, this->drainfilename);
+	FILE *f = fopen(filename, "a+");
+	if (f == NULL)
+		return -1;
+	while ((m = STAILQ_FIRST(&tmp_mimeq))) {
+		STAILQ_REMOVE_HEAD(&tmp_mimeq, next);
+		fputs(m->s, f);
+		fputs("\n", f);
+		mime_free(m);
+	}
+	fclose(f);
+	return r;
+}
+
+/*
+ * Insert a new item in the queue, checking accepted size.
+ */
+void ntrip_task_queue(struct ntrip_task *this, char *json) {
 	char *s = mystrdup(json);
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
-	if (this->bulk_max_size && m->len > this->bulk_max_size - 1) {
+	if (m == NULL) {
+		logfmt(&this->caster->flog, LOG_CRIT, "Out of memory when allocating log output, dropping");
+		return;
+	}
+	size_t len = m->len;
+
+	if (len + this->queue_size > this->queue_max_size) {
+		size_t len = ntrip_task_drain_queue(this);
+		logfmt(&this->caster->flog, LOG_CRIT, "Backlog queue was %d bytes, drained", len);
+	}
+
+	if (this->st != NULL)
+		bufferevent_lock(this->st->bev);
+
+	if (this->bulk_max_size && len > this->bulk_max_size - 1) {
 		if (this->st)
-			ntrip_log(this->st, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping", m->len, this->bulk_max_size-1);
+			ntrip_log(this->st, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping",
+				m->len, this->bulk_max_size-1);
 		else
-			logfmt(&this->caster->flog, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping", m->len, this->bulk_max_size-1);
+			logfmt(&this->caster->flog, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping",
+				m->len, this->bulk_max_size-1);
 		mime_free(m);
 	} else
 		STAILQ_INSERT_TAIL(&this->mimeq, m, next);
+
+	this->queue_size += len;
+
 	if (this->st != NULL) {
 		if (this->st->state == NTRIP_IDLE_CLIENT)
 			ntrip_task_send_next_request(this->st);
@@ -140,6 +199,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 		while (n--) {
 			m = STAILQ_FIRST(&st->task->mimeq);
 			STAILQ_REMOVE_HEAD(&st->task->mimeq, next);
+			st->task->queue_size -= m->len;
 			if (evbuffer_add_reference(output, m->s, m->len, mime_free_callback, m) < 0
 			 || evbuffer_add_reference(output, "\n", 1, NULL, NULL) < 0) {
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
@@ -153,6 +213,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 		if (m) {
 			STAILQ_REMOVE_HEAD(&st->task->mimeq, next);
 			st->sent_bytes += m->len;
+			st->task->queue_size -= m->len;
 			ntripcli_send_request(st, m, 1);
 		}
 	}

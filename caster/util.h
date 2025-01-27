@@ -81,6 +81,7 @@ void iso_date_from_timeval(char *iso_date, size_t iso_date_len, struct timeval *
 struct parsed_file *file_parse(const char *filename, int nfields, const char *seps, int skipempty, struct log *log);
 void file_free(struct parsed_file *p);
 void logdate(char *date, size_t len);
+void filedate(char *filename, size_t len, const char *format);
 
 char *mystrcasestr(const char *s, const char *find);
 

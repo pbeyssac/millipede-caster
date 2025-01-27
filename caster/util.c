@@ -642,6 +642,14 @@ void logdate(char *date, size_t len) {
 	snprintf(date, len, "%s.%03ld ", tmp_date, tstamp.tv_usec/1000);
 }
 
+void filedate(char *filename, size_t len, const char *format) {
+	struct tm t;
+	struct timeval ts;
+	gettimeofday(&ts, NULL);
+	localtime_r(&ts.tv_sec, &t);
+	strftime(filename, len, format, &t);
+}
+
 /*
  * Find the first occurrence of find in s, ignore case.
  *

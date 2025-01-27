@@ -57,6 +57,10 @@ struct ntrip_task {
 	/* MIME request queue */
 	struct mimeq mimeq;
 
+	/* Current and maximum MIME queue size */
+	size_t queue_size;
+	size_t queue_max_size;
+
 	/* Use the above queue instead of hardcoded requests */
 	char use_mimeq;
 
@@ -68,11 +72,14 @@ struct ntrip_task {
 
 	/* MIME type for bulk requests */
 	const char *bulk_content_type;
+
+	/* strftime(3) format file name for overflow files */
+	const char *drainfilename;
 };
 
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	const char *host, unsigned short port, int tls, int retry_delay,
-	size_t bulk_max_size, const char *type);
+	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename);
 void ntrip_task_free(struct ntrip_task *this);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
