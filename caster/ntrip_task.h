@@ -56,6 +56,12 @@ struct ntrip_task {
 	/* Use the above queue instead of hardcoded requests */
 	char use_mimeq;
 
+	/*
+	 * Maximum content size for aggregating messages in bulk requests,
+	 * 0 = no bulk mode.
+	 */
+	size_t bulk_max_size;
+
 	/* MIME type for bulk requests */
 	const char *bulk_content_type;
 };

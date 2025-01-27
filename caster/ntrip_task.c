@@ -43,6 +43,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->use_mimeq = 0;
 	TAILQ_INIT(&this->headers);
 	STAILQ_INIT(&this->mimeq);
+	this->bulk_max_size = 0;
 	return this;
 }
 
@@ -82,7 +83,14 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 		bufferevent_lock(this->st->bev);
 	char *s = mystrdup(json);
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
-	STAILQ_INSERT_TAIL(&this->mimeq, m, next);
+	if (this->bulk_max_size && m->len > this->bulk_max_size - 1) {
+		if (this->st)
+			ntrip_log(this->st, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping", m->len, this->bulk_max_size-1);
+		else
+			logfmt(&this->caster->flog, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping", m->len, this->bulk_max_size-1);
+		mime_free(m);
+	} else
+		STAILQ_INSERT_TAIL(&this->mimeq, m, next);
 	if (this->st != NULL) {
 		if (this->st->state == NTRIP_IDLE_CLIENT)
 			ntrip_task_send_next_request(this->st);
@@ -97,9 +105,52 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 void ntrip_task_send_next_request(struct ntrip_state *st) {
 	struct mime_content *m;
 	assert(st->state == NTRIP_IDLE_CLIENT);
-	m = STAILQ_FIRST(&st->task->mimeq);
-	if (m) {
-		STAILQ_REMOVE_HEAD(&st->task->mimeq, next);
-		ntripcli_send_request(st, m, 1);
+	size_t size = 0;
+	if (st->task->bulk_max_size) {
+		/*
+		 * Bulk mode
+		 */
+		struct evbuffer *output = bufferevent_get_output(st->bev);
+
+		/*
+		 * Count how many elements we can send under the max size
+		 */
+		int n = 0;
+		STAILQ_FOREACH(m, &st->task->mimeq, next) {
+			if (size + m->len + 1 > st->task->bulk_max_size)
+				break;
+			// count 1 more for the added newline
+			size += m->len + 1;
+			n++;
+		}
+
+		if (n == 0)
+			return;
+
+		/* Dummy MIME content to pass MIME type and size */
+		struct mime_content mc;
+		mc.len = size;
+		mc.mime_type = st->task->bulk_content_type;
+
+		/* Send the HTTP request followed by the MIME items joined by '\n' */
+		ntripcli_send_request(st, &mc, 0);
+		while (n--) {
+			m = STAILQ_FIRST(&st->task->mimeq);
+			STAILQ_REMOVE_HEAD(&st->task->mimeq, next);
+			if (evbuffer_add_reference(output, m->s, m->len, mime_free_callback, m) < 0
+			 || evbuffer_add_reference(output, "\n", 1, NULL, NULL) < 0) {
+				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
+				ntrip_deferred_free(st, "ntripcli_send_next_request");
+				return;
+			}
+		}
+	} else {
+		/* Regular mode: 1 request per MIME item */
+		m = STAILQ_FIRST(&st->task->mimeq);
+		if (m) {
+			STAILQ_REMOVE_HEAD(&st->task->mimeq, next);
+			st->sent_bytes += m->len;
+			ntripcli_send_request(st, m, 1);
+		}
 	}
 }
