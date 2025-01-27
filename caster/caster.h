@@ -17,6 +17,7 @@
 #include "queue.h"
 #include "sourcetable.h"
 #include "util.h"
+#include "graylog_sender.h"
 
 /*
  * Descriptor for a listener
@@ -78,6 +79,8 @@ struct caster_state {
 	/* Logs */
 	struct log flog, alog;
 	char hostname[128];
+	struct graylog_sender **graylog;
+	int graylog_count;	/* 0 or 1 */
 
 	/* Thread id (thread-specific variable) for logs */
 	pthread_key_t thread_id;

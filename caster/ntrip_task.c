@@ -50,6 +50,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->bulk_max_size = bulk_max_size;
 	this->queue_max_size = queue_max_size;
 	this->queue_size = 0;
+	this->nograylog = 0;
 	this->drainfilename = drainfilename?mystrdup(drainfilename):NULL;
 	return this;
 }

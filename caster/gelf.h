@@ -15,6 +15,7 @@ struct gelf_entry {
 	char *short_message;				// Message itself
 	int thread_id;					// Thread id or -1
 	unsigned long long connection_id;		// IP connection id
+	char nograylog;					// Skip sending to graylog
 };
 
 void gelf_init(struct gelf_entry *g, int level, const char *hostname, int thread_id);

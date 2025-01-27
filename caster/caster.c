@@ -30,6 +30,7 @@
 #include "caster.h"
 #include "config.h"
 #include "gelf.h"
+#include "graylog_sender.h"
 #include "ip.h"
 #include "jobs.h"
 #include "livesource.h"
@@ -130,6 +131,14 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, FILE *log, int le
 	else
 		free(msg);
 
+	if (caster->graylog && caster->graylog[0] && !g->nograylog && level <= caster->config->graylog[0].log_level) {
+		json_object *j = gelf_json(g);
+		char *s = mystrdup(json_object_to_json_string(j));
+		json_object_put(j);
+		graylog_sender_queue(caster->graylog[0], s);
+		strfree(s);
+	}
+
 	free(g->short_message);
 	g->short_message = NULL;
 }
@@ -143,7 +152,7 @@ caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list
 static void
 caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	if (level > this->config->log_level)
+	if (level > this->config->log_level && level > this->config->graylog[0].log_level)
 		return;
 	_caster_log(this, g, this->flog.logfile, level, fmt, ap);
 }
@@ -237,6 +246,9 @@ caster_new(struct config *config, const char *config_file) {
 	int r1 = log_init(&this->flog, this->config->log, &caster_log_cb, this);
 	int r2 = log_init(&this->alog, this->config->access_log, &caster_alog, this);
 
+	this->graylog = NULL;
+	this->graylog_count = 0;
+
 	fchdir(current_dir);
 	close(current_dir);
 
@@ -279,6 +291,52 @@ static void caster_free_listeners(struct caster_state *this) {
 	this->listeners_count = 0;
 }
 
+static int caster_start_graylog(struct caster_state *this) {
+	if (this->config->graylog_count != 1)
+		return 0;
+	this->graylog = (struct graylog_sender **)malloc(sizeof(struct graylog_sender *)*this->config->graylog_count);
+	this->graylog_count = this->config->graylog_count;
+	for (int i = 0; i < this->config->graylog_count; i++) {
+		this->graylog[i] = graylog_sender_new(this,
+			this->config->graylog[i].host,
+			this->config->graylog[i].port,
+			this->config->graylog[i].tls,
+			this->config->graylog[i].retry_delay,
+			this->config->graylog[i].bulk_max_size,
+			this->config->graylog[i].queue_max_size,
+			this->config->graylog[i].authorization,
+			this->config->graylog[i].drainfilename);
+		graylog_sender_start(this->graylog[i]);
+	}
+	return 0;
+}
+
+static void caster_free_graylog(struct caster_state *this) {
+	for (int i = 0; i < this->graylog_count; i++)
+		graylog_sender_free(this->graylog[i]);
+	free(this->graylog);
+	this->graylog = NULL;
+	this->graylog_count = 0;
+}
+
+static int caster_reload_graylog(struct caster_state *this) {
+	if (this->graylog_count == 1 && this->config->graylog_count == 1) {
+		int i = 0;
+		return graylog_sender_reload(this->graylog[i],
+			this->config->graylog[i].host,
+			this->config->graylog[i].port,
+			this->config->graylog[i].tls,
+			this->config->graylog[i].retry_delay,
+			this->config->graylog[i].bulk_max_size,
+			this->config->graylog[i].queue_max_size,
+			this->config->graylog[i].authorization,
+			this->config->graylog[i].drainfilename);
+	} else {
+		caster_free_graylog(this);
+		return caster_start_graylog(this);
+	}
+}
+
 void caster_free(struct caster_state *this) {
 	if (threads)
 		jobs_stop_threads(this->joblist);
@@ -290,6 +348,7 @@ void caster_free(struct caster_state *this) {
 	if (this->signalint_event)
 		event_free(this->signalint_event);
 
+	caster_free_graylog(this);
 	caster_free_listeners(this);
 	hash_table_free(this->ntrips.ipcount);
 
@@ -732,6 +791,8 @@ int caster_reload(struct caster_state *this) {
 		r = -1;
 	if (caster_reload_fetchers(this) < 0)
 		r = -1;
+	if (caster_reload_graylog(this) < 0)
+		r = -1;
 	if (caster_chdir_reload(this, 1) < 0)
 		r = -1;
 	return r;
@@ -942,6 +1003,7 @@ int caster_main(char *config_file) {
 	}
 
 	caster_start_fetchers(caster);
+	caster_start_graylog(caster);
 
 	event_base_dispatch(caster->base);
 

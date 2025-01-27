@@ -565,6 +565,9 @@ _ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt
 	gelf_init(&g, level, this->caster->hostname, thread_id);
 	g.connection_id = this->id;
 
+	if (this->caster->graylog && this->caster->graylog[0] && this->task && this->task->nograylog)
+		g.nograylog = 1;
+
 	if (this->remote) {
 		unsigned port = ntrip_peer_port(this);
 		struct sockaddr *sa = &this->peeraddr.generic;
@@ -605,7 +608,7 @@ void ntrip_alog(void *arg, const char *fmt, ...) {
 
 void ntrip_log(void *arg, int level, const char *fmt, ...) {
 	struct ntrip_state *this = (struct ntrip_state *)arg;
-	if (level > this->caster->config->log_level)
+	if (level > this->caster->config->log_level && level > this->caster->config->graylog[0].log_level)
 		return;
 	va_list ap;
 	va_start(ap, fmt);

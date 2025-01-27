@@ -17,6 +17,7 @@ void gelf_init(struct gelf_entry *g, int level, const char *hostname, int thread
 	g->hostname = hostname;
 	g->thread_id = thread_id;
 	g->connection_id = 0;
+	g->nograylog = 0;
 	gettimeofday(&g->ts, NULL);
 }
 

@@ -73,6 +73,9 @@ struct ntrip_task {
 	/* MIME type for bulk requests */
 	const char *bulk_content_type;
 
+	/* Flag: don't send logs for this task to graylog, to avoid loops */
+	char nograylog;
+
 	/* strftime(3) format file name for overflow files */
 	const char *drainfilename;
 };

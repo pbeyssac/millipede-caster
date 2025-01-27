@@ -33,6 +33,33 @@ listen:
 #    port:			2101
 
 #
+# Optional Graylog log server configuration.
+#
+#graylog:
+#  - host:			graylogserver.example.com
+#    port:			7777
+#    tls:			true
+#    log_level:			INFO
+#    #
+#    # How many seconds to wait to reconnect when the connection is lost
+#    retry_delay:		30
+#    #
+#    # Maximum queue size in memory. Data dumped to the drain file when
+#    # the queue size is exceeded.
+#    queue_max_size:		1000000
+#    #
+#    # Drain file name template.
+#    drainfile:			'/tmp/%Y%m%d-%H%M%S.log'
+#    #
+#    # Maximal size for a bulk POST -- 0 to disable bulk mode.
+#    bulk_max_size:		62000
+#    #
+#    # Value for the Authorization: header
+#    authorization:		'7c9a4e662915fb065fa991660e27f99e212f59be57a293aa2a23de6c8bd44fbc'
+#    #
+#
+
+#
 # Credentials to connect to remote hosts, especially for the proxy mode.
 #
 host_auth_file:		/usr/local/etc/millipede/host.auth

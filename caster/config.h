@@ -43,6 +43,31 @@ struct config_proxy {
 	int tls;
 };
 
+struct config_graylog {
+	/*
+	 * Configuration for a graylog server
+	 */
+	char *host;
+	unsigned short port;
+	int tls;
+	int log_level;
+
+	/* Token for Authorization: HTTP header */
+	char *authorization;
+
+	/* How many seconds to wait before restarting a failed connection */
+	int retry_delay;
+
+	/* Maximum size for bulk mode, 0 to disable bulk mode */
+	size_t bulk_max_size;
+
+	/* Maximum queue size for memory backlog */
+	size_t queue_max_size;
+
+	/* File template (see strftime(3)) for overflow files */
+	char *drainfilename;
+};
+
 struct config_threads {
 	/* Thread stack size */
 	size_t	stacksize;
@@ -59,6 +84,12 @@ struct config {
 	 */
 	struct config_proxy	*proxy;
 	int			proxy_count;
+
+	/*
+	 * Graylog server definition
+	 */
+	struct config_graylog	*graylog;
+	int			graylog_count;
 
 	/*
 	 * Sizes of accepted backlogs before we drop a client.
