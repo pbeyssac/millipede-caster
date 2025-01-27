@@ -1,4 +1,4 @@
-Millipede 0.5
+Millipede 0.6
 =============
 
 
@@ -21,6 +21,7 @@ Features:
  * "blocklist" with quotas per IP prefix
  * On-demand stream subscription
  * "wildcard" base configuration to allow unregistered sources to send hidden streams
+ * GELF/Graylog export with bulk mode
 
 The current version requires:
  * libcyaml
