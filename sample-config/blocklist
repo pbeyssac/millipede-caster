@@ -1,7 +1,13 @@
 # Blocklist
 #
-# First field: IP prefix
-# Second field: allowed quota, -1 = no limit
+# First field: IP[/prefix length]
+#
+# The IP prefix length is optional.
+# By default it is 128 for IPv6, 32 for IPv4.
+#
+# Second field: allowed quota
+#	-1 = no limit
+#	0 = block this prefix
 #
 # default: no limit
 #
