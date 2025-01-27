@@ -54,12 +54,6 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	return this;
 }
 
-void ntrip_task_free(struct ntrip_task *this) {
-	evhttp_clear_headers(&this->headers);
-	strfree(this->host);
-	free(this);
-}
-
 /*
  * Clear associated rescheduling event for a task.
  */
@@ -217,4 +211,24 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 			ntripcli_send_request(st, m, 1);
 		}
 	}
+}
+
+void ntrip_task_free(struct ntrip_task *this) {
+	evhttp_clear_headers(&this->headers);
+	ntrip_task_drain_queue(this);
+	strfree(this->host);
+	free(this);
+}
+
+void ntrip_task_reload(struct ntrip_task *this,
+	const char *host, unsigned short port, int tls,
+	int retry_delay, int bulk_max_size, int queue_max_size, const char *drainfilename) {
+
+	ntrip_task_stop(this);
+	this->refresh_delay = retry_delay;
+	this->bulk_max_size = bulk_max_size;
+	this->queue_max_size = queue_max_size;
+	if (this->drainfilename)
+		strfree((char *)this->drainfilename);
+	this->drainfilename = mystrdup(drainfilename);
 }

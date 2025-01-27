@@ -86,4 +86,8 @@ void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
 void ntrip_task_queue(struct ntrip_task *this, char *json);
 void ntrip_task_send_next_request(struct ntrip_state *st);
 
+void ntrip_task_reload(struct ntrip_task *this,
+	const char *host, unsigned short port, int tls,
+	int retry_delay, int bulk_max_size, int queue_max_size, const char *drainfilename);
+
 #endif
