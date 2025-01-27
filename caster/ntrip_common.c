@@ -608,7 +608,7 @@ void ntrip_alog(void *arg, const char *fmt, ...) {
 
 void ntrip_log(void *arg, int level, const char *fmt, ...) {
 	struct ntrip_state *this = (struct ntrip_state *)arg;
-	if (level > this->caster->config->log_level && level > this->caster->config->graylog[0].log_level)
+	if (level > this->caster->config->log_level && (!this->caster->config->graylog || level > this->caster->config->graylog[0].log_level))
 		return;
 	va_list ap;
 	va_start(ap, fmt);
