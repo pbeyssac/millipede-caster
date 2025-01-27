@@ -556,44 +556,50 @@ unsigned short ntrip_peer_port(struct ntrip_state *this) {
 }
 
 static void
-_ntrip_log(struct log *log, struct ntrip_state *this, const char *fmt, va_list ap) {
-	char date[36];
-	logdate(date, sizeof date);
+_ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt, va_list ap) {
+	struct gelf_entry g;
+	int thread_id;
+	char addrport[64];
 
-	P_RWLOCK_WRLOCK(&log->lock);
-	fputs(date, log->logfile);
+	thread_id = threads?(long)pthread_getspecific(this->caster->thread_id):-1;
+	gelf_init(&g, level, this->caster->hostname, thread_id);
+	g.connection_id = this->id;
 
 	if (this->remote) {
 		unsigned port = ntrip_peer_port(this);
 		struct sockaddr *sa = &this->peeraddr.generic;
+		g.addrport = addrport;
 		switch(sa->sa_family) {
 		case AF_INET:
-			fprintf(log->logfile, "%s:%hu ", this->remote_addr, port);
+			snprintf(addrport, sizeof addrport, "%s:%hu", this->remote_addr, port);
 			break;
 		case AF_INET6:
-			fprintf(log->logfile, "%s.%hu ", this->remote_addr, port);
+			snprintf(addrport, sizeof addrport, "%s.%hu", this->remote_addr, port);
 			break;
 		default:
-			fprintf(log->logfile, "[???] ");
+			g.addrport = NULL;
+			snprintf(addrport, sizeof addrport, "[???]");
 		}
-	} else
-		fputs("- ", log->logfile);
+	} else {
+		g.addrport = NULL;
+		strcpy(addrport, "-");
+	}
 
-	fprintf(log->logfile, "%lld ", this->id);
+	vasprintf(&g.short_message, fmt, ap);
 
 	if (threads)
-		fprintf(log->logfile, "[%lu] ", (long)pthread_getspecific(this->caster->thread_id));
+		logfmt_g(log, &g, level, "%s %lld [%lu] %s", addrport, this->id, (long)thread_id, g.short_message);
+	else
+		logfmt_g(log, &g, level, "%s %lld %s", addrport, this->id, g.short_message);
 
-	vfprintf(log->logfile, fmt, ap);
-	fputs("\n", log->logfile);
-	P_RWLOCK_UNLOCK(&log->lock);
+	free(g.short_message);
 }
 
 void ntrip_alog(void *arg, const char *fmt, ...) {
 	struct ntrip_state *this = (struct ntrip_state *)arg;
 	va_list ap;
 	va_start(ap, fmt);
-	_ntrip_log(&this->caster->alog, this, fmt, ap);
+	_ntrip_log(&this->caster->alog, this, -1, fmt, ap);
 	va_end(ap);
 }
 
@@ -603,7 +609,7 @@ void ntrip_log(void *arg, int level, const char *fmt, ...) {
 		return;
 	va_list ap;
 	va_start(ap, fmt);
-	_ntrip_log(&this->caster->flog, this, fmt, ap);
+	_ntrip_log(&this->caster->flog, this, level, fmt, ap);
 	va_end(ap);
 }
 

@@ -632,14 +632,12 @@ void file_free(struct parsed_file *p) {
 	free(p);
 }
 
-void logdate(char *date, size_t len) {
+void logdate(char *date, size_t len, struct timeval *ts) {
 	char tmp_date[30];
-	struct timeval tstamp;
-	gettimeofday(&tstamp, NULL);
 	struct tm t;
-	localtime_r(&tstamp.tv_sec, &t);
+	localtime_r(&ts->tv_sec, &t);
 	strftime(tmp_date, sizeof tmp_date, "%Y-%m-%d %H:%M:%S", &t);
-	snprintf(date, len, "%s.%03ld ", tmp_date, tstamp.tv_usec/1000);
+	snprintf(date, len, "%s.%03ld", tmp_date, ts->tv_usec/1000);
 }
 
 void filedate(char *filename, size_t len, const char *format) {

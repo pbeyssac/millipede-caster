@@ -40,22 +40,22 @@ void log_free(struct log *this) {
 	P_RWLOCK_DESTROY(&this->lock);
 }
 
-/*
-static void
-_log(struct log *this, const char *fmt, va_list ap) {
-	char date[36];
-	logdate(date, sizeof date);
-	fputs(date, this->logfile);
-	vfprintf(this->logfile, fmt, ap);
+void
+logfmt_g(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	P_RWLOCK_WRLOCK(&this->lock);
+	this->log_cb(this->state, g, level, fmt, ap);
+	P_RWLOCK_UNLOCK(&this->lock);
+	va_end(ap);
 }
-*/
 
 void
 logfmt(struct log *this, int level, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	P_RWLOCK_WRLOCK(&this->lock);
-	this->log_cb(this->state, level, fmt, ap);
+	this->log_cb(this->state, NULL, level, fmt, ap);
 	P_RWLOCK_UNLOCK(&this->lock);
 	va_end(ap);
 }

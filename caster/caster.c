@@ -29,6 +29,7 @@
 
 #include "caster.h"
 #include "config.h"
+#include "gelf.h"
 #include "ip.h"
 #include "jobs.h"
 #include "livesource.h"
@@ -46,8 +47,8 @@
   const char *malloc_conf = "retain:false";
 #endif
 
-static void caster_log_cb(void *arg, int level, const char *fmt, va_list ap);
-static void caster_alog(void *arg, int level, const char *fmt, va_list ap);
+static void caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
+static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
 static int caster_start_fetchers(struct caster_state *this);
 static int caster_reload_fetchers(struct caster_state *this);
 static void caster_free_fetchers(struct caster_state *this);
@@ -99,26 +100,52 @@ void caster_log_error(struct caster_state *this, char *orig) {
 }
 
 static void
-_caster_log(FILE *log, int level, const char *fmt, va_list ap) {
+_caster_log(struct caster_state *caster, struct gelf_entry *g, FILE *log, int level, const char *fmt, va_list ap) {
 	char date[36];
-	logdate(date, sizeof date);
-	fputs(date, log);
-	vfprintf(log, fmt, ap);
-	fputs("\n", log);
+	struct gelf_entry localg;
+	int thread_id = threads?(long)pthread_getspecific(caster->thread_id):-1;
+
+	if (g == NULL) {
+		g = &localg;
+		gelf_init(g, level, caster->hostname, thread_id);
+	} else {
+		g->hostname = caster->hostname;
+		g->thread_id = thread_id;
+	}
+
+	logdate(date, sizeof date, &g->ts);
+
+	char *msg;
+	vasprintf(&msg, fmt, ap);
+
+	if (level <= caster->config->log_level) {
+		fputs(date, log);
+		fputs(" ", log);
+		fputs(msg, log);
+		fputs("\n", log);
+	}
+
+	if (g->short_message == NULL)
+		g->short_message = msg;
+	else
+		free(msg);
+
+	free(g->short_message);
+	g->short_message = NULL;
 }
 
 static void
-caster_alog(void *arg, int dummy, const char *fmt, va_list ap) {
+caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	_caster_log(this->alog.logfile, -1, fmt, ap);
+	_caster_log(this, g, this->alog.logfile, -1, fmt, ap);
 }
 
 static void
-caster_log_cb(void *arg, int level, const char *fmt, va_list ap) {
+caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
 	if (level > this->config->log_level)
 		return;
-	_caster_log(this->flog.logfile, level, fmt, ap);
+	_caster_log(this, g, this->flog.logfile, level, fmt, ap);
 }
 
 /*
@@ -230,6 +257,8 @@ caster_new(struct config *config, const char *config_file) {
 	TAILQ_INIT(&this->ntrips.free_queue);
 	this->ntrips.n = 0;
 	this->ntrips.nfree = 0;
+	gethostname(this->hostname, sizeof(this->hostname));
+	this->hostname[sizeof(this->hostname)-1] = '\0';
 	TAILQ_INIT(&this->sourcetablestack.list);
 	return this;
 }

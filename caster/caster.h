@@ -28,6 +28,7 @@ struct listener {
 
 	int tls;			// is TLS activated?
 	SSL_CTX *ssl_server_ctx;	// TLS context, certs etc.
+	char *hostname;			// hostname for TLS/SNI
 };
 
 /*
@@ -76,6 +77,7 @@ struct caster_state {
 
 	/* Logs */
 	struct log flog, alog;
+	char hostname[128];
 
 	/* Thread id (thread-specific variable) for logs */
 	pthread_key_t thread_id;
