@@ -25,9 +25,9 @@ static void display_headers(struct ntrip_state *st, struct evkeyvalq *headers) {
 	struct evkeyval *np;
 	TAILQ_FOREACH(np, headers, next) {
 		if (!strcasecmp(np->key, "authorization"))
-			ntrip_log(st, LOG_DEBUG, "Request header %s: *****", np->key);
+			ntrip_log(st, LOG_DEBUG, "Header %s: *****", np->key);
 		else
-			ntrip_log(st, LOG_DEBUG, "Request header %s: %s", np->key, np->value);
+			ntrip_log(st, LOG_DEBUG, "Header %s: %s", np->key, np->value);
 	}
 }
 
@@ -90,7 +90,7 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 		TAILQ_FOREACH(np, &st->task->headers, next)
 			hlen += strlen(np->key) + strlen(np->value) + 4;
 
-	char *format = "%s %s HTTP/1.1\r\n";
+	char *format = "%s %s HTTP/1.1";
 	size_t s = strlen(format) + strlen(method) + strlen(uri) + hlen + 2;
 	char *r = (char *)strmalloc(s);
 	if (r == NULL) {
@@ -100,10 +100,11 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 	}
 	sprintf(r, format, method, uri);
 
-	ntrip_log(st, LOG_DEBUG, "Request method %s", r);
+	ntrip_log(st, LOG_DEBUG, "Method %s", r);
 	display_headers(st, &headers);
 	display_headers(st, &st->task->headers);
 
+	strcat(r, "\r\n");
 	TAILQ_FOREACH(np, &headers, next) {
 		strcat(r, np->key);
 		strcat(r, ": ");
@@ -160,7 +161,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Got \"%s\" on %s", line, st->uri);
+			ntrip_log(st, LOG_DEBUG, "Status \"%s\" on %s", line, st->uri);
 
 			char *septmp = line;
 			for (arg = &st->http_args[0];
@@ -221,7 +222,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Got header \"%s\", %zd bytes", line, len);
 			st->received_bytes += len + 2;
 			if (len == 0) {
 				ntrip_log(st, LOG_DEBUG, "[End headers]");
@@ -246,6 +246,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				}
 			} else {
 				char *key, *value;
+				ntrip_log(st, LOG_DEBUG, "Header \"%s\"", line);
 				if (!parse_header(line, &key, &value)) {
 					free(line);
 					ntrip_log(st, LOG_DEBUG, "parse_header failed");
@@ -297,8 +298,12 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				end = 1;
 		} else if (st->state == NTRIP_IDLE_CLIENT) {
 			if (len) {
-				ntrip_log(st, LOG_INFO, "Server sent data on idle connection, closing");
 				st->received_bytes += len;
+				char data[65];
+				data[64] = '\0';
+				ntrip_log(st, LOG_NOTICE, "Server sent %d bytes on idle connection, closing", len);
+				evbuffer_remove(st->input, data, len > 64 ? 64:len);
+				ntrip_log(st, LOG_INFO, "Data (truncated to 64 bytes): \"%s\"", data);
 				end = 1;
 			}
 		} else if (st->state == NTRIP_REGISTER_SOURCE) {

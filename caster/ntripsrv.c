@@ -254,7 +254,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes", line, len);
+			ntrip_log(st, LOG_DEBUG, "Method \"%s\", %zd bytes", line, len);
 			int i = 0;
 			char *septmp = line;
 			while ((token = strsep(&septmp, " \t")) != NULL && i < SIZE_HTTP_ARGS) {
@@ -276,7 +276,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Got \"%s\", %zd bytes", line, len);
+			ntrip_log(st, LOG_DEBUG, "Header \"%s\", %zd bytes", line, len);
 			if (strlen(line) != 0) {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
