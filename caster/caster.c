@@ -101,7 +101,7 @@ void caster_log_error(struct caster_state *this, char *orig) {
 }
 
 static void
-_caster_log(struct caster_state *caster, struct gelf_entry *g, FILE *log, int level, const char *fmt, va_list ap) {
+_caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, int level, const char *fmt, va_list ap) {
 	char date[36];
 	struct gelf_entry localg;
 	int thread_id = threads?(long)pthread_getspecific(caster->thread_id):-1;
@@ -119,12 +119,8 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, FILE *log, int le
 	char *msg;
 	vasprintf(&msg, fmt, ap);
 
-	if (level <= caster->config->log_level) {
-		fputs(date, log);
-		fputs(" ", log);
-		fputs(msg, log);
-		fputs("\n", log);
-	}
+	if (level <= caster->config->log_level)
+		logfmt_direct(log, g, level, "%s %s\n", date, msg);
 
 	if (g->short_message == NULL)
 		g->short_message = msg;
@@ -146,7 +142,7 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, FILE *log, int le
 static void
 caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	_caster_log(this, g, this->alog.logfile, -1, fmt, ap);
+	_caster_log(this, g, &this->alog, -1, fmt, ap);
 }
 
 static void
@@ -154,7 +150,7 @@ caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_li
 	struct caster_state *this = (struct caster_state *)arg;
 	if (level > this->config->log_level && level > this->config->graylog[0].log_level)
 		return;
-	_caster_log(this, g, this->flog.logfile, level, fmt, ap);
+	_caster_log(this, g, &this->flog, level, fmt, ap);
 }
 
 /*

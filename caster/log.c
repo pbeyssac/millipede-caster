@@ -41,12 +41,20 @@ void log_free(struct log *this) {
 }
 
 void
-logfmt_g(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
+logfmt_direct(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	P_RWLOCK_WRLOCK(&this->lock);
-	this->log_cb(this->state, g, level, fmt, ap);
+	vfprintf(this->logfile, fmt, ap);
 	P_RWLOCK_UNLOCK(&this->lock);
+	va_end(ap);
+}
+
+void
+logfmt_g(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	this->log_cb(this->state, g, level, fmt, ap);
 	va_end(ap);
 }
 
@@ -54,8 +62,6 @@ void
 logfmt(struct log *this, int level, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
-	P_RWLOCK_WRLOCK(&this->lock);
 	this->log_cb(this->state, NULL, level, fmt, ap);
-	P_RWLOCK_UNLOCK(&this->lock);
 	va_end(ap);
 }

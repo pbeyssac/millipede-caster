@@ -29,6 +29,7 @@ struct log {
 
 int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg);
 int log_reopen(struct log *this, const char *filename);
+void logfmt_direct(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...);
 void logfmt_g(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...);
 void logfmt(struct log *this, int level, const char *fmt, ...);
 void log_free(struct log *this);
