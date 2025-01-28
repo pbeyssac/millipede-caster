@@ -120,7 +120,7 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 	vasprintf(&msg, fmt, ap);
 
 	if (level <= caster->config->log_level)
-		logfmt_direct(log, g, level, "%s %s\n", date, msg);
+		logfmt_direct(log, "%s %s\n", date, msg);
 
 	if (g->short_message == NULL)
 		g->short_message = msg;

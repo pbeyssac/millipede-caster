@@ -41,7 +41,7 @@ void log_free(struct log *this) {
 }
 
 void
-logfmt_direct(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
+logfmt_direct(struct log *this, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	P_RWLOCK_WRLOCK(&this->lock);
