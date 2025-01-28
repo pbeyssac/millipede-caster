@@ -476,8 +476,11 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 
 	bufferevent_enable(bev, EV_READ|EV_WRITE);
 
-	struct timeval timeout = { caster->config->sourcetable_fetch_timeout, 0 };
-	bufferevent_set_timeouts(bev, &timeout, &timeout);
+	struct timeval read_timeout = {
+		st->task && st->task->read_timeout ? st->task->read_timeout : st->caster->config->ntripcli_default_read_timeout, 0 };
+	struct timeval write_timeout = {
+		st->task && st->task->write_timeout ? st->task->write_timeout : st->caster->config->ntripcli_default_write_timeout, 0 };
+	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 
 	bufferevent_socket_connect_hostname(bev, caster->dns_base, AF_UNSPEC, host, port);
 

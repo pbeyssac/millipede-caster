@@ -105,6 +105,13 @@ struct config {
 	 * Read timeout for sources
 	 */
 	int			source_read_timeout;
+
+	/*
+	 * Default timeouts for ntripcli and ntripsrv,
+	 * unless otherwise specified by specific tasks.
+	 */
+	int			ntripcli_default_read_timeout;
+	int			ntripcli_default_write_timeout;
 	int			ntripsrv_default_read_timeout;
 	int			ntripsrv_default_write_timeout;
 

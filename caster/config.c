@@ -42,6 +42,8 @@ static struct config default_config = {
 	.sourcetable_fetch_timeout = 60,
 	.on_demand_source_timeout = 60,
 	.source_read_timeout = 60,
+	.ntripcli_default_read_timeout = 60,
+	.ntripcli_default_write_timeout = 60,
 	.ntripsrv_default_read_timeout = 60,
 	.ntripsrv_default_write_timeout = 60,
 	.access_log = "/var/log/millipede/access.log",
@@ -207,6 +209,10 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_INT(
 		"source_read_timeout", CYAML_FLAG_OPTIONAL, struct config, source_read_timeout),
 	CYAML_FIELD_INT(
+		"ntripcli_default_read_timeout", CYAML_FLAG_OPTIONAL, struct config, ntripcli_default_read_timeout),
+	CYAML_FIELD_INT(
+		"ntripcli_default_write_timeout", CYAML_FLAG_OPTIONAL, struct config, ntripcli_default_write_timeout),
+	CYAML_FIELD_INT(
 		"ntripsrv_default_read_timeout", CYAML_FLAG_OPTIONAL, struct config, ntripsrv_default_read_timeout),
 	CYAML_FIELD_INT(
 		"ntripsrv_default_write_timeout", CYAML_FLAG_OPTIONAL, struct config, ntripsrv_default_write_timeout),
@@ -262,6 +268,8 @@ struct config *config_parse(const char *filename) {
 	DEFAULT_ASSIGN(this, source_read_timeout);
 	DEFAULT_ASSIGN(this, backlog_socket);
 	DEFAULT_ASSIGN(this, backlog_evbuffer);
+	DEFAULT_ASSIGN(this, ntripcli_default_read_timeout);
+	DEFAULT_ASSIGN(this, ntripcli_default_write_timeout);
 	DEFAULT_ASSIGN(this, ntripsrv_default_read_timeout);
 	DEFAULT_ASSIGN(this, ntripsrv_default_write_timeout);
 	DEFAULT_ASSIGN(this, access_log);

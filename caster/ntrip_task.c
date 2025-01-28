@@ -48,6 +48,8 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->method = "GET";
 	this->connection_keepalive = 0;
 	this->use_mimeq = 0;
+	this->read_timeout = 0;
+	this->write_timeout = 0;
 	TAILQ_INIT(&this->headers);
 	STAILQ_INIT(&this->mimeq);
 	this->bulk_max_size = bulk_max_size;

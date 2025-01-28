@@ -81,6 +81,10 @@ struct ntrip_task {
 
 	/* strftime(3) format file name for overflow files */
 	const char *drainfilename;
+
+	/* Specific timeout, or 0 to use the defaults */
+	int read_timeout;
+	int write_timeout;
 };
 
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
