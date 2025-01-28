@@ -14,7 +14,10 @@ enum check_password_result {
 void ntripsrv_redo_virtual_pos(struct ntrip_state *st);
 int ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, struct mime_content *m, struct evkeyvalq *opt_headers);
 int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct evkeyvalq *opt_headers);
-void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster));
+void ntripsrv_deferred_output(
+	struct ntrip_state *st,
+	struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
+	struct hash_table *hash);
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd);
 
 void ntripsrv_readcb(struct bufferevent *bev, void *arg);

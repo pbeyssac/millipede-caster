@@ -447,7 +447,7 @@ static json_object *ntrip_json(struct ntrip_state *st) {
 /*
  * Return a list of ntrip_state as a JSON object.
  */
-struct mime_content *ntrip_list_json(struct caster_state *caster) {
+struct mime_content *ntrip_list_json(struct caster_state *caster, struct hash_table *h) {
 	char *s;
 	json_object *new_list = json_object_new_object();
 	struct ntrip_state *sst;
@@ -472,7 +472,7 @@ struct mime_content *ntrip_list_json(struct caster_state *caster) {
 /*
  * Return memory stats.
  */
-struct mime_content *ntrip_mem_json(struct caster_state *caster) {
+struct mime_content *ntrip_mem_json(struct caster_state *caster, struct hash_table *h) {
 	struct mime_content *m = malloc_stats_dump(1);
 	return m;
 }
@@ -480,7 +480,7 @@ struct mime_content *ntrip_mem_json(struct caster_state *caster) {
 /*
  * Reload the configuration and return a status code.
  */
-struct mime_content *ntrip_reload_json(struct caster_state *caster) {
+struct mime_content *ntrip_reload_json(struct caster_state *caster, struct hash_table *h) {
 	char result[40];
 	int r = caster_reload(caster);
 	snprintf(result, sizeof result, "{\"result\": %d}\n", r);

@@ -127,7 +127,7 @@ void joblist_run(struct joblist *this) {
 			else if (j->type == JOB_NTRIP_UNLOCKED)
 				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
 			else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
-				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb);
+				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb, j->ntrip_unlocked_content.hash);
 			else if (j->type == JOB_STOP_THREAD)
 				pthread_exit(NULL);
 			free(j);
@@ -412,17 +412,24 @@ void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip
 /*
  * Queue a new unlocked ntrip job, or directly execute in unthreaded mode.
  */
-void joblist_append_ntrip_unlocked_content(struct joblist *this, void (*cb)(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster
-)), struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)) {
+void joblist_append_ntrip_unlocked_content(
+	struct joblist *this,
+	void (*cb)(struct ntrip_state *st,
+		struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
+		struct hash_table *hash),
+	struct ntrip_state *st,
+	struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
+	struct hash_table *hash) {
 	if (threads) {
 		struct job tmpj;
 		tmpj.type = JOB_NTRIP_UNLOCKED_CONTENT;
 		tmpj.ntrip_unlocked_content.cb = cb;
 		tmpj.ntrip_unlocked_content.st = st;
 		tmpj.ntrip_unlocked_content.content_cb = content_cb;
+		tmpj.ntrip_unlocked_content.hash = hash;
 		_joblist_append_generic(this, NULL, &tmpj);
 	} else
-		cb(st, content_cb);
+		cb(st, content_cb, hash);
 }
 
 void joblist_append_stop(struct joblist *this) {

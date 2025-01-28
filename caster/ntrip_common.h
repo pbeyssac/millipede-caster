@@ -7,6 +7,7 @@
 
 #include "conf.h"
 #include "caster.h"
+#include "hash.h"
 #include "ip.h"
 #include "livesource.h"
 #include "redistribute.h"
@@ -209,9 +210,9 @@ void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t so
 void ntrip_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this);
-struct mime_content *ntrip_list_json(struct caster_state *caster);
-struct mime_content *ntrip_mem_json(struct caster_state *caster);
-struct mime_content *ntrip_reload_json(struct caster_state *caster);
+struct mime_content *ntrip_list_json(struct caster_state *caster, struct hash_table *h);
+struct mime_content *ntrip_mem_json(struct caster_state *caster, struct hash_table *h);
+struct mime_content *ntrip_reload_json(struct caster_state *caster, struct hash_table *h);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, struct livesource **existing);
 void ntrip_unregister_livesource(struct ntrip_state *this);
 char *ntrip_peer_ipstr(struct ntrip_state *this);

@@ -100,13 +100,19 @@ int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *ou
  *
  * Avoids keeping a lock on ntrip_state unless needed, to avoid deadlocks.
  */
-void ntripsrv_deferred_output(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)) {
-	struct mime_content *r = content_cb(st->caster);
+void ntripsrv_deferred_output(
+	struct ntrip_state *st,
+	struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
+	struct hash_table *hash) {
+
+	struct mime_content *r = content_cb(st->caster, hash);
 	bufferevent_lock(st->bev);
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	ntripsrv_send_result_ok(st, output, r, NULL);
 	st->state = NTRIP_WAIT_CLOSE;
 	bufferevent_unlock(st->bev);
+	if (hash)
+		hash_table_free(hash);
 }
 
 /*

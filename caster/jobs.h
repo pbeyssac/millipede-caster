@@ -2,6 +2,7 @@
 #define __JOBS_H__
 
 #include <event2/bufferevent.h>
+#include "hash.h"
 #include "queue.h"
 
 enum job_type {
@@ -73,9 +74,12 @@ struct job {
 		 *	requires no lock on ntrip_state.
 		 */
 		struct {
-			void (*cb)(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster));
+			void (*cb)(struct ntrip_state *st,
+				struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
+				struct hash_table *hash);
 			struct ntrip_state *st;
-			struct mime_content *(*content_cb)(struct caster_state *caster);
+			struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *h);
+			struct hash_table *hash;
 		} ntrip_unlocked_content;
 	};
 };
@@ -131,7 +135,14 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 void joblist_append_ntrip_locked(struct joblist *this, struct ntrip_state *st, void (*cb)(struct ntrip_state *arg));
 void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistribute_cb_args *redis_args), struct redistribute_cb_args *redis_args);
 void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip_state *st), struct ntrip_state *st);
-void joblist_append_ntrip_unlocked_content(struct joblist *this, void (*cb)(struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster)), struct ntrip_state *st, struct mime_content *(*content_cb)(struct caster_state *caster));
+void joblist_append_ntrip_unlocked_content(
+	struct joblist *this,
+	void (*cb)(struct ntrip_state *st,
+			struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
+			struct hash_table *hash),
+	struct ntrip_state *st,
+	struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
+	struct hash_table *hash);
 void joblist_append_stop(struct joblist *this);
 void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);
