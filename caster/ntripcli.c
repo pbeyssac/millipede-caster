@@ -102,7 +102,8 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 
 	ntrip_log(st, LOG_DEBUG, "Method %s", r);
 	display_headers(st, &headers);
-	display_headers(st, &st->task->headers);
+	if (st->task)
+		display_headers(st, &st->task->headers);
 
 	strcat(r, "\r\n");
 	TAILQ_FOREACH(np, &headers, next) {
