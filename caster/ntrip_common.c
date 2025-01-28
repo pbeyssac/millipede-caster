@@ -207,7 +207,7 @@ static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *be
  * Required lock: ntrip_state
  */
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
-	ntrip_log(this, LOG_DEBUG, "FREE %s", orig);
+	ntrip_log(this, LOG_EDEBUG, "FREE %s", orig);
 
 	strfree(this->mountpoint);
 	strfree(this->uri);

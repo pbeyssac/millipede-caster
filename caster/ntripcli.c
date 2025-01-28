@@ -338,7 +338,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 void ntripcli_writecb(struct bufferevent *bev, void *arg)
 {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-	ntrip_log(st, LOG_DEBUG, "ntripcli_writecb");
+	ntrip_log(st, LOG_EDEBUG, "ntripcli_writecb");
 
 	struct evbuffer *output = bufferevent_get_output(bev);
 	if (evbuffer_get_length(output) == 0) {
