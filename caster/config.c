@@ -267,6 +267,7 @@ struct config *config_parse(const char *filename) {
 	DEFAULT_ASSIGN(this, log_level);
 	DEFAULT_ASSIGN(this, admin_user);
 	DEFAULT_ASSIGN(this, sourcetable_priority);
+	DEFAULT_ASSIGN(this, sourcetable_fetch_timeout);
 
 	// Undocumented
 	DEFAULT_ASSIGN(this, disable_zero_copy);
