@@ -21,14 +21,17 @@ _ntrip_task_restart_cb(int fd, short what, void *arg) {
  * Don't start it.
  */
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
-	const char *host, unsigned short port, int tls, int refresh_delay,
+	const char *host, unsigned short port, const char *uri, int tls, int refresh_delay,
 	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename) {
 
 	struct ntrip_task *this = (struct ntrip_task *)malloc(sizeof(struct ntrip_task));
 	if (this == NULL)
 		return NULL;
 	this->host = mystrdup(host);
-	if (this->host == NULL) {
+	this->uri = mystrdup(uri);
+	if (this->host == NULL || this->uri == NULL) {
+		strfree(this->host);
+		strfree((char *)this->uri);
 		free(this);
 		return NULL;
 	}
@@ -219,17 +222,20 @@ void ntrip_task_free(struct ntrip_task *this) {
 	evhttp_clear_headers(&this->headers);
 	ntrip_task_drain_queue(this);
 	strfree(this->host);
+	strfree((char *)this->uri);
 	free(this);
 }
 
 void ntrip_task_reload(struct ntrip_task *this,
-	const char *host, unsigned short port, int tls,
+	const char *host, unsigned short port, const char *uri, int tls,
 	int retry_delay, int bulk_max_size, int queue_max_size, const char *drainfilename) {
 
 	ntrip_task_stop(this);
 	this->refresh_delay = retry_delay;
 	this->bulk_max_size = bulk_max_size;
 	this->queue_max_size = queue_max_size;
+	strfree((char *)this->uri);
+	this->uri = mystrdup(uri);
 	if (this->drainfilename)
 		strfree((char *)this->drainfilename);
 	this->drainfilename = mystrdup(drainfilename);

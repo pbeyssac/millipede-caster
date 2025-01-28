@@ -49,6 +49,10 @@ struct config_graylog {
 	 */
 	char *host;
 	unsigned short port;
+
+	/* URI on the server */
+	const char *uri;
+
 	int tls;
 	int log_level;
 

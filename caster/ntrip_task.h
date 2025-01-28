@@ -19,6 +19,9 @@ struct ntrip_task {
 	/* HTTP method to use */
 	const char *method;
 
+	/* HTTP URI */
+	const char *uri;
+
 	/* How often to runs, in seconds. 0 = one shot. */
 	int refresh_delay;
 
@@ -81,7 +84,7 @@ struct ntrip_task {
 };
 
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
-	const char *host, unsigned short port, int tls, int retry_delay,
+	const char *host, unsigned short port, const char *uri, int tls, int retry_delay,
 	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename);
 void ntrip_task_free(struct ntrip_task *this);
 void ntrip_task_stop(struct ntrip_task *this);
@@ -90,7 +93,7 @@ void ntrip_task_queue(struct ntrip_task *this, char *json);
 void ntrip_task_send_next_request(struct ntrip_state *st);
 
 void ntrip_task_reload(struct ntrip_task *this,
-	const char *host, unsigned short port, int tls,
+	const char *host, unsigned short port, const char *uri, int tls,
 	int retry_delay, int bulk_max_size, int queue_max_size, const char *drainfilename);
 
 #endif

@@ -41,13 +41,13 @@ status_cb(void *arg, int status) {
  * Initialize a graylog sender task.
  */
 struct graylog_sender *graylog_sender_new(struct caster_state *caster,
-	const char *host, unsigned short port, int tls,
+	const char *host, unsigned short port, const char *uri, int tls,
 	int retry_delay, int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename) {
 
 	struct graylog_sender *this = (struct graylog_sender *)malloc(sizeof(struct graylog_sender));
 	if (this == NULL)
 		return NULL;
-	this->task = ntrip_task_new(caster, host, port, tls, retry_delay, bulk_max_size, queue_max_size, "graylog_sender", drainfilename);
+	this->task = ntrip_task_new(caster, host, port, uri, tls, retry_delay, bulk_max_size, queue_max_size, "graylog_sender", drainfilename);
 	this->task->method = "POST";
 	this->task->status_cb = status_cb;
 	this->task->status_cb_arg = this;
@@ -86,10 +86,10 @@ void graylog_sender_free(struct graylog_sender *this) {
  * Same as a stop/start, except we keep the sourcetable during the reload.
  */
 int graylog_sender_reload(struct graylog_sender *this,
-	const char *host, unsigned short port, int tls,
+	const char *host, unsigned short port, const char *uri, int tls,
 	int retry_delay, int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename) {
 
-	ntrip_task_reload(this->task, host, port, tls, retry_delay, bulk_max_size, queue_max_size, drainfilename);
+	ntrip_task_reload(this->task, host, port, uri, tls, retry_delay, bulk_max_size, queue_max_size, drainfilename);
 
 	evhttp_clear_headers(&this->task->headers);
 	evhttp_add_header(&this->task->headers, "Authorization", authkey);
@@ -105,7 +105,7 @@ void
 graylog_sender_start(void *arg_cb) {
 	struct graylog_sender *a = (struct graylog_sender *)arg_cb;
 
-	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, "/gelf", a->task->type, a->task) < 0) {
+	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->uri, a->task->type, a->task) < 0) {
 		a->task->st = NULL;
 		ntrip_task_reschedule(a->task, a);
 	}

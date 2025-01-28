@@ -38,6 +38,7 @@ listen:
 #graylog:
 #  - host:			graylogserver.example.com
 #    port:			7777
+#    uri:			'/gelf'
 #    tls:			true
 #    log_level:			INFO
 #    #

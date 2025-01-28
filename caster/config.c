@@ -142,6 +142,8 @@ static const cyaml_schema_field_t graylog_fields_schema[] = {
 		"host", CYAML_FLAG_POINTER, struct config_graylog, host, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_INT(
 		"port", CYAML_FLAG_DEFAULT, struct config_graylog, port),
+	CYAML_FIELD_STRING_PTR(
+		"uri", CYAML_FLAG_POINTER, struct config_graylog, uri, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_BOOL(
 		"tls", CYAML_FLAG_OPTIONAL, struct config_graylog, tls),
 	CYAML_FIELD_STRING_PTR(
