@@ -327,7 +327,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	if (end || st->state == NTRIP_FORCE_CLOSE) {
 		ntrip_notify_close(st);
 		ntripcli_log_close(st);
-		ntrip_deferred_free(st, "ntripcli_readcb/sourcetable");
+		ntrip_deferred_free(st, "ntripcli_readcb");
 	}
 }
 
