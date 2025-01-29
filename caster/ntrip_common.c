@@ -84,9 +84,15 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->status_code = 0;
 	this->id = 0;
 	memset(&this->http_args, 0, sizeof(this->http_args));
+
 	this->remote_addr[0] = '\0';
 	this->remote = 0;
 	memset(&this->peeraddr, 0, sizeof(this->peeraddr));
+
+	this->local_addr[0] = '\0';
+	this->local = 0;
+	memset(&this->myaddr, 0, sizeof(this->myaddr));
+
 	this->counted = 0;
 	this->ssl = NULL;
 	this->content_length = 0;
@@ -187,6 +193,16 @@ void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t so
 		memcpy(&this->peeraddr, sa, socklen < sizeof this->peeraddr ? socklen:sizeof this->peeraddr);
 	this->remote = 1;
 	ip_str(&this->peeraddr, this->remote_addr, sizeof this->remote_addr);
+}
+
+void ntrip_set_localaddr(struct ntrip_state *this) {
+	socklen_t psocklen = sizeof(this->myaddr);
+	if (getsockname(this->fd, &this->myaddr.generic, &psocklen) < 0) {
+		ntrip_log(this, LOG_NOTICE, "getsockname failed: %s", strerror(errno));
+		return;
+	}
+	this->local = 1;
+	ip_str(&this->myaddr, this->local_addr, sizeof this->local_addr);
 }
 
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {

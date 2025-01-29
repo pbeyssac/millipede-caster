@@ -748,6 +748,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	st->ssl = ssl;
 	ntrip_set_peeraddr(st, sa, socklen);
+	ntrip_set_localaddr(st);
 
 	st->state = NTRIP_WAIT_HTTP_METHOD;
 

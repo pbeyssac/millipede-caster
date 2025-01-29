@@ -370,6 +370,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		ntrip_set_fd(st);
 
 		ntrip_set_peeraddr(st, NULL, 0);
+		ntrip_set_localaddr(st);
 		ntrip_log(st, LOG_INFO, "Connected to %s:%d for %s", st->host, st->port, st->uri);
 		if (st->task && st->task->use_mimeq) {
 			st->state = NTRIP_IDLE_CLIENT;
