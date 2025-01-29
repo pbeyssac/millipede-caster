@@ -183,8 +183,8 @@ void joblist_run(struct joblist *this) {
 		 * libevent locks the bufferevent during joblist_append() if threading is activated,
 		 * so in the following callbacks we need to get our own locks beginning
 		 * with bufferevent to avoid deadlocks due to lock order reversal.
-                 *
-                 * The bufferevent is associated with the ntrip_state, it's the same for all jobs in the queue,
+		 *
+		 * The bufferevent is associated with the ntrip_state, it's the same for all jobs in the queue,
 		 * so we only need to lock it once.
 		 */
 		bufferevent_lock(bev);

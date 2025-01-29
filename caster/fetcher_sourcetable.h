@@ -11,7 +11,7 @@ struct sourcetable_fetch_args {
 };
 
 struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *caster,
-        const char *host, unsigned short port, int tls, int refresh_delay, int priority);
+	const char *host, unsigned short port, int tls, int refresh_delay, int priority);
 void fetcher_sourcetable_free(struct sourcetable_fetch_args *this);
 void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this);
 void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay, int sourcetable_priority);

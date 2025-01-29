@@ -251,12 +251,12 @@ struct config *config_parse(const char *filename) {
 	cyaml_err_t err;
 
 	/* Load YAML file */
-        err = cyaml_load_file(filename, &cyaml_config,
+	err = cyaml_load_file(filename, &cyaml_config,
 		&top_schema, (cyaml_data_t **)&this, NULL);
 	if (err != CYAML_OK) {
 		fprintf(stderr, "ERROR: %s\n", cyaml_strerror(err));
 		return NULL;
-        }
+	}
 
 #define	DEFAULT_ASSIGN(this, field)	{if (!(this)->field) {(this)->field = default_config.field;}}
 
