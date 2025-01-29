@@ -105,6 +105,9 @@ struct ntrip_state {
 	// Linked-list entry for the caster->ntrips.free_queue
 	TAILQ_ENTRY(ntrip_state) nextf;
 
+	// Flag: is this a client (outgoing) or a server (incoming) connection?
+	char client;
+
 	/*
 	 * State for a NTRIP client or server
 	 */
@@ -213,6 +216,7 @@ void ntrip_deferred_run(struct caster_state *this);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, struct livesource **existing);
 void ntrip_unregister_livesource(struct ntrip_state *this);
 char *ntrip_peer_ipstr(struct ntrip_state *this);
+void ntrip_notify_close(struct ntrip_state *st);
 unsigned short ntrip_peer_port(struct ntrip_state *this);
 void ntrip_alog(void *arg, const char *fmt, ...);
 void ntrip_log(void *arg, int level, const char *fmt, ...);

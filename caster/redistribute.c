@@ -147,6 +147,7 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 	st->type = "source_fetcher";
 	st->redistribute = 1;
 	st->persistent = redis_args->persistent;
+	st->client = 1;
 	redis_args->source_st = st;
 	ntrip_register(st);
 

@@ -94,6 +94,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->content = NULL;
 	this->query_string = NULL;
 	this->content_type = NULL;
+	this->client = 0;
 	return this;
 }
 
@@ -439,6 +440,34 @@ char *ntrip_peer_ipstr(struct ntrip_state *this) {
 	char inetaddr[64];
 	r = ip_str(&this->peeraddr, inetaddr, sizeof inetaddr);
 	return r?mystrdup(r):NULL;
+/*
+ * Notify users of a connection that it is closing.
+ *
+ * Required lock: ntrip_state
+ */
+void ntrip_notify_close(struct ntrip_state *st) {
+
+	/*
+	 * Superfluous check, might be needed later in case some fields
+	 * of ntrip_state are placed in a union to save space.
+	 */
+	if (!st->client)
+		return;
+
+	if (st->task != NULL) {
+		/* Notify the callback the transfer is over, and failed. */
+		st->task->end_cb(0, st->task->end_cb_arg);
+		st->task = NULL;
+	}
+	if (st->own_livesource) {
+		if (st->redistribute && st->persistent) {
+			struct redistribute_cb_args *redis_args;
+			redis_args = redistribute_args_new(st->caster, st->own_livesource, st->mountpoint, &st->mountpoint_pos, st->caster->config->reconnect_delay, 0);
+			if (redis_args)
+				redistribute_schedule(st->caster, st, redis_args);
+		} else
+			ntrip_unregister_livesource(st);
+	}
 }
 
 unsigned short ntrip_peer_port(struct ntrip_state *this) {
