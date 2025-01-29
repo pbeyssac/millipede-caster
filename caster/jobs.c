@@ -128,8 +128,10 @@ void joblist_run(struct joblist *this) {
 				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
 			else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
 				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb, j->ntrip_unlocked_content.hash);
-			else if (j->type == JOB_STOP_THREAD)
+			else if (j->type == JOB_STOP_THREAD) {
+				logfmt(&this->caster->flog, LOG_INFO, "Exiting thread %d", (long)pthread_getspecific(this->caster->thread_id));
 				pthread_exit(NULL);
+			}
 			free(j);
 			P_MUTEX_LOCK(&this->mutex);
 		}
