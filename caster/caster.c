@@ -127,7 +127,7 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 	else
 		free(msg);
 
-	if (caster->graylog && caster->graylog[0] && !g->nograylog && level <= caster->config->graylog[0].log_level) {
+	if (level != -1 && caster->graylog && caster->graylog[0] && !g->nograylog && level <= caster->config->graylog[0].log_level) {
 		json_object *j = gelf_json(g);
 		char *s = mystrdup(json_object_to_json_string(j));
 		json_object_put(j);
@@ -141,12 +141,12 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 
 /*
  * Caster access log.
- * level 100 => not sent to graylog.
+ * level -1 => not sent to graylog.
  */
 static void
 caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	_caster_log(this, g, &this->alog, 100, fmt, ap);
+	_caster_log(this, g, &this->alog, -1, fmt, ap);
 }
 
 static void
