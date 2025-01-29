@@ -82,8 +82,6 @@ struct mime_content *api_ntrip_list_json(struct caster_state *caster, struct has
 	s = mystrdup(json_object_to_json_string(new_list));
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	json_object_put(new_list);
-	if (m == NULL)
-		strfree((char *)s);
 	return m;
 }
 

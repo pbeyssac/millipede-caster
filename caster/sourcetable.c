@@ -136,9 +136,9 @@ struct mime_content *sourcetable_get(struct sourcetable *this) {
 		hash_array_free(ep);
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
+	if (s == NULL)
+		return NULL;
 	struct mime_content *m = mime_new(s, len-1, "gnss/sourcetable", 1);
-	if (m == NULL)
-		strfree(s);
 	return m;
 }
 

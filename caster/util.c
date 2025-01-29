@@ -385,8 +385,10 @@ parse_header(char *line, char **key, char **val) {
  */
 struct mime_content *mime_new(char *s, long long len, const char *mime_type, int use_strfree) {
 	struct mime_content *m = (struct mime_content *)malloc(sizeof(struct mime_content));
-	if (m == NULL || s == NULL)
+	if (m == NULL || s == NULL) {
+		strfree(s);
 		return NULL;
+	}
 	m->s = s;
 	m->len = len >= 0 ? len : strlen(s);
 	m->mime_type = mime_type;
@@ -684,10 +686,8 @@ static void malloc_write_cb(void *opaque, const char *string) {
 struct mime_content *malloc_stats_dump(int json) {
 	char *empty = mystrdup("");
 	struct mime_content *m = mime_new(empty, 0, "application/json", 1);
-	if (m == NULL) {
-		strfree(empty);
+	if (m == NULL)
 		return NULL;
-	}
 
 	if (json) {
 		//malloc_stats_print(malloc_write_cb, m, "mdablxeJ");
