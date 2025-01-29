@@ -601,14 +601,14 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 	while (1) {
 		len_raw = evbuffer_get_length(input);
 		if (len_raw <= 0) {
-			ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d", len_done);
+			ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode OK/MORE done %d", len_done);
 			return len_done?BEV_OK:BEV_NEED_MORE;
 		}
 
 		if (st->chunk_state == CHUNK_WAIT_LEN) {
 			char *line = evbuffer_readln(input, &len, EVBUFFER_EOL_CRLF_STRICT);
 			if (line == NULL) {
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode readln failed, OK/MORE done %d", len_done);
+				ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode readln failed, OK/MORE done %d", len_done);
 				return len_done?BEV_OK:BEV_NEED_MORE;
 			}
 
@@ -621,7 +621,7 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 				free(line);
 				st->state = NTRIP_FORCE_CLOSE;
 				st->chunk_state = CHUNK_NONE;
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/ERROR done %d", len_done);
+				ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode OK/ERROR done %d", len_done);
 				return len_done?BEV_OK:BEV_ERROR;
 			}
 			free(line);
@@ -651,7 +651,7 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 		} else if (st->chunk_state == CHUNK_WAITING_TRAILER || st->chunk_state == CHUNK_LAST) {
 			char data[2];
 			if (len_raw < 2) {
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode OK/MORE done %d", len_done);
+				ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode OK/MORE done %d", len_done);
 				return len_done?BEV_OK:BEV_NEED_MORE;
 			}
 			// skip trailing CR LF
@@ -662,7 +662,7 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 			if (st->chunk_state == CHUNK_LAST) {
 				st->state = NTRIP_FORCE_CLOSE;
 				st->chunk_state = CHUNK_END;
-				ntrip_log(st, LOG_DEBUG, "ntrip_chunk_decode 0-length done %d, closing", len_done);
+				ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode 0-length done %d, closing", len_done);
 				return BEV_OK;
 			}
 			st->chunk_state = CHUNK_WAIT_LEN;

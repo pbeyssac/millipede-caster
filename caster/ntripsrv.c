@@ -260,11 +260,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Method \"%s\", %zd bytes", line, len);
+			ntrip_log(st, LOG_EDEBUG, "Method \"%s\", %zd bytes", line, len);
 			int i = 0;
 			char *septmp = line;
 			while ((token = strsep(&septmp, " \t")) != NULL && i < SIZE_HTTP_ARGS) {
-				//ntrip_log(st, LOG_DEBUG, "TOKEN %s", token);
+				//ntrip_log(st, LOG_EDEBUG, "TOKEN %s", token);
 				st->http_args[i] = mystrdup(token);
 				if (st->http_args[i] == NULL) {
 					err = 503;
@@ -282,11 +282,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
-			ntrip_log(st, LOG_DEBUG, "Header \"%s\", %zd bytes", line, len);
+			ntrip_log(st, LOG_EDEBUG, "Header \"%s\", %zd bytes", line, len);
 			if (strlen(line) != 0) {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
-					ntrip_log(st, LOG_DEBUG, "parse_header failed");
+					ntrip_log(st, LOG_EDEBUG, "parse_header failed on %s", line);
 					err = 1;
 					break;
 				}
@@ -315,9 +315,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_DEBUG, "Header %s: *****", key);
-					if (http_decode_auth(value, &st->user, &st->password) >= 0)
-						ntrip_log(st, LOG_DEBUG, "Decoded auth: %s, %s", st->user, st->password);
-					else {
+					if (http_decode_auth(value, &st->user, &st->password) < 0) {
 						if (st->caster->config->log_level >= LOG_DEBUG) {
 							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"", value);
 						} else {
@@ -497,7 +495,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
 			st->received_bytes += len + 1;
 			pos_t pos;
-			ntrip_log(st, LOG_DEBUG, "GGA? \"%s\", %zd bytes", line, len);
+			ntrip_log(st, LOG_EDEBUG, "GGA? \"%s\", %zd bytes", line, len);
 			if (parse_gga(line, &pos) >= 0) {
 				st->last_pos = pos;
 				st->last_pos_valid = 1;
@@ -606,7 +604,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout");
 	}
 
-	ntrip_log(st, LOG_DEBUG, "ntrip_free srv_eventcb bev %p", bev);
+	ntrip_log(st, LOG_EDEBUG, "ntrip_free srv_eventcb bev %p", bev);
 	ntrip_deferred_free(st, "ntripsrv_eventcb");
 }
 
