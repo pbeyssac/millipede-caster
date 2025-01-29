@@ -243,29 +243,6 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 }
 
 /*
- * Display a list of current live sources.
- */
-static void livesource_list(struct caster_state *caster) {
-	struct livesource *np;
-
-	P_RWLOCK_RDLOCK(&caster->livesources.lock);
-
-	TAILQ_FOREACH(np, &caster->livesources.queue, next) {
-		logfmt(&caster->flog, LOG_INFO, "Live:");
-		break;
-	}
-	TAILQ_FOREACH(np, &caster->livesources.queue, next) {
-		logfmt(&caster->flog, LOG_INFO, " %s", np->mountpoint);
-	}
-	TAILQ_FOREACH(np, &caster->livesources.queue, next) {
-		logfmt(&caster->flog, LOG_INFO, "");
-		break;
-	}
-
-	P_RWLOCK_UNLOCK(&caster->livesources.lock);
-}
-
-/*
  * Find a livesource by mountpoint name.
  * Warning: O(n) complexity.
  *
