@@ -77,6 +77,10 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_reload_json, h);
 			return 0;
 		}
+		if (!strcmp(uri, "/api/v1/drop") && !strcmp(method, "POST")) {
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_drop_json, h);
+			return 0;
+		}
 
 		*err = 404;
 		return -1;
