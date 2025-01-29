@@ -283,7 +283,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			if (!line)
 				break;
 			ntrip_log(st, LOG_EDEBUG, "Header \"%s\", %zd bytes", line, len);
-			if (strlen(line) != 0) {
+			if (len != 0) {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
 					ntrip_log(st, LOG_EDEBUG, "parse_header failed on %s", line);
