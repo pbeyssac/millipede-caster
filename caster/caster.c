@@ -139,10 +139,14 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 	g->short_message = NULL;
 }
 
+/*
+ * Caster access log.
+ * level 100 => not sent to graylog.
+ */
 static void
 caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	_caster_log(this, g, &this->alog, -1, fmt, ap);
+	_caster_log(this, g, &this->alog, 100, fmt, ap);
 }
 
 static void
