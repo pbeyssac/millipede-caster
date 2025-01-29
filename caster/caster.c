@@ -565,15 +565,18 @@ static int caster_reload_listeners(struct caster_state *this) {
 	return 0;
 }
 
-void caster_del_livesource(struct caster_state *this, struct livesource *livesource) {
+int caster_del_livesource(struct caster_state *this, struct livesource *livesource) {
+	int r = 0;
 	P_MUTEX_LOCK(&this->livesources.delete_lock);
 	P_RWLOCK_WRLOCK(&this->livesources.lock);
 
 	TAILQ_REMOVE(&this->livesources.queue, livesource, next);
 	livesource_free(livesource);
+	r = 1;
 
 	P_RWLOCK_UNLOCK(&this->livesources.lock);
 	P_MUTEX_UNLOCK(&this->livesources.delete_lock);
+	return r;
 }
 
 static int
