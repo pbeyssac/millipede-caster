@@ -435,11 +435,6 @@ void ntrip_unregister_livesource(struct ntrip_state *this) {
 	this->own_livesource = NULL;
 }
 
-char *ntrip_peer_ipstr(struct ntrip_state *this) {
-	char *r;
-	char inetaddr[64];
-	r = ip_str(&this->peeraddr, inetaddr, sizeof inetaddr);
-	return r?mystrdup(r):NULL;
 /*
  * Notify users of a connection that it is closing.
  *

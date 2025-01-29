@@ -215,7 +215,6 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this);
 struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, struct livesource **existing);
 void ntrip_unregister_livesource(struct ntrip_state *this);
-char *ntrip_peer_ipstr(struct ntrip_state *this);
 void ntrip_notify_close(struct ntrip_state *st);
 unsigned short ntrip_peer_port(struct ntrip_state *this);
 void ntrip_alog(void *arg, const char *fmt, ...);
