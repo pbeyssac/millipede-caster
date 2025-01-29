@@ -15,7 +15,6 @@
 #include "ntripcli.h"
 #include "ntrip_common.h"
 #include "ntrip_task.h"
-#include "redistribute.h"
 #include "util.h"
 
 const char *client_ntrip_version = "Ntrip/2.0";
