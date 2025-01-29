@@ -12,20 +12,29 @@
 static json_object *api_ntrip_json(struct ntrip_state *st) {
 	bufferevent_lock(st->bev);
 
-	char *ipstr = st->remote_addr;
-	json_object *jsonip;
-	unsigned port = ip_port(&st->peeraddr);
-	jsonip = ipstr[0] ? json_object_new_string(ipstr) : json_object_new_null();
 	json_object *new_obj = json_object_new_object();
+
+	if (st->local) {
+		json_object *jip = st->local_addr[0] ? json_object_new_string(st->local_addr) : json_object_new_null();
+		json_object *jport = json_object_new_int(ip_port(&st->myaddr));
+		json_object *j = json_object_new_object();
+		json_object_object_add(j, "ip", jip);
+		json_object_object_add(j, "port", jport);
+		json_object_object_add(new_obj, "local", j);
+	}
+	if (st->remote) {
+		json_object *jip = st->remote_addr[0] ? json_object_new_string(st->remote_addr) : json_object_new_null();
+		json_object *jport = json_object_new_int(ip_port(&st->peeraddr));
+		json_object_object_add(new_obj, "ip", jip);
+		json_object_object_add(new_obj, "port", jport);
+	}
+
 	json_object *jsonid = json_object_new_int64(st->id);
 	json_object *received_bytes = json_object_new_int64(st->received_bytes);
 	json_object *sent_bytes = json_object_new_int64(st->sent_bytes);
-	json_object *jsonport = json_object_new_int(port);
 	json_object_object_add(new_obj, "id", jsonid);
 	json_object_object_add(new_obj, "received_bytes", received_bytes);
 	json_object_object_add(new_obj, "sent_bytes", sent_bytes);
-	json_object_object_add(new_obj, "ip", jsonip);
-	json_object_object_add(new_obj, "port", jsonport);
 	json_object_object_add(new_obj, "type", json_object_new_string(st->type));
 	json_object_object_add(new_obj, "wildcard", json_object_new_boolean(st->wildcard));
 	if (!strcmp(st->type, "source") || !strcmp(st->type, "source_fetcher"))
