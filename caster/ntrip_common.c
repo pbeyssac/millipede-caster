@@ -67,6 +67,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->njobs = 0;
 	this->newjobs = 0;
 	this->bev_freed = 0;
+	this->bev_close_on_free = 0;
 	this->bev = bev;
 
 	// Explicitly copied to avoid locking issues later with bufferevent_getfd()
@@ -208,6 +209,8 @@ void ntrip_set_localaddr(struct ntrip_state *this) {
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 	if (!this->bev_freed) {
 		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p", bev);
+		if (this->bev_close_on_free)
+			close(this->fd);
 		bufferevent_free(bev);
 		this->bev_freed = 1;
 	} else

@@ -114,6 +114,9 @@ struct ntrip_state {
 
 	struct bufferevent *bev;		// main bufferevent associated with the session
 	char bev_freed;				// has it been freed already?
+	char bev_close_on_free;			// do we have to close() the file descriptor
+						// at bufferevent_free()? libevent can't do it
+						// for accept()'ed sockets.
 	struct evbuffer *input;
 	int fd;					// file descriptor for the bufferevent
 	SSL *ssl;				// TLS state
