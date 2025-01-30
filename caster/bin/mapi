@@ -49,7 +49,7 @@ class Mapi(object):
 def main(argv):
   if not os.path.exists(confpath):
     print("No configuration file found. Please create one as", confpath, "with:")
-    print('{"user": "admin", "password": ".....", "baseurl": "https:/caster.example.com/adm/api/v1/"}')
+    print('{"user": "admin", "password": ".....", "baseurl": "https://caster.example.com/adm/api/v1/"}')
     sys.exit(0)
 
   mapi = Mapi()
