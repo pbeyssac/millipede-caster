@@ -210,8 +210,38 @@ void ntrip_set_localaddr(struct ntrip_state *this) {
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 	if (!this->bev_freed) {
 		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p", bev);
-		if (this->bev_close_on_free)
-			close(this->fd);
+		if (this->bev_close_on_free) {
+			/*
+			 * We have to cleanup this bufferevent "by hand" in cases
+			 * where BEV_OPT_CLOSE_ON_FREE doesn't apply.
+			 */
+			int r = bufferevent_flush(this->bev, EV_WRITE, BEV_FINISHED);
+			if (r < 0)
+				ntrip_log(this, LOG_DEBUG, "bufferevent_flush err");
+			bufferevent_disable(this->bev, EV_READ|EV_WRITE);
+			bufferevent_set_timeouts(this->bev, NULL, NULL);
+			bufferevent_setcb(this->bev, NULL, NULL, NULL, NULL);
+
+			/*
+			 * The following is crucial to work around a libevent bug
+			 * with pending timeouts applying on the next use of the
+			 * file descriptor, closing innocent random connections
+			 * reusing the fd.
+			 *
+			 * Setting it to -1 ensures this doesn't happen.
+			 *
+			 * Clearing the timeouts and callbacks as done above doesn't
+			 * seem to be enough.
+			 */
+			bufferevent_setfd(this->bev, -1);
+
+			/*
+			 * Log close() failures (typically EBADF), which are an early sign
+			 * of something amiss.
+			 */
+			if (close(this->fd) < 0)
+				ntrip_log(this, LOG_NOTICE, "CLOSE fd %d err %d", this->fd, errno);
+		}
 		bufferevent_free(bev);
 		this->bev_freed = 1;
 	} else
