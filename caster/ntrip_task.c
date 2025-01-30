@@ -71,9 +71,11 @@ void ntrip_task_stop(struct ntrip_task *this) {
 		this->ev = NULL;
 	}
 	if (this->st && this->st->state != NTRIP_END) {
-		bufferevent_lock(this->st->bev);
+		struct bufferevent *bev = this->st->bev;
+		bufferevent_lock(bev);
 		ntrip_deferred_free(this->st, "task_stop");
 		this->st = NULL;
+		bufferevent_unlock(bev);
 	}
 }
 
