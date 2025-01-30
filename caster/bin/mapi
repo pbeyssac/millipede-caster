@@ -29,7 +29,7 @@ class Mapi(object):
   def _post(self, call, data):
     data = urllib.parse.urlencode(data)
     data = data.encode('ascii')
-    with urllib.request.urlopen(self.base_url + "reload", data) as f:
+    with urllib.request.urlopen(self.base_url + call, data) as f:
        return json.load(f)
 
   def net(self):
@@ -57,8 +57,7 @@ def main(argv):
   if len(argv) == 2 and argv[1] == 'killall':
     j = mapi.net()
     for k, v in j.items():
-      if v['type'] in ['graylog_sender', 'source', 'client']: # , 'source_fetcher']:
-        print(v)
+      print(v)
       print(mapi.drop(v['id']))
   elif len(argv) == 2 and argv[1] == 'net':
     j = mapi.net()
