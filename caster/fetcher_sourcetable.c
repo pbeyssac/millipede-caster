@@ -36,15 +36,25 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 	return this;
 }
 
-void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
+static void task_stop(struct sourcetable_fetch_args *this) {
 	ntrip_task_stop(this->task);
+	/*
+	 * Needed in case a fetch is in progress right now
+	 */
+	if (this->sourcetable) {
+		sourcetable_free(this->sourcetable);
+		this->sourcetable = NULL;
+	}
+}
+
+void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
 	stack_replace_host(this->task->caster, &this->task->caster->sourcetablestack, this->task->host, this->task->port, NULL);
 	ntrip_task_free(this->task);
 	free(this);
 }
 
 void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this) {
-	ntrip_task_stop(this->task);
+	task_stop(this);
 	stack_replace_host(this->task->caster, &this->task->caster->sourcetablestack, this->task->host, this->task->port, NULL);
 }
 
@@ -54,7 +64,7 @@ void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this) {
  * Same as a stop/start, except we keep the sourcetable during the reload.
  */
 void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay, int sourcetable_priority) {
-	ntrip_task_stop(this->task);
+	task_stop(this);
 	this->task->refresh_delay = refresh_delay;
 	this->priority = sourcetable_priority;
 	fetcher_sourcetable_start(this);
