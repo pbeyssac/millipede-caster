@@ -10,7 +10,6 @@
 
 struct redistribute_cb_args {
 	struct caster_state *caster;
-	struct ntrip_state *source_st;
 	struct timeval t0;
 	char *uri, *mountpoint;
 	pos_t mountpoint_pos;

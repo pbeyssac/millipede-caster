@@ -50,7 +50,6 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 			redis_args->mountpoint_pos.lon = 0.;
 		}
 		redis_args->caster = caster;
-		redis_args->source_st = NULL;
 		redis_args->ev = NULL;
 		redis_args->persistent = persistent;
 		redis_args->livesource = livesource;
@@ -148,7 +147,6 @@ redistribute_source_stream(struct redistribute_cb_args *redis_args) {
 	st->redistribute = 1;
 	st->persistent = redis_args->persistent;
 	st->client = 1;
-	redis_args->source_st = st;
 	ntrip_register(st);
 
 	logfmt(&redis_args->caster->flog, LOG_INFO, "Starting socket connect to %s:%d for /%s", st->host, st->port, redis_args->mountpoint);
