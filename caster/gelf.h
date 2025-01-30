@@ -10,7 +10,8 @@
 struct gelf_entry {
 	struct timeval ts;				// date
 	int level;					// log level
-	const char *addrport;				// remote host IP & port
+	const char *remote_ip;				// remote host IP
+	int remote_port;				// remote port
 	const char *hostname;				// local hostname
 	char *short_message;				// Message itself
 	int thread_id;					// Thread id or -1

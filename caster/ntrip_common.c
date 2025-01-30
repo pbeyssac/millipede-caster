@@ -522,6 +522,7 @@ _ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt
 	struct gelf_entry g;
 	int thread_id;
 	char addrport[64];
+	char addr[40];
 
 	thread_id = threads?(long)pthread_getspecific(this->caster->thread_id):-1;
 	gelf_init(&g, level, this->caster->hostname, thread_id);
@@ -533,7 +534,9 @@ _ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt
 	if (this->remote) {
 		unsigned port = ntrip_peer_port(this);
 		struct sockaddr *sa = &this->peeraddr.generic;
-		g.addrport = addrport;
+		g.remote_ip = addr;
+		g.remote_port = port;
+		ip_str((union sock *)sa, addr, sizeof addr);
 		switch(sa->sa_family) {
 		case AF_INET:
 			snprintf(addrport, sizeof addrport, "%s:%hu", this->remote_addr, port);
@@ -542,11 +545,11 @@ _ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt
 			snprintf(addrport, sizeof addrport, "%s.%hu", this->remote_addr, port);
 			break;
 		default:
-			g.addrport = NULL;
+			g.remote_ip = NULL;
 			snprintf(addrport, sizeof addrport, "[???]");
 		}
 	} else {
-		g.addrport = NULL;
+		g.remote_ip = NULL;
 		strcpy(addrport, "-");
 	}
 
