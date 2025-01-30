@@ -1,4 +1,4 @@
-Millipede 0.6
+Millipede 0.7
 =============
 
 
@@ -12,7 +12,7 @@ It can easily handle tens of thousands of NTRIP sessions on a minimal server.
 Currently runs on FreeBSD.
 
 Features:
- * "Virtual" base algorithm which picks the nearest base from the source table
+ * "Virtual" "near" base algorithm which picks the nearest base from the source table
  * High performance
  * Low memory footprint
  * Supports IPv6 and IPv4
@@ -22,6 +22,8 @@ Features:
  * On-demand stream subscription
  * "wildcard" base configuration to allow unregistered sources to send hidden streams
  * GELF/Graylog export with bulk mode
+ * JSON API for remote administration and monitoring
+ * API tool `mapi`
 
 The current version requires:
  * libcyaml
