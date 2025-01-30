@@ -9,6 +9,7 @@
 #include "ntripsrv.h"
 #include "adm.h"
 #include "caster.h"
+#include "file.h"
 #include "http.h"
 #include "jobs.h"
 #include "ntrip_common.h"
@@ -23,29 +24,47 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 	struct mime_content *m) {
 	char date[32];
 	time_t tstamp = time(NULL);
+	int sent = 0, len;
+
 	firstword = (this->client_version == 1 && firstword && this->user_agent_ntrip)?firstword:"HTTP/1.1";
 	struct tm *t = gmtime(&tstamp);
 	strftime(date, sizeof date, "%a, %d %b %Y %H:%M:%S GMT", t);
-	evbuffer_add_printf(ev, "%s %d %s\r\n%sDate: %s\r\n", firstword, status_code, status, server_headers, date);
-	if (this->server_version == 2)
+
+	len = evbuffer_add_printf(ev, "%s %d %s\r\n%sDate: %s\r\n", firstword, status_code, status, server_headers, date);
+	if (len > 0) sent += len;
+
+	if (this->server_version == 2) {
 		evbuffer_add_reference(ev, "Ntrip-Version: Ntrip/2.0\r\n", 26, NULL, NULL);
-	if (m && m->mime_type)
-		evbuffer_add_printf(ev, "Content-Length: %lu\r\nContent-Type: %s\r\n", m->len, m->mime_type);
-	else if (m)
-		evbuffer_add_printf(ev, "Content-Length: %lu\r\n", m->len);
-	evbuffer_add_reference(ev, "Connection: close\r\n", 19, NULL, NULL);
+		sent += 26;
+	}
+	if (m && m->mime_type) {
+		len = evbuffer_add_printf(ev, "Content-Length: %lu\r\nContent-Type: %s\r\n", m->len, m->mime_type);
+		if (len > 0) sent += len;
+	} else if (m) {
+		len = evbuffer_add_printf(ev, "Content-Length: %lu\r\n", m->len);
+		if (len > 0) sent += len;
+	} if (this->connection_keepalive) {
+		evbuffer_add_reference(ev, "Connection: keep-alive\r\n", 24, NULL, NULL);
+		len += 24;
+	} else {
+		evbuffer_add_reference(ev, "Connection: close\r\n", 19, NULL, NULL);
+		len += 19;
+	}
 	if (headers) {
 		struct evkeyval *np;
 		TAILQ_FOREACH(np, headers, next) {
-			evbuffer_add_printf(ev, "%s: %s\r\n", np->key, np->value);
+			len = evbuffer_add_printf(ev, "%s: %s\r\n", np->key, np->value);
+			if (len > 0) sent += len;
 		}
 	}
 	evbuffer_add_reference(ev, "\r\n", 2, NULL, NULL);
+	len += 2;
 	if (m && evbuffer_add_reference(ev, m->s, m->len, mime_free_callback, m) < 0)
 		// the call failed so we need to free m instead of letting the callback do it.
 		mime_free(m);
 	else if (m)
-		this->sent_bytes += m->len;
+		sent += m->len;
+	this->sent_bytes += sent;
 }
 
 static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *output) {
@@ -67,9 +86,10 @@ static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *
 static int _ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *output, const char *mime_type, struct mime_content *m, struct evkeyvalq *opt_headers) {
 	struct evkeyvalq headers;
 	struct evkeyval *np;
-	if (this->client_version == 1)
-		evbuffer_add_reference(output, "ICY 200 OK\r\n\r\n", 14, NULL, NULL);
-	else {
+	if (this->client_version == 1) {
+		evbuffer_add_reference(output, "ICY 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", 52, NULL, NULL);
+		this->sent_bytes += 52;
+	} else {
 		TAILQ_INIT(&headers);
 		if (m == NULL && mime_type != NULL)
 			evhttp_add_header(&headers, "Content-Type", mime_type);
@@ -109,6 +129,7 @@ void ntripsrv_deferred_output(
 	bufferevent_lock(st->bev);
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	ntripsrv_send_result_ok(st, output, r, NULL);
+	ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output WAIT_CLOSE");
 	st->state = NTRIP_WAIT_CLOSE;
 	bufferevent_unlock(st->bev);
 	if (hash)
@@ -260,6 +281,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
+			st->received_bytes += len;
 			ntrip_log(st, LOG_EDEBUG, "Method \"%s\", %zd bytes", line, len);
 			int i = 0;
 			char *septmp = line;
@@ -282,6 +304,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
+			st->received_bytes += len;
 			ntrip_log(st, LOG_EDEBUG, "Header \"%s\", %zd bytes", line, len);
 			if (len != 0) {
 				char *key, *value;
@@ -514,6 +537,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				break;
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
+			// will increment st->received_bytes itself
 			if (!ntrip_handle_raw(st))
 				break;
 		}
@@ -552,6 +576,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			send_server_reply(st, output, 501, "Not Implemented", NULL, NULL, NULL);
 		else if (err == 503)
 			send_server_reply(st, output, 503, "Service Unavailable", NULL, NULL, NULL);
+		else
+			send_server_reply(st, output, err, "Unknown Error", NULL, NULL, NULL);
+		ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb err %d", err);
 		st->state = NTRIP_WAIT_CLOSE;
 	}
 	evhttp_clear_headers(&opt_headers);
