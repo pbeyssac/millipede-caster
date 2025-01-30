@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+import json
+import os
+import sys
+import urllib.request
+import urllib.parse
+
+#
+# CLI tool to manipulate the Millipede API
+#
+
+confpath = os.path.join(os.getenv('HOME'), '.mapi.conf')
+
+class Mapi(object):
+  def __init__(self, user=None, password=None):
+    with open(confpath, 'r') as f:
+      self._conf = json.load(f)
+    self._credentials = {'user': self._conf['user'], 'password': self._conf['password']}
+    self.base_url = self._conf['baseurl']
+    if not self.base_url.endswith('/'):
+      self.base_url += '/'
+
+  def _get(self, call, data):
+    data = urllib.parse.urlencode(data)
+    with urllib.request.urlopen(self.base_url + call + "?" + data) as f:
+       return json.load(f)
+
+  def _post(self, call, data):
+    data = urllib.parse.urlencode(data)
+    data = data.encode('ascii')
+    with urllib.request.urlopen(self.base_url + "reload", data) as f:
+       return json.load(f)
+
+  def net(self):
+    return self._get("net", self._credentials)
+
+  def mem(self):
+    return self._get("mem", self._credentials)
+
+  def reload(self):
+    return self._post("reload", self._credentials)
+
+  def drop(self, id):
+    data = self._credentials.copy()
+    data['id'] = id
+    return self._post("drop", data)
+
+def main(argv):
+  mapi = Mapi()
+
+  if not os.path.exists(confpath):
+    print("No configuration file found. Please create one as", confpath, "with:")
+    print('{"user": "admin", "password": ".....", "baseurl": "https:/caster.example.com/adm/api/v1/"}')
+    sys.exit(0)
+
+  if len(argv) == 2 and argv[1] == 'killall':
+    j = mapi.net()
+    for k, v in j.items():
+      if v['type'] in ['graylog_sender', 'source', 'client']: # , 'source_fetcher']:
+        print(v)
+      print(mapi.drop(v['id']))
+  elif len(argv) == 2 and argv[1] == 'net':
+    j = mapi.net()
+    for k, v in j.items():
+      print("id: %s\t%s" % (k, v))
+  elif len(argv) > 2 and argv[1] == 'drop':
+    for id in argv[1:]:
+      mapi.drop(id);
+  elif len(argv) == 2 and argv[1] == 'reload':
+    print(mapi.reload())
+  else:
+    print("\nMillipede API tool\n\nUsage:\n\tmapi net\n\tmapi drop [id1 [id2 ...]]\n\tmapi killall\n\tmapi reload\n", file=sys.stderr)
+
+if __name__ == "__main__":
+  main(sys.argv)

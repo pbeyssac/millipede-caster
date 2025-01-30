@@ -22,6 +22,7 @@ depend:
 
 install:	caster
 	install -m 0755 caster $(DEST_DIR)
+	install -m 0755 bin/mapi $(DEST_DIR)
 
 
 clean:
