@@ -82,8 +82,6 @@ void graylog_sender_free(struct graylog_sender *this) {
 
 /*
  * Reload fetcher, possibly modifying the refresh_delay and priority.
- *
- * Same as a stop/start, except we keep the sourcetable during the reload.
  */
 int graylog_sender_reload(struct graylog_sender *this,
 	const char *host, unsigned short port, const char *uri, int tls,
