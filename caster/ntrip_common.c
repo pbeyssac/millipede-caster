@@ -77,7 +77,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->input = bufferevent_get_input(bev);
 	this->filter.in_filter = NULL;
 	this->filter.raw_input = this->input;
-	this->redistribute = 0;
 	this->persistent = 0;
 	this->task = NULL;
 	this->subscription = NULL;
@@ -503,15 +502,6 @@ void ntrip_notify_close(struct ntrip_state *st) {
 		/* Notify the callback the transfer is over, and failed. */
 		st->task->end_cb(0, st->task->end_cb_arg);
 		st->task = NULL;
-	}
-	if (st->own_livesource) {
-		if (st->redistribute && st->persistent) {
-			struct redistribute_cb_args *redis_args;
-			redis_args = redistribute_args_new(st->caster, st->own_livesource, st->mountpoint, &st->mountpoint_pos, st->caster->config->reconnect_delay, 0);
-			if (redis_args)
-				redistribute_schedule(st->caster, st, redis_args);
-		} else
-			ntrip_unregister_livesource(st);
 	}
 }
 

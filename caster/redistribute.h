@@ -2,20 +2,21 @@
 #define __REDISTRIBUTE_H__
 
 #include <sys/time.h>
-#include <event2/event.h>
 
 #include "livesource.h"
-#include "sourceline.h"
 #include "util.h"
 
+/*
+ * Parameters for a call to a on-demand source.
+ */
 struct redistribute_cb_args {
 	struct caster_state *caster;
-	struct timeval t0;
+	struct timeval t0;			// time started
 	char *uri, *mountpoint;
-	pos_t mountpoint_pos;
-	char persistent;
-	struct event *ev;
+	pos_t mountpoint_pos;			// position from the STR line
+	char persistent;			// restart after failure?
 	struct livesource *livesource;
+	struct ntrip_task *task;
 };
 
 int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource);

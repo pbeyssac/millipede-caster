@@ -105,7 +105,7 @@ void
 graylog_sender_start(void *arg_cb) {
 	struct graylog_sender *a = (struct graylog_sender *)arg_cb;
 
-	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->uri, a->task->type, a->task) < 0) {
+	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->uri, a->task->type, a->task, NULL, 0) < 0) {
 		a->task->st = NULL;
 		ntrip_task_reschedule(a->task, a);
 	}

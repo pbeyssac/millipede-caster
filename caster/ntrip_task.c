@@ -27,9 +27,9 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	struct ntrip_task *this = (struct ntrip_task *)malloc(sizeof(struct ntrip_task));
 	if (this == NULL)
 		return NULL;
-	this->host = mystrdup(host);
-	this->uri = mystrdup(uri);
-	if (this->host == NULL || this->uri == NULL) {
+	this->host = host?mystrdup(host):NULL;
+	this->uri = uri?mystrdup(uri):NULL;
+	if ((host && this->host == NULL) || (uri && this->uri == NULL)) {
 		strfree(this->host);
 		strfree((char *)this->uri);
 		free(this);
@@ -80,9 +80,12 @@ void ntrip_task_stop(struct ntrip_task *this) {
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
 	if (this->refresh_delay) {
 		struct timeval timeout_interval = { this->refresh_delay, 0 };
-		logfmt(&this->caster->flog, LOG_INFO, "Starting refresh callback for %s %s:%d in %d seconds", this->type, this->host, this->port, this->refresh_delay);
 		this->ev = event_new(this->caster->base, -1, 0, _ntrip_task_restart_cb, this);
-		event_add(this->ev, &timeout_interval);
+		if (this->ev) {
+			logfmt(&this->caster->flog, LOG_INFO, "Starting refresh callback for %s %s:%d in %d seconds", this->type, this->host, this->port, this->refresh_delay);
+			event_add(this->ev, &timeout_interval);
+		} else
+			logfmt(&this->caster->flog, LOG_CRIT, "Can't schedule refresh callback for %s %s:%d, canceling", this->type, this->host, this->port);
 	}
 }
 

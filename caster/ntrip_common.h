@@ -3,6 +3,7 @@
 
 #include <netinet/in.h>
 
+#include <event2/event.h>
 #include <openssl/ssl.h>
 
 #include "conf.h"
@@ -155,8 +156,7 @@ struct ntrip_state {
 
 	/* packet feed (RTCM or other) redistribution */
 	time_t last_send;			// last time a packet was resent to someone
-	char redistribute;			// Flag: register as a live source
-	char persistent;			// Flag: don't unregister & close even after idle_max_delay
+	char persistent;			// Flag: don't unregister & close the livesource even after idle_max_delay
 
 	/*
 	 * NTRIP client state

@@ -396,7 +396,11 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 }
 
 int
-ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri, const char *type, struct ntrip_task *task) {
+ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri,
+	const char *type, struct ntrip_task *task,
+	struct livesource *livesource,
+	int persistent) {
+
 	struct bufferevent *bev;
 
 	SSL *ssl = NULL;
@@ -435,7 +439,7 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent in ntripcli_start!");
 		return -1;
 	}
-	struct ntrip_state *st = ntrip_new(caster, bev, host, port, uri, NULL);
+	struct ntrip_state *st = ntrip_new(caster, bev, host, port, uri, livesource?livesource->mountpoint:NULL);
 	if (st == NULL) {
 		bufferevent_free(bev);
 		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state in ntripcli_start!");
@@ -445,6 +449,8 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 	st->task = task;
 	st->ssl = ssl;
 	st->client = 1;
+	st->own_livesource = livesource;
+	st->persistent = persistent;
 
 	ntrip_register(st);
 	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d", type, host, port);
