@@ -64,12 +64,12 @@ def main(argv):
     for k, v in j.items():
       print("id: %s\t%s" % (k, v))
   elif len(argv) > 2 and argv[1] == 'drop':
-    for id in argv[1:]:
+    for id in argv[2:]:
       mapi.drop(id);
   elif len(argv) == 2 and argv[1] == 'reload':
     print(mapi.reload())
   else:
-    print("\nMillipede API tool\n\nUsage:\n\tmapi net\n\tmapi drop [id1 [id2 ...]]\n\tmapi killall\n\tmapi reload\n", file=sys.stderr)
+    print("\nMillipede API tool\n\nUsage:\n\tmapi net\n\tmapi drop id1 [id2 ...]\n\tmapi killall\n\tmapi reload\n", file=sys.stderr)
 
 if __name__ == "__main__":
   main(sys.argv)
