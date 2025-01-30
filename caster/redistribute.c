@@ -116,7 +116,7 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
 	}
 
 	this->task->port = sp->port;
-	this->task->tls = 0;
+	this->task->tls = sp->tls;
 	this->task->read_timeout = this->caster->config->on_demand_source_timeout;
 	this->task->write_timeout = this->caster->config->on_demand_source_timeout;
 

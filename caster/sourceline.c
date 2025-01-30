@@ -7,7 +7,7 @@
 #include "util.h"
 
 
-struct sourceline *sourceline_new(const char *host, unsigned short port, const char *key, const char *value, int priority) {
+struct sourceline *sourceline_new(const char *host, unsigned short port, int tls, const char *key, const char *value, int priority) {
 	struct sourceline *this = (struct sourceline *)malloc(sizeof(struct sourceline));
 	char *duphost = mystrdup(host);
 	char *dupkey = mystrdup(key);
@@ -23,6 +23,7 @@ struct sourceline *sourceline_new(const char *host, unsigned short port, const c
 	this->key = dupkey;
 	this->value = dupvalue;
 	this->port = port;
+	this->tls = tls;
 	this->priority = priority;
 	return this;
 }
@@ -30,7 +31,7 @@ struct sourceline *sourceline_new(const char *host, unsigned short port, const c
 /*
  * Return a new struct sourceline * parsed from the provided entry, a "STR;..." line.
  */
-struct sourceline *sourceline_new_parse(const char *entry, const char *caster, unsigned short port, int priority, int on_demand) {
+struct sourceline *sourceline_new_parse(const char *entry, const char *caster, unsigned short port, int tls, int priority, int on_demand) {
 	struct sourceline *r = NULL;
 
 	if (memcmp("STR;", entry, 4))
@@ -57,7 +58,7 @@ struct sourceline *sourceline_new_parse(const char *entry, const char *caster, u
 	}
 	key[p2-p1] = '\0';
 	memcpy(key, p1, p2-p1);
-	struct sourceline *n1 = sourceline_new(caster, port, key, entry, priority);
+	struct sourceline *n1 = sourceline_new(caster, port, tls, key, entry, priority);
 	strfree(key);
 	if (n1 == NULL) {
 		strfree(valueparse);
@@ -104,7 +105,7 @@ struct sourceline *sourceline_new_parse(const char *entry, const char *caster, u
  * Return a deep copy of a struct sourceline
  */
 struct sourceline *sourceline_copy(struct sourceline *orig) {
-	struct sourceline *this = sourceline_new(orig->host, orig->port, orig->key, orig->value, orig->priority);
+	struct sourceline *this = sourceline_new(orig->host, orig->port, orig->tls, orig->key, orig->value, orig->priority);
 	if (this == NULL)
 		return NULL;
 	this->pos = orig->pos;

@@ -24,7 +24,7 @@ struct sourcetable *sourcetable_read(const char *filename, int priority) {
 		return NULL;
 	}
 
-	struct sourcetable *tmp_sourcetable = sourcetable_new("LOCAL", 0);
+	struct sourcetable *tmp_sourcetable = sourcetable_new("LOCAL", 0, 0);
 	tmp_sourcetable->local = 1;
 	tmp_sourcetable->filename = mystrdup(filename);
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
@@ -50,7 +50,7 @@ struct sourcetable *sourcetable_read(const char *filename, int priority) {
 	return tmp_sourcetable;
 }
 
-struct sourcetable *sourcetable_new(const char *host, unsigned short port) {
+struct sourcetable *sourcetable_new(const char *host, unsigned short port, int tls) {
 	struct sourcetable *this = (struct sourcetable *)malloc(sizeof(struct sourcetable));
 	char *duphost = (host == NULL) ? NULL : mystrdup(host);
 	char *header = mystrdup("");
@@ -75,6 +75,7 @@ struct sourcetable *sourcetable_new(const char *host, unsigned short port) {
 	struct timeval t = { 0, 0 };
 	this->fetch_time = t;
 	this->nvirtual = 0;
+	this->tls = tls;
 	return this;
 }
 
@@ -155,7 +156,9 @@ static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *
 int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand) {
 	int r = 0;
 	if (!strncmp(sourcetable_entry, "STR;", 4)) {
-		struct sourceline *n1 = sourceline_new_parse(sourcetable_entry, this->caster, this->port, this->priority, on_demand);
+		struct sourceline *n1 = sourceline_new_parse(sourcetable_entry,
+			this->caster, this->port, this->tls,
+			this->priority, on_demand);
 		if (n1 == NULL)
 			return -1;
 		r = _sourcetable_add_direct(this, n1);
@@ -447,7 +450,7 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 	char *header = mystrdup("");
 	struct hash_iterator hi;
 	struct element *e;
-	struct sourcetable *r = sourcetable_new(NULL, 0);
+	struct sourcetable *r = sourcetable_new(NULL, 0, 0);
 
 	if (header == NULL || r == NULL)
 		goto cancel;

@@ -18,11 +18,12 @@ struct sourceline {
 	char *host;
 	int priority;		// priority for this source, higher = better
 	unsigned short port;
+	int tls;
 };
 TAILQ_HEAD (sourcelineq, sourceline);
 
-struct sourceline *sourceline_new(const char *host, unsigned short port, const char *key, const char *value, int priority);
-struct sourceline *sourceline_new_parse(const char *entry, const char *caster, unsigned short port, int priority, int on_demand);
+struct sourceline *sourceline_new(const char *host, unsigned short port, int tls, const char *key, const char *value, int priority);
+struct sourceline *sourceline_new_parse(const char *entry, const char *caster, unsigned short port, int tls, int priority, int on_demand);
 struct sourceline *sourceline_copy(struct sourceline *orig);
 void sourceline_free(struct sourceline *this);
 

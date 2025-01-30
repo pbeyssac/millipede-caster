@@ -20,6 +20,7 @@ struct sourcetable {
 
 	char *caster;                   // from which caster hostname did we get this table
 	unsigned short port;            // caster port
+	int tls;			// use TLS?
 	char *header;                   // All "CAS" & "NET" lines
 	struct hash_table *key_val;	// "STR" lines in a hash table
 	int pullable;                   // 1: pull mounpoints streams from the caster on demand
@@ -68,7 +69,7 @@ struct mp_prio {
 };
 
 struct sourcetable *sourcetable_read(const char *filename, int priority);
-struct sourcetable *sourcetable_new(const char *host, unsigned short port);
+struct sourcetable *sourcetable_new(const char *host, unsigned short port, int tls);
 void sourcetable_free_unlocked(struct sourcetable *this);
 void sourcetable_free(struct sourcetable *this);
 struct mime_content *sourcetable_get(struct sourcetable *this);
