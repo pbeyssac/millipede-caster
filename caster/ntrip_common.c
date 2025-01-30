@@ -555,10 +555,7 @@ _ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt
 
 	vasprintf(&g.short_message, fmt, ap);
 
-	if (threads)
-		logfmt_g(log, &g, level, "%s %lld [%lu] %s", addrport, this->id, (long)thread_id, g.short_message);
-	else
-		logfmt_g(log, &g, level, "%s %lld %s", addrport, this->id, g.short_message);
+	logfmt_g(log, &g, level, "%s %lld %s", addrport, this->id, g.short_message);
 
 	free(g.short_message);
 }
