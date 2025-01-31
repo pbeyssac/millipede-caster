@@ -3,6 +3,8 @@
 
 #include "conf.h"
 
+struct ntrip_state;
+
 /*
  * A raw packet.
  * Variable-length structure, varies according to packet size.
@@ -17,5 +19,7 @@ struct packet {
 
 struct packet *packet_new(size_t len_raw, struct caster_state *caster);
 void packet_free(struct packet *packet);
+int packet_handle_raw(struct ntrip_state *st);
+int packet_handle_rtcm(struct ntrip_state *st);
 
 #endif

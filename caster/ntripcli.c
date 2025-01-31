@@ -15,6 +15,7 @@
 #include "ntripcli.h"
 #include "ntrip_common.h"
 #include "ntrip_task.h"
+#include "packet.h"
 #include "util.h"
 
 const char *client_ntrip_version = "Ntrip/2.0";
@@ -313,7 +314,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 			st->state = NTRIP_WAIT_STREAM_GET;
 		} else if (st->state == NTRIP_WAIT_STREAM_GET) {
-			if (!ntrip_handle_raw(st))
+			if (!packet_handle_raw(st))
 				break;
 			if (st->persistent)
 				continue;

@@ -13,6 +13,7 @@
 #include "http.h"
 #include "jobs.h"
 #include "ntrip_common.h"
+#include "packet.h"
 #include "redistribute.h"
 #include "util.h"
 
@@ -538,7 +539,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
 			// will increment st->received_bytes itself
-			if (!ntrip_handle_raw(st))
+			if (!packet_handle_raw(st))
 				break;
 		}
 
