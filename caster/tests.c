@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,39 +7,85 @@
 #include "ip.h"
 #include "util.h"
 
-static void b64_test() {
-	char *testlist[] = {"", "f", "fo", "foo", "foob", "fooba", "foobar", "tralalaéèèé", NULL};
-	for (char **s = testlist; *s; s++) {
-		char *b64 = b64encode(*s, strlen(*s), 1);
-		char *b64d = b64decode(b64, strlen(b64), 1);
-		printf("%s -> %s -> %s\n", *s, b64, b64d);
-	}
-}
-
-static void gga_test() {
-	char *ggalist[] = {
-	    "$GPGGA,014822.78,0000.0000000,N,00000.0000000,E,1,00,1.0,-17.162,M,17.162,M,0.0,*5C\r\n",
-	    "$GNGGA,205655.60,4849.4770477,N,00220.6693234,E,4,12,0.63,60.806,M,46.188,M,14.6,0000*6E\r\n",
-	    "$GNGGA,104710.00,4832.5844943,N,00229.8320136,E,5,12,0.84,80.418,M,46.332,M,1.0,0000*5A\r\n",
-	    "$GPGGA,182700,4609.8802,N,00056.9231,W,4,10,1,11.8,M,1,M,3,0*50\r\n",
-	    "$GPGGA,182700,4609.8802,S,00056.9231,W,4,10,1,11.8,M,1,M,3,0*50\r\n",
-	    "$GPGGA,223105.79,4849.4654397,N,00220.6576662,E,1,00,1.0,69.071,M,44.857,M,0.0,*76",
-	    "$GNGGA,103812.00,4511.0814681,N,00544.9383397,E,1,12,0.70,226.973,M,47.399,M,,*4E",
-	    "$GNGGA,103841.00,4511.0762921,N,00544.9783512,E,2,12,0.79,217.897,M,47.399,M,2.0,0000*63",
-	    NULL
+static int b64_test() {
+	puts("b64encode/b64decode");
+	struct b64test {
+		char *send, *expect;
+	};
+	int fail = 0;
+	struct b64test testlist[] = {
+		{"", ""},
+		{"f", "Zg=="},
+		{"fo", "Zm8="},
+		{"foo", "Zm9v"},
+		{"foob", "Zm9vYg=="},
+		{"fooba", "Zm9vYmE="},
+		{"foobar", "Zm9vYmFy"},
+		{"tralalaéèèé", "dHJhbGFsYcOpw6jDqMOp"},
+		{NULL, NULL}
 	};
 
-	for (char **gga = ggalist; *gga; gga++) {
-		pos_t pos;
-		if (parse_gga(*gga, &pos) < 0) {
-			printf("Can't parse %s\n", *gga);
-			continue;
+	for (struct b64test *s = testlist; s->send; s++) {
+		char *b64 = b64encode(s->send, strlen(s->send), 1);
+		char *b64d = b64decode(b64, strlen(b64), 1);
+		if (!strcmp(s->expect, b64))
+			putchar('.');
+		else {
+			printf("\nFAIL: %s vs %s\n", b64, s->expect);
+			fail++;
 		}
-		printf("gga from %s\n-> %.3f %.3f\n", *gga, pos.lat, pos.lon);
+		if (!strcmp(s->send, b64d))
+			putchar('.');
+		else {
+			putchar('X');
+			fail++;
+		}
 	}
+	putchar('\n');
+	return fail;
 }
 
-static void test_ip_analyze_prefixquota() {
+static int gga_test() {
+	puts("parse_gga");
+	int fail = 0;
+
+	struct ggatest {
+		char *gga;
+		float lat, lon;
+	};
+
+	struct ggatest ggalist[] = {
+	    {"$GPGGA,014822.78,0000.0000000,N,00000.0000000,E,1,00,1.0,-17.162,M,17.162,M,0.0,*5C", 0., 0.},
+	    {"$GNGGA,205655.60,4849.4770477,N,00220.6693234,E,4,12,0.63,60.806,M,46.188,M,14.6,0000*6E", 48.824619, 2.344489},
+	    {"$GNGGA,104710.00,4832.5844943,N,00229.8320136,E,5,12,0.84,80.418,M,46.332,M,1.0,0000*5A", 48.543076, 2.497200},
+	    {"$GPGGA,182700,4609.8802,N,00056.9231,W,4,10,1,11.8,M,1,M,3,0*50", 46.164669, -0.948718},
+	    {"$GPGGA,182700,4609.8802,S,00056.9231,W,4,10,1,11.8,M,1,M,3,0*50", -46.164669, -0.948718},
+	    {"$GPGGA,223105.79,4849.4654397,N,00220.6576662,E,1,00,1.0,69.071,M,44.857,M,0.0,*76", 48.824425, 2.344295},
+	    {"$GNGGA,103812.00,4511.0814681,N,00544.9383397,E,1,12,0.70,226.973,M,47.399,M,,*4E", 45.184692, 5.748972},
+	    {"$GNGGA,103841.00,4511.0762921,N,00544.9783512,E,2,12,0.79,217.897,M,47.399,M,2.0,0000*63", 45.184605, 5.749639},
+	    {NULL, 0., 0.}
+	};
+
+	for (struct ggatest *gga = ggalist; gga->gga; gga++) {
+		pos_t pos;
+		if (parse_gga(gga->gga, &pos) < 0) {
+			printf("Can't parse %s\n", gga->gga);
+			fail++;
+			continue;
+		}
+		if (fabs(pos.lat-gga->lat) > 1e-6 || fabs(pos.lon-gga->lon) > 1e6) {
+			printf("FAIL: gga from %s\n-> %f %f\n", gga->gga, pos.lat, pos.lon);
+			fail++;
+		}
+		putchar('.');
+	}
+	putchar('\n');
+	return fail;
+}
+
+static int test_ip_analyze_prefixquota() {
+	puts("prefix_quota_parse");
+	int fail = 0;
 	struct iptest {
 		char *arg1, *arg2, *expect;
 	};
@@ -101,28 +148,28 @@ static void test_ip_analyze_prefixquota() {
 		char *ippref = strdup(ipt->arg1);
 		char *quota = ipt->arg2;
 		char *expect = ipt->expect;
-		printf("%s %s => ", ippref, quota);
 		r = prefix_quota_parse(ippref, quota);
-		if (r == NULL) {
-			printf("NULL");
-		} else {
+		if (r != NULL)
 			r2 = prefix_quota_str(r);
-			printf("%s", r2);
-		}
 		if (r == NULL && expect == NULL)
-			puts(" OK");
-		else if (r != NULL && expect == NULL)
-			printf(" FAIL (%s instead of NULL)\n", r2);
-		else if (r == NULL && expect != NULL)
+			putchar('.');
+		else if (r != NULL && expect == NULL) {
+			fail++;
+			printf("FAIL (%s instead of NULL)\n", r2);
+		} else if (r == NULL && expect != NULL) {
+			fail++;
 			printf(" FAIL (NULL instead of %s)\n", expect);
-		else if (strcmp(r2, expect))
+		} else if (strcmp(r2, expect)) {
+			fail++;
 			printf(" FAIL (%s instead of %s)\n", r2, expect);
-		else
-			printf(" OK (%s)\n", r2);
+		} else
+			putchar('.');
 		free(r2);
 		free(r);
 		free(ippref);
 	}
+	putchar('\n');
+	return fail;
 }
 
 #if 0
@@ -152,7 +199,9 @@ static void sourcetable_test(struct sourcetable *sourcetable) {
 #endif
 
 int main() {
-	gga_test();
-	b64_test();
-	test_ip_analyze_prefixquota();
+	int fail = 0;
+	fail += gga_test();
+	fail += b64_test();
+	fail += test_ip_analyze_prefixquota();
+	return fail != 0;
 }
