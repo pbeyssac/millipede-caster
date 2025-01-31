@@ -70,7 +70,6 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 		free(this);
 		return NULL;
 	}
-	STAILQ_INIT(&this->mimeq);
 	return this;
 }
 

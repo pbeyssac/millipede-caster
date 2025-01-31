@@ -8,7 +8,6 @@
 
 struct graylog_sender {
 	struct ntrip_task *task;
-	struct mimeq mimeq;
 };
 
 void graylog_sender_queue(struct graylog_sender *this, char *json);
