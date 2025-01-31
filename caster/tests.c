@@ -7,6 +7,36 @@
 #include "ip.h"
 #include "util.h"
 
+static int urldecode_test() {
+	int fail = 0;
+	puts("urldecode");
+	struct utest {
+		char *send, *expect;
+	};
+	struct utest testlist[] = {
+		{"abcd", "abcd"},
+		{"a%20bcd", "a bcd"},
+		{"a+bcd", "a bcd"},
+		{"efgh%3d%3dijkl", "efgh==ijkl"},
+		{"efgh%3D%25ijkl", "efgh=%ijkl"},
+		{"%zz", "%zz"},
+		{NULL, NULL}
+	};
+	for (struct utest *s = testlist; s->send; s++) {
+		char *src = (char *)strdup(s->send);
+		urldecode(src);
+		if (!strcmp(src, s->expect))
+			putchar('.');
+		else {
+			printf("\nFAIL: %s vs %s\n", src, s->expect);
+			fail++;
+		}
+		free(src);
+	}
+	putchar('\n');
+	return fail;
+}
+
 static int b64_test() {
 	puts("b64encode/b64decode");
 	struct b64test {

@@ -267,11 +267,11 @@ struct hash_table *hash_from_urlencoding(char *urlencoding) {
 		char *eq2;
 		if (eq) {
 			*eq++ = '\0';
-			percent_decode(keyval);
-			percent_decode(eq);
+			urldecode(keyval);
+			urldecode(eq);
 			eq2 = mystrdup(eq);
 		} else {
-			percent_decode(keyval);
+			urldecode(keyval);
 			eq2 = mystrdup("");
 		}
 		if (eq2 == NULL) {

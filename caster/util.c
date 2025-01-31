@@ -34,20 +34,34 @@ float distance(pos_t *p1, pos_t *p2) {
 
 /*
  * %-decode a string in place.
+ * In addition, convert '+' to ' '.
  * Return the same string pointer.
  */
-char *percent_decode(char *s) {
-	char *percent;
-	percent = s;
-	while ((percent = strchr(percent, '%'))) {
-		if (isxdigit(percent[1]) && isxdigit(percent[2])) {
-			int d1 = tolower(percent[1]) - (isdigit(percent[1]) ? '0':('a'-10));
-			int d2 = tolower(percent[2]) - (isdigit(percent[2]) ? '0':('a'-10));
-			char c = d1*16+d2;
-			*percent++ = c;
-			memmove(percent, percent+2, strlen(percent+2)+1);
-		}
+char *urldecode(char *s) {
+	char *src, *dst, c;
+
+	src = s;
+	while (*src && *src != '+' && *src != '%')
+		src++;
+	if (!*src)
+		return s;
+
+	dst = src;
+
+	while (*src) {
+		if (*src == '+') {
+			c = ' ';
+			src++;
+		} else if (*src == '%' && isxdigit(src[1]) && isxdigit(src[2])) {
+			int d1 = tolower(src[1]) - (isdigit(src[1]) ? '0':('a'-10));
+			int d2 = tolower(src[2]) - (isdigit(src[2]) ? '0':('a'-10));
+			c = d1*16+d2;
+			src += 3;
+		} else
+			c = *src++;
+		*dst++ = c;
 	}
+	*dst++ = '\0';
 	return s;
 }
 

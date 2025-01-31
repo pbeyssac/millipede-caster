@@ -62,7 +62,7 @@ void strfree_callback(const void *data, size_t datalen, void *extra);
 void mime_free_callback(const void *data, size_t datalen, void *extra);
 
 float distance(pos_t *p1, pos_t *p2);
-char *percent_decode(char *s);
+char *urldecode(char *s);
 char *b64encode(const char *str, size_t len, int add_nul);
 char *b64decode(char *str, size_t len, int add_nul);
 unsigned long crc24q_hash(unsigned char *data, size_t len);
