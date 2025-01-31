@@ -407,6 +407,15 @@ static int listener_load_certs(struct listener *this, char *tls_full_certificate
 	return 0;
 }
 
+static int tls_sni_callback(SSL *ssl, int *al, void *arg) {
+	struct listener *listener = (struct listener *)arg;
+	const char *hostname = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+	logfmt(&listener->caster->flog, LOG_INFO, "SNI callback hostname %s", hostname);
+	if (hostname == NULL || strcmp(hostname, listener->hostname))
+		return SSL_TLSEXT_ERR_NOACK;
+	return SSL_TLSEXT_ERR_OK;
+}
+
 /*
  * Set-up or update TLS server configuration.
  */
@@ -416,6 +425,14 @@ static int listener_setup_tls(struct listener *this, struct config_bind *config)
 		if (this->ssl_server_ctx == NULL) {
 			ERR_print_errors_cb(caster_tls_log_cb, this->caster);
 			return -1;
+		}
+		if (config->hostname) {
+			this->hostname = mystrdup(config->hostname);
+			if (this->hostname == NULL)
+				return -1;
+			/* Configure a SNI callback */
+			SSL_CTX_set_tlsext_servername_callback(this->ssl_server_ctx, tls_sni_callback);
+			SSL_CTX_set_tlsext_servername_arg(this->ssl_server_ctx, this);
 		}
 	}
 	if (listener_load_certs(this, config->tls_full_certificate_chain, config->tls_private_key) < 0) {
@@ -437,6 +454,7 @@ static int caster_start_listener(struct caster_state *this, struct config_bind *
 	int tls = config->tls;
 	listener->tls = tls;
 	listener->ssl_server_ctx = NULL;
+	listener->hostname = NULL;
 
 	if (config->tls && config->tls_full_certificate_chain && config->tls_private_key) {
 		if (listener_setup_tls(listener, config) < 0)

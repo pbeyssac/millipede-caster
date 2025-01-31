@@ -59,7 +59,8 @@ static struct config_bind default_config_bind = {
 	.queue_size = 2000,
 	.tls = 0,
 	.tls_full_certificate_chain = NULL,
-	.tls_private_key = NULL
+	.tls_private_key = NULL,
+	.hostname = NULL
 };
 
 static struct config_proxy default_config_proxy = {
@@ -106,6 +107,8 @@ static const cyaml_schema_field_t bind_fields_schema[] = {
 		"tls_full_certificate_chain", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config_bind, tls_full_certificate_chain, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"tls_private_key", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config_bind, tls_private_key, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_STRING_PTR(
+		"hostname", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config_bind, hostname, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_END
 };
 

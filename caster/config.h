@@ -20,6 +20,7 @@ struct config_bind {
 	int tls;
 	char *tls_full_certificate_chain;
 	char *tls_private_key;
+	char *hostname;
 };
 
 struct config_proxy {
