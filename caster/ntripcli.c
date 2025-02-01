@@ -16,6 +16,7 @@
 #include "ntrip_common.h"
 #include "ntrip_task.h"
 #include "packet.h"
+#include "rtcm.h"
 #include "util.h"
 
 const char *client_ntrip_version = "Ntrip/2.0";
@@ -314,10 +315,9 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 			st->state = NTRIP_WAIT_STREAM_GET;
 		} else if (st->state == NTRIP_WAIT_STREAM_GET) {
-			if (!packet_handle_raw(st))
+			int r = rtcm_packet_handle(st);
+			if (st->persistent || r == 0)
 				break;
-			if (st->persistent)
-				continue;
 			int idle_time = time(NULL) - st->last_send;
 			if (idle_time > st->caster->config->idle_max_delay) {
 				ntrip_log(st, LOG_NOTICE, "last_send %s: %d seconds ago, dropping", st->mountpoint, idle_time);

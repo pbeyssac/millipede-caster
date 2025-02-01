@@ -14,6 +14,7 @@
 #include "ntrip_common.h"
 #include "packet.h"
 #include "redistribute.h"
+#include "rtcm.h"
 #include "util.h"
 
 const char *server_headers = "Server: NTRIP " SERVER_VERSION_STRING "\r\n";
@@ -538,8 +539,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
 			// will increment st->received_bytes itself
-			if (!packet_handle_raw(st))
-				break;
+			rtcm_packet_handle(st);
+			break;
 		}
 
 		if (line) {
