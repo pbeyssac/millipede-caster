@@ -9,7 +9,6 @@
 #include "ntripsrv.h"
 #include "adm.h"
 #include "caster.h"
-#include "file.h"
 #include "http.h"
 #include "jobs.h"
 #include "ntrip_common.h"
