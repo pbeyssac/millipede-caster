@@ -337,7 +337,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					}
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
-					ntrip_log(st, LOG_DEBUG, "Header %s: *****", key);
+					ntrip_log(st, LOG_EDEBUG, "Header %s: *****", key);
 					if (http_decode_auth(value, &st->user, &st->password) < 0) {
 						if (st->caster->config->log_level >= LOG_DEBUG) {
 							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"", value);
@@ -346,10 +346,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						}
 					}
 				} else {
-					ntrip_log(st, LOG_DEBUG, "Header %s: %s", key, value);
+					ntrip_log(st, LOG_EDEBUG, "Header %s: %s", key, value);
 				}
 			} else {
-				ntrip_log(st, LOG_DEBUG, "[End headers]");
+				ntrip_log(st, LOG_EDEBUG, "[End headers]");
 				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
 					err = 503;
 					break;
