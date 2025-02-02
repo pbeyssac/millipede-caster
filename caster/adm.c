@@ -69,6 +69,10 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, h);
 			return 0;
 		}
+		if (!strcmp(uri, "/api/v1/rtcm") && !strcmp(method, "GET")) {
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_rtcm_json, h);
+			return 0;
+		}
 		if (!strcmp(uri, "/api/v1/mem") && !strcmp(method, "GET")) {
 			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_mem_json, h);
 			return 0;
