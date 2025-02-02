@@ -79,7 +79,7 @@ static unsigned long crc24q[] = {
 };
 
 /* Compute and return CRC24Q (RTCM) checksum on a byte string. */
-unsigned long crc24q_hash(unsigned char *data, size_t len) {
+static unsigned long rtcm_crc24q_hash(unsigned char *data, size_t len) {
 	unsigned long crc = 0;
 	for (int d = 0; d < len; d++) {
 		crc = (crc << 8) ^ crc24q[(data[d] ^ (crc>>16)) & 0xff];
@@ -87,6 +87,120 @@ unsigned long crc24q_hash(unsigned char *data, size_t len) {
 
 	crc = crc & 0x00ffffff;
 	return crc;
+}
+
+
+/*
+ * Extract a bit field in a RTCM packet.
+ * beg and len are counted in bits.
+ */
+static inline long getbits(unsigned char *d, int beg, int len) {
+	long r;
+	unsigned char mask;
+
+	// Compute all constants that depend on function arguments
+	// to make the task easier for the inline optimizer.
+	int offset_first = beg >> 3;
+	int offset_last = (beg+len-1) >> 3;
+	int bits_first = beg & 7;
+	int full_bytes = (len - (8 - bits_first)) >> 3;
+	int bits_last = (len - (8 - bits_first)) & 7;
+
+	/* First, possibly incomplete, byte */
+	mask = 0xff>>bits_first;
+	r = d[offset_first] & mask;
+
+	if (offset_first == offset_last)
+		return r >> (8-beg-len);
+
+	int offset = offset_first+1;
+
+	/* Process full bytes */
+	while (full_bytes--)
+		r = (r<<8) + d[offset++];
+
+	/* Last, possibly incomplete, byte */
+	if (bits_last)
+		r = (r << bits_last) + (d[offset] >> (8-bits_last));
+	return r;
+}
+
+/*
+ * Get and return a int38 as a long
+ */
+static inline long get_int38(unsigned char *d, int beg, int len) {
+	long r = getbits(d, beg, len);
+	if (r & (1L<<37)) r |= 0xffffffc000000000;
+	return r;
+}
+
+/*
+ * Handle packet types 1005 and 1006.
+ */
+static void handle_1005_1006(struct ntrip_state *st, struct rtcm_info *rp, int type, unsigned char *d, int len) {
+	unsigned char *data = d+3;
+	long ecef_x, ecef_y, ecef_z;
+
+	ecef_x = get_int38(data, 34, 38);
+	ecef_y = get_int38(data, 74, 38);
+	ecef_z = get_int38(data, 114, 38);
+
+	if (type == 1005) {
+		gettimeofday(&rp->posdate, NULL);
+		rp->date1005 = rp->posdate;
+		memcpy(&rp->copy1005, d, sizeof(rp->copy1005));
+	} else if (type == 1005) {
+		gettimeofday(&rp->posdate, NULL);
+		rp->date1006 = rp->posdate;
+		memcpy(&rp->copy1006, d, sizeof(rp->copy1006));
+	}
+	rp->x = ecef_x;
+	rp->y = ecef_y;
+	rp->z = ecef_z;
+}
+
+struct rtcm_info *rtcm_info_new() {
+	struct rtcm_info *this = (struct rtcm_info *)malloc(sizeof(struct rtcm_info));
+	if (this == NULL)
+		return NULL;
+	memset(this->types1k, 0, sizeof this->types1k);
+	memset(this->types4k, 0, sizeof this->types4k);
+	return this;
+}
+
+void rtcm_info_free(struct rtcm_info *this) {
+	free(this);
+}
+
+static void handle_1006(struct ntrip_state *st, struct rtcm_info *rp, unsigned char *d, int len) {
+	handle_1005_1006(st, rp, 1006, d, len);
+	// d += 3;
+	// unsigned short antenna_height = getbits(d, 152, 16);
+}
+
+/*
+ * Set a type bit in the type bitfields.
+ */
+static inline void rtcm_info_set_type(struct rtcm_info *this, int type) {
+	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
+		this->types1k[(type-RTCM_1K_MIN)>>3] |= (1<<(type&7));
+	else if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
+		this->types4k[(type-RTCM_4K_MIN)>>3] |= (1<<(type&7));
+}
+
+static void rtcm_handler(struct ntrip_state *st, unsigned char *d, int len, struct rtcm_info *rp) {
+	unsigned short type = getbits(d+3, 0, 12);
+	ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len, type);
+
+	if (!rp)
+		return;
+
+	rtcm_info_set_type(rp, type);
+
+	if (type == 1005 && len == 25)
+		handle_1005_1006(st, rp, 1005, d, len);
+	else if (type == 1006 && len == 27)
+		handle_1006(st, rp, d, len);
 }
 
 /*
@@ -150,9 +264,9 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		}
 
 		evbuffer_remove(input, &rtcmp->data[0], len_rtcm);
-		unsigned long crc = crc24q_hash(&rtcmp->data[0], len_rtcm-3);
+		unsigned long crc = rtcm_crc24q_hash(&rtcmp->data[0], len_rtcm-3);
 		if (crc == (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]) {
-			//
+			rtcm_handler(st, rtcmp->data, len_rtcm, NULL);
 		} else {
 			ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
 		}
