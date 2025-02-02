@@ -214,6 +214,7 @@ caster_new(struct config *config, const char *config_file) {
 	P_MUTEX_INIT(&this->livesources.delete_lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
+	P_RWLOCK_INIT(&this->rtcm_lock, NULL);
 	this->ntrips.next_id = 1;
 
 	this->ntrips.ipcount = hash_table_new(509, NULL);
@@ -273,6 +274,7 @@ caster_new(struct config *config, const char *config_file) {
 	TAILQ_INIT(&this->ntrips.free_queue);
 	this->ntrips.n = 0;
 	this->ntrips.nfree = 0;
+	this->rtcm_cache = hash_table_new(509, (void(*)(void *))rtcm_info_free);
 	gethostname(this->hostname, sizeof(this->hostname));
 	this->hostname[sizeof(this->hostname)-1] = '\0';
 	TAILQ_INIT(&this->sourcetablestack.list);
@@ -357,6 +359,7 @@ void caster_free(struct caster_state *this) {
 	caster_free_graylog(this);
 	caster_free_listeners(this);
 	hash_table_free(this->ntrips.ipcount);
+	hash_table_free(this->rtcm_cache);
 
 	caster_free_fetchers(this);
 
@@ -380,6 +383,7 @@ void caster_free(struct caster_state *this) {
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
 	P_RWLOCK_DESTROY(&this->livesources.lock);
 	P_MUTEX_DESTROY(&this->livesources.delete_lock);
+	P_RWLOCK_DESTROY(&this->rtcm_lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.free_lock);
 	P_RWLOCK_DESTROY(&this->configlock);

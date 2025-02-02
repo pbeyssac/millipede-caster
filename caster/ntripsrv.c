@@ -509,6 +509,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
 					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
 					st->state = NTRIP_WAIT_STREAM_SOURCE;
+					ntrip_set_rtcm_cache(st);
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				}
 			}

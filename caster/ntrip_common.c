@@ -15,6 +15,7 @@
 #include "log.h"
 #include "livesource.h"
 #include "ntrip_common.h"
+#include "rtcm.h"
 
 /*
  * Create a NTRIP session state for a client or a server connection.
@@ -62,6 +63,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->user_agent = NULL;
 	this->user_agent_ntrip = 0;
 	this->wildcard = 0;
+	this->rtcm_info = NULL;
 	this->own_livesource = NULL;
 	if (threads)
 		STAILQ_INIT(&this->jobq);
@@ -697,4 +699,22 @@ int ntrip_chunk_decode_init(struct ntrip_state *st) {
 		ntrip_chunk_decode(st->filter.raw_input, st->input, -1, BEV_NORMAL, st);
 	}
 	return 0;
+}
+
+/*
+ * Find or create the RTCM cache entry for the current source.
+ */
+void ntrip_set_rtcm_cache(struct ntrip_state *st) {
+	if (st->caster->rtcm_cache == NULL)
+		return;
+
+	P_RWLOCK_WRLOCK(&st->caster->rtcm_lock);
+	struct rtcm_info *rp = NULL;
+	rp = hash_table_get(st->caster->rtcm_cache, st->mountpoint);
+	if (rp == NULL) {
+		rp = rtcm_info_new();
+		hash_table_add(st->caster->rtcm_cache, st->mountpoint, rp);
+	}
+	st->rtcm_info = rp;
+	P_RWLOCK_UNLOCK(&st->caster->rtcm_lock);
 }

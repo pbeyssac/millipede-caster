@@ -266,7 +266,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		evbuffer_remove(input, &rtcmp->data[0], len_rtcm);
 		unsigned long crc = rtcm_crc24q_hash(&rtcmp->data[0], len_rtcm-3);
 		if (crc == (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]) {
-			rtcm_handler(st, rtcmp->data, len_rtcm, NULL);
+			rtcm_handler(st, rtcmp->data, len_rtcm, st->rtcm_info);
 		} else {
 			ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
 		}

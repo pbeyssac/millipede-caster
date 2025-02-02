@@ -15,6 +15,7 @@
 #include "livesource.h"
 #include "log.h"
 #include "queue.h"
+#include "rtcm.h"
 #include "sourcetable.h"
 #include "util.h"
 #include "graylog_sender.h"
@@ -52,6 +53,8 @@ struct caster_state {
 	struct joblist *joblist;
 	struct event_base *base;
 	struct evdns_base *dns_base;
+	struct hash_table *rtcm_cache;
+	P_RWLOCK_T rtcm_lock;
 
 	// Array of pointers to listener configurations
 	struct listener **listeners;

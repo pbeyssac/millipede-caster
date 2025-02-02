@@ -62,6 +62,8 @@ enum ntrip_chunk_state {
  * State for a connection (client or server)
  */
 
+struct rtcm_info;
+
 struct ntrip_state {
 	/*
 	 * The ntrip_state structure is locked by way of its
@@ -128,6 +130,8 @@ struct ntrip_state {
 	unsigned long content_done;		// How many content bytes have been received
 	char *content;				// Received content
 	char *content_type;			// MIME type
+
+	struct rtcm_info *rtcm_info;
 
 	struct {
 		struct evbuffer *raw_input;
@@ -230,5 +234,6 @@ int ntrip_handle_raw(struct ntrip_state *st);
 int ntrip_filter_run_input(struct ntrip_state *st);
 int ntrip_handle_raw_chunk(struct ntrip_state *st);
 int ntrip_chunk_decode_init(struct ntrip_state *st);
+void ntrip_set_rtcm_cache(struct ntrip_state *st);
 
 #endif
