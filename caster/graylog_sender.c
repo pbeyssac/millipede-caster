@@ -35,6 +35,9 @@ status_cb(void *arg, int status) {
 	struct graylog_sender *a = (struct graylog_sender *)arg;
 	if (status == 202)
 		a->task->st->status_code = 200;
+	if (a->task->st->status_code == 200)
+		/* acknowledge pending data so it can be purged */
+		ntrip_task_ack_pending(a->task);
 }
 
 /*

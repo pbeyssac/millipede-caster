@@ -48,6 +48,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->method = "GET";
 	this->connection_keepalive = 0;
 	this->use_mimeq = 0;
+	this->pending = 0;
 	this->read_timeout = 0;
 	this->write_timeout = 0;
 	TAILQ_INIT(&this->headers);
@@ -66,6 +67,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
  */
 void ntrip_task_stop(struct ntrip_task *this) {
 	logfmt(&this->caster->flog, LOG_INFO, "Stopping %s from %s:%d", this->type, this->host, this->port);
+	this->pending = 0;
 	if (this->ev) {
 		event_free(this->ev);
 		this->ev = NULL;
@@ -80,6 +82,7 @@ void ntrip_task_stop(struct ntrip_task *this) {
 }
 
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
+	this->pending = 0;
 	if (this->refresh_delay) {
 		struct timeval timeout_interval = { this->refresh_delay, 0 };
 		this->ev = event_new(this->caster->base, -1, 0, _ntrip_task_restart_cb, this);
@@ -171,14 +174,15 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
  * Should only be called when in NTRIP_IDLE_CLIENT state.
  */
 void ntrip_task_send_next_request(struct ntrip_state *st) {
+	struct evbuffer *output = bufferevent_get_output(st->bev);
 	struct mime_content *m;
 	assert(st->state == NTRIP_IDLE_CLIENT);
+	assert(st->task->pending == 0);
 	size_t size = 0;
 	if (st->task->bulk_max_size) {
 		/*
 		 * Bulk mode
 		 */
-		struct evbuffer *output = bufferevent_get_output(st->bev);
 
 		/*
 		 * Count how many elements we can send under the max size
@@ -202,27 +206,46 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 
 		/* Send the HTTP request followed by the MIME items joined by '\n' */
 		ntripcli_send_request(st, &mc, 0);
-		while (n--) {
-			m = STAILQ_FIRST(&st->task->mimeq);
-			STAILQ_REMOVE_HEAD(&st->task->mimeq, next);
-			st->task->queue_size -= m->len;
-			if (evbuffer_add_reference(output, m->s, m->len, mime_free_callback, m) < 0
+		int nsent = n;
+		STAILQ_FOREACH(m, &st->task->mimeq, next) {
+			if (n == 0)
+				break;
+			if (evbuffer_add_reference(output, m->s, m->len, NULL, NULL) < 0
 			 || evbuffer_add_reference(output, "\n", 1, NULL, NULL) < 0) {
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
 				ntrip_deferred_free(st, "ntripcli_send_next_request");
 				return;
 			}
+			n--;
 		}
+		st->task->pending = nsent;
 	} else {
 		/* Regular mode: 1 request per MIME item */
 		m = STAILQ_FIRST(&st->task->mimeq);
 		if (m) {
-			STAILQ_REMOVE_HEAD(&st->task->mimeq, next);
-			st->sent_bytes += m->len;
-			st->task->queue_size -= m->len;
-			ntripcli_send_request(st, m, 1);
+			ntripcli_send_request(st, m, 0);
+			if (evbuffer_add_reference(output, m->s, m->len, NULL, NULL) < 0) {
+				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
+				ntrip_deferred_free(st, "ntripcli_send_next_request");
+				return;
+			}
+			st->task->pending = 1;
 		}
 	}
+}
+
+/*
+ * Acknowledge pending data.
+ */
+void ntrip_task_ack_pending(struct ntrip_task *this) {
+	struct mime_content *m;
+	while (this->pending && (m = STAILQ_FIRST(&this->mimeq))) {
+		STAILQ_REMOVE_HEAD(&this->mimeq, next);
+		this->st->sent_bytes += m->len;
+		this->queue_size -= m->len;
+		this->pending--;
+	}
+	assert(this->pending == 0);
 }
 
 void ntrip_task_free(struct ntrip_task *this) {

@@ -59,6 +59,8 @@ struct ntrip_task {
 
 	/* MIME request queue */
 	struct mimeq mimeq;
+	// number of sent queue items waiting for a ack by the server
+	int pending;
 
 	/* Current and maximum MIME queue size */
 	size_t queue_size;
@@ -90,6 +92,7 @@ struct ntrip_task {
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	const char *host, unsigned short port, const char *uri, int tls, int retry_delay,
 	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename);
+void ntrip_task_ack_pending(struct ntrip_task *this);
 void ntrip_task_free(struct ntrip_task *this);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
