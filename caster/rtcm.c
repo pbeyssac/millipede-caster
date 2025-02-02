@@ -89,6 +89,48 @@ static unsigned long rtcm_crc24q_hash(unsigned char *data, size_t len) {
 	return crc;
 }
 
+// WGS84 constants
+static double a = 6378137.0;
+static double e = 8.1819190842622e-2;
+
+/*
+ * Convert ECEF coordinates in tenths of millimeters to (lat, lon, alt).
+ */
+static void ecef_to_lat_lon(pos_t *pos, double *palt, long ecef_x, long ecef_y, long ecef_z) {
+	// Adapted from https://github.com/navdata-net/meta-navdatanet/blob/rocko/recipes-setup/gnss-station/files/ecef2llh.py
+
+	/* Constants */
+	double a2 = a*a;
+	double e2 = e*e;
+	double b = sqrt(a2*(1.0-e2));
+	double b2 = b*b;
+	double ep = sqrt((a2-b2)/b2);
+	double ep2 = ep*ep;
+
+	double x = (double)ecef_x/1e4;
+	double y = (double)ecef_y/1e4;
+	double z = (double)ecef_z/1e4;
+	double x2 = x*x;
+	double y2 = y*y;
+
+	double p = sqrt(x2+y2);
+
+	double theta = atan2(a*z, b*p);
+	double cost = cos(theta);
+	double sint = sin(theta);
+
+	double lon = atan2(y, x);
+	double lat = atan2(z + ep2*b*sint*sint*sint,
+		p-e2*a*cost*cost*cost);
+	double sinlat = sin(lat);
+	double N = a / sqrt(1.0 - e2*sinlat*sinlat);
+	double alt = p / cos(lat) - N;
+
+	pos->lon = lon*(180/M_PI);
+	pos->lat = lat*(180/M_PI);
+	*palt = alt;
+	return;
+}
 
 /*
  * Extract a bit field in a RTCM packet.
@@ -179,6 +221,17 @@ static void handle_1006(struct ntrip_state *st, struct rtcm_info *rp, unsigned c
 }
 
 /*
+ * Return a type bit in the type bitfields.
+ */
+static inline int rtcm_info_check_type(struct rtcm_info *this, int type) {
+	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
+		return this->types1k[(type-RTCM_1K_MIN)>>3] & (1<<((type-RTCM_1K_MIN)&7));
+	if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
+		return this->types4k[(type-RTCM_4K_MIN)>>3] & (1<<((type-RTCM_4K_MIN)&7));
+	return 0;
+}
+
+/*
  * Set a type bit in the type bitfields.
  */
 static inline void rtcm_info_set_type(struct rtcm_info *this, int type) {
@@ -186,6 +239,74 @@ static inline void rtcm_info_set_type(struct rtcm_info *this, int type) {
 		this->types1k[(type-RTCM_1K_MIN)>>3] |= (1<<(type&7));
 	else if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
 		this->types4k[(type-RTCM_4K_MIN)>>3] |= (1<<(type&7));
+}
+
+/*
+ * Return a string list of marked RTCM types, separated by ';',
+ * ended by '\0'
+ */
+static char *rtcm_info_types(struct rtcm_info *this) {
+	int n = 0;
+	for (int i = RTCM_1K_MIN; i <= RTCM_1K_MAX; i++)
+		if (rtcm_info_check_type(this, i))
+			n++;
+	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
+		if (rtcm_info_check_type(this, i))
+			n++;
+	if (n == 0)
+		return NULL;
+
+	// 4 digits + ';' per entry or '\0' after the last,
+	// + 1 for the extra '\0' stored by snprintf.
+	char *r = (char *)strmalloc(n*5+1);
+	if (r == NULL)
+		return NULL;
+
+	char *rp = r;
+	for (int i = RTCM_1K_MIN; i <= RTCM_1K_MAX; i++)
+		if (rtcm_info_check_type(this, i)) {
+			snprintf(rp, 6, "%d;", i);
+			rp += 5;
+		}
+	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
+		if (rtcm_info_check_type(this, i)) {
+			snprintf(rp, 6, "%d;", i);
+			rp += 5;
+		}
+	// stomp over the last ';'
+	rp[-1] = '\0';
+	return r;
+}
+
+/*
+ * Return the RTCM cache as a JSON object.
+ */
+json_object *rtcm_info_json(struct rtcm_info *this) {
+	json_object *j = json_object_new_object();
+	char *types = rtcm_info_types(this);
+	if (types) {
+		json_object_object_add(j, "types", json_object_new_string(types));
+	} else {
+		json_object_object_add(j, "types", json_object_new_null());
+	}
+	if (rtcm_info_check_type(this, 1005) || rtcm_info_check_type(this, 1006)) {
+		pos_t pos;
+		double alt;
+		json_object *jpos = json_object_new_object();
+		json_object_object_add(jpos, "x", json_object_new_int64(this->x));
+		json_object_object_add(jpos, "y", json_object_new_int64(this->y));
+		json_object_object_add(jpos, "z", json_object_new_int64(this->z));
+		ecef_to_lat_lon(&pos, &alt, this->x, this->y, this->z);
+		json_object_object_add(jpos, "lat", json_object_new_double(pos.lat));
+		json_object_object_add(jpos, "lon", json_object_new_double(pos.lon));
+		json_object_object_add(jpos, "alt", json_object_new_double(alt));
+		json_object_object_add(j, "pos", jpos);
+
+		char iso_date[30];
+		iso_date_from_timeval(iso_date, sizeof iso_date, &this->posdate);
+		json_object_object_add(jpos, "date", json_object_new_string(iso_date));
+	}
+	return j;
 }
 
 static void rtcm_handler(struct ntrip_state *st, unsigned char *d, int len, struct rtcm_info *rp) {

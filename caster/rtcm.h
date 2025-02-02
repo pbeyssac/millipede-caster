@@ -26,6 +26,7 @@ struct rtcm_info {
 
 struct rtcm_info *rtcm_info_new();
 void rtcm_info_free(struct rtcm_info *this);
+json_object *rtcm_info_json(struct rtcm_info *this);
 int rtcm_packet_handle(struct ntrip_state *st);
 
 #endif

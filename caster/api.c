@@ -4,6 +4,7 @@
 
 #include "conf.h"
 #include "ntrip_common.h"
+#include "rtcm.h"
 
 /*
  * JSON API routines.
@@ -88,6 +89,32 @@ struct mime_content *api_ntrip_list_json(struct caster_state *caster, struct has
 	}
 	P_RWLOCK_UNLOCK(&caster->ntrips.lock);
 
+	s = mystrdup(json_object_to_json_string(new_list));
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	json_object_put(new_list);
+	return m;
+}
+
+/*
+ * Return the RTCM cache as a JSON object.
+ */
+struct mime_content *api_rtcm_json(struct caster_state *caster, struct hash_table *h) {
+	char *s;
+	json_object *new_list;
+
+	if (!caster->rtcm_cache) {
+		new_list = json_object_new_null();
+	} else {
+		new_list = json_object_new_object();
+		struct hash_iterator hi;
+		struct element *e;
+		P_RWLOCK_RDLOCK(&caster->rtcm_lock);
+		HASH_FOREACH(e, caster->rtcm_cache, hi) {
+			json_object *j = rtcm_info_json((struct rtcm_info *)e->value);
+			json_object_object_add(new_list, e->key, j);
+		}
+		P_RWLOCK_UNLOCK(&caster->rtcm_lock);
+	}
 	s = mystrdup(json_object_to_json_string(new_list));
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	json_object_put(new_list);
