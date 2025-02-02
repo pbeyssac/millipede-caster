@@ -381,7 +381,7 @@ struct sourceline *stack_find_mountpoint(struct caster_state *caster, sourcetabl
 		/*
 		 * If the mountpoint is from our local table, skip if not live.
 		 */
-		if (!strcmp(s->caster, "LOCAL") && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
+		if (np && !strcmp(s->caster, "LOCAL") && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
 			continue;
 		if (np && s->priority > priority) {
 			priority = s->priority;
