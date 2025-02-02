@@ -468,7 +468,7 @@ struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoi
 		this->own_livesource = NULL;
 		return NULL;
 	}
-	TAILQ_INSERT_TAIL(&this->caster->livesources.queue, np, next);
+	hash_table_add(this->caster->livesources.hash, mountpoint, np);
 	this->own_livesource = np;
 	P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
 	ntrip_log(this, LOG_INFO, "livesource %s created RUNNING", mountpoint);

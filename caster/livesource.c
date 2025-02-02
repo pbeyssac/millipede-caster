@@ -244,28 +244,25 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 
 /*
  * Find a livesource by mountpoint name.
- * Warning: O(n) complexity.
  *
  * Required lock (read): livesource list.
  */
 struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state) {
 	struct livesource *np;
 	struct livesource *result = NULL;
-	TAILQ_FOREACH(np, &this->livesources.queue, next) {
-		if (!strcmp(np->mountpoint, mountpoint)
-			&& (np->state == LIVESOURCE_RUNNING
-			    || (on_demand && np->state == LIVESOURCE_FETCH_PENDING))) {
-			result = np;
-			break;
-		}
-	}
+
+	np = (struct livesource *)hash_table_get(this->livesources.hash, mountpoint);
+
+	if (np && (np->state == LIVESOURCE_RUNNING
+			    || (on_demand && np->state == LIVESOURCE_FETCH_PENDING)))
+		result = np;
 
 	if (result == NULL && on_demand && st) {
 		struct livesource *np = livesource_new(mountpoint, LIVESOURCE_FETCH_PENDING);
 		if (np == NULL) {
 			return NULL;
 		}
-		TAILQ_INSERT_TAIL(&this->livesources.queue, np, next);
+		hash_table_add(this->livesources.hash, mountpoint, np);
 		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s", mountpoint);
 		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
 		joblist_append_redistribute(this->joblist, redistribute_source_stream, redis_args);

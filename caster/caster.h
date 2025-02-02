@@ -72,7 +72,7 @@ struct caster_state {
 	 * Live sources (currently received) related to this caster
 	 */
 	struct {
-		struct livesourceq queue;
+		struct hash_table *hash;
 		P_RWLOCK_T lock;
 		P_MUTEX_T delete_lock;
 	} livesources;

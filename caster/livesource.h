@@ -34,14 +34,12 @@ TAILQ_HEAD (subscribersq, subscriber);
  */
 struct livesource {
 	P_RWLOCK_T lock;
-	TAILQ_ENTRY(livesource) next;
 	char *mountpoint;
 	struct subscribersq subscribers;
 	int nsubs;
 	int npackets;
 	enum livesource_state state;
 };
-TAILQ_HEAD (livesourceq, livesource);
 
 struct caster_state;
 struct livesource *livesource_new(char *mountpoint, enum livesource_state state);
