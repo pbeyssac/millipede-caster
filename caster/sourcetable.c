@@ -361,7 +361,7 @@ void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max
 /*
  * Find a mountpoint in a sourcetable stack.
  */
-struct sourceline *stack_find_mountpoint(struct caster_state *caster, sourcetable_stack_t *stack, char *mountpoint) {
+static struct sourceline *_stack_find_mountpoint(struct caster_state *caster, sourcetable_stack_t *stack, char *mountpoint, int local) {
 	struct sourceline *np = NULL;
 
 	/*
@@ -377,11 +377,14 @@ struct sourceline *stack_find_mountpoint(struct caster_state *caster, sourcetabl
 	P_RWLOCK_RDLOCK(&stack->lock);
 
 	TAILQ_FOREACH(s, &stack->list, next) {
+		if (local && strcmp(s->caster, "LOCAL"))
+			continue;
 		np = sourcetable_find_mountpoint(s, mountpoint);
 		/*
-		 * If the mountpoint is from our local table, skip if not live.
+		 * If the mountpoint is from our local table, and other non-local tables are to
+		 * be looked-up, skip if not live.
 		 */
-		if (np && !strcmp(s->caster, "LOCAL") && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
+		if (!local && np && !strcmp(s->caster, "LOCAL") && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
 			continue;
 		if (np && s->priority > priority) {
 			priority = s->priority;
@@ -391,6 +394,22 @@ struct sourceline *stack_find_mountpoint(struct caster_state *caster, sourcetabl
 
 	P_RWLOCK_UNLOCK(&stack->lock);
 	return r;
+}
+
+/*
+ * Find a mountpoint in a sourcetable stack.
+ * Used for clients.
+ */
+struct sourceline *stack_find_mountpoint(struct caster_state *caster, sourcetable_stack_t *stack, char *mountpoint) {
+	return _stack_find_mountpoint(caster, stack, mountpoint, 0);
+}
+
+/*
+ * Find a mountpoint in a local sourcetable from the stack.
+ * Used to check for legitimate incoming sources.
+ */
+struct sourceline *stack_find_local_mountpoint(struct caster_state *caster, sourcetable_stack_t *stack, char *mountpoint) {
+	return _stack_find_mountpoint(caster, stack, mountpoint, 1);
 }
 
 struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpoint, struct sourcetable **sourcetable) {

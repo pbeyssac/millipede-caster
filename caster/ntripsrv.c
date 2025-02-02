@@ -469,7 +469,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						mountpoint = st->http_args[2];
 						st->client_version = 1;
 					}
-					struct sourceline *sourceline = stack_find_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
+					struct sourceline *sourceline = stack_find_local_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
 					if (st->client_version == 2 && (!st->user || !st->password)) {
 						err = 401;
 						break;
