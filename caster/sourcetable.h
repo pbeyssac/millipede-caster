@@ -81,7 +81,7 @@ struct sourceline *sourcetable_find_mountpoint(struct sourcetable *this, char *m
 struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos);
 void dist_table_free(struct dist_table *this);
 void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max);
-struct sourceline *stack_find_mountpoint(sourcetable_stack_t *stack, char *mountpoint);
+struct sourceline *stack_find_mountpoint(struct caster_state *caster, sourcetable_stack_t *stack, char *mountpoint);
 struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpoint, struct sourcetable **sourcetable);
 void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack, char *host, unsigned port, struct sourcetable *new_sourcetable);
 struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack_t *this);

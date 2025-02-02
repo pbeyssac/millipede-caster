@@ -381,7 +381,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					char *mountpoint = st->http_args[1]+1;
 					struct sourceline *sourceline = NULL;
 					if (*mountpoint)
-						sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, mountpoint);
+						sourceline = stack_find_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
 
 					/*
 					 * Source not found: reply with the sourcetable in NTRIP1, 404 in NTRIP2.
@@ -469,7 +469,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						mountpoint = st->http_args[2];
 						st->client_version = 1;
 					}
-					struct sourceline *sourceline = stack_find_mountpoint(&st->caster->sourcetablestack, mountpoint);
+					struct sourceline *sourceline = stack_find_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
 					if (st->client_version == 2 && (!st->user || !st->password)) {
 						err = 401;
 						break;

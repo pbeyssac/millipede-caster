@@ -361,7 +361,7 @@ void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max
 /*
  * Find a mountpoint in a sourcetable stack.
  */
-struct sourceline *stack_find_mountpoint(sourcetable_stack_t *stack, char *mountpoint) {
+struct sourceline *stack_find_mountpoint(struct caster_state *caster, sourcetable_stack_t *stack, char *mountpoint) {
 	struct sourceline *np = NULL;
 
 	/*
@@ -372,14 +372,20 @@ struct sourceline *stack_find_mountpoint(sourcetable_stack_t *stack, char *mount
 
 	struct sourceline *r = NULL;
 	struct sourcetable *s;
+	int priority = -10000;
 
 	P_RWLOCK_RDLOCK(&stack->lock);
 
 	TAILQ_FOREACH(s, &stack->list, next) {
 		np = sourcetable_find_mountpoint(s, mountpoint);
-		if (np) {
+		/*
+		 * If the mountpoint is from our local table, skip if not live.
+		 */
+		if (!strcmp(s->caster, "LOCAL") && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
+			continue;
+		if (np && s->priority > priority) {
+			priority = s->priority;
 			r = np;
-			break;
 		}
 	}
 
