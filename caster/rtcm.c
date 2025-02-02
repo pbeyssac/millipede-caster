@@ -343,18 +343,20 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		p = evbuffer_search(input, "\xd3", 1, &p);
 		if (p.pos < 0) {
 			unsigned long len = evbuffer_get_length(input);
+			if (len) {
 #if 0
-			char *drain = (char *)strmalloc(len+1);
-			if (drain != NULL) {
-				evbuffer_remove(input, drain, len);
-				drain[len] = '\0';
-				ntrip_log(st, LOG_INFO, "RTCM: draining %zd bytes: \"%s\"", len, drain);
-				free(drain);
-			} else
+				char *drain = (char *)strmalloc(len+1);
+				if (drain != NULL) {
+					evbuffer_remove(input, drain, len);
+					drain[len] = '\0';
+					ntrip_log(st, LOG_INFO, "RTCM: draining %zd bytes: \"%s\"", len, drain);
+					free(drain);
+				} else
 #endif
-			{
-				ntrip_log(st, LOG_INFO, "draining %zd bytes", len);
-				evbuffer_drain(input, len);
+				{
+					ntrip_log(st, LOG_INFO, "draining %zd bytes", len);
+					evbuffer_drain(input, len);
+				}
 			}
 			return r;
 		}
