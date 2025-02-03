@@ -74,7 +74,13 @@ def main(argv):
   elif len(argv) == 2 and argv[1] == 'reload':
     print(mapi.reload())
   else:
-    print("\nMillipede API tool\n\nUsage:\n\tmapi net\n\tmapi drop id1 [id2 ...]\n\tmapi killall\n\tmapi reload\n", file=sys.stderr)
+    print("""\nMillipede API tool
+
+Usage:
+\tmapi drop id1 [id2 ...]
+\tmapi killall
+\tmapi net
+\tmapi reload\n""", file=sys.stderr)
 
 if __name__ == "__main__":
   main(sys.argv)
