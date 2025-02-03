@@ -43,6 +43,8 @@ struct livesource {
 
 struct caster_state;
 struct livesource *livesource_new(char *mountpoint, enum livesource_state state);
+int livesource_del(struct livesource *this, struct caster_state *caster);
+struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint, struct livesource **existing);
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos);
 struct livesource *livesource_find_on_demand(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state);
 int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backlogged);

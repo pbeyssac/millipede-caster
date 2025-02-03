@@ -494,7 +494,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					struct livesource *old_livesource, *new_livesource;
-					new_livesource = ntrip_add_livesource(st, st->mountpoint, &old_livesource);
+					new_livesource = livesource_connected(st, st->mountpoint, &old_livesource);
 					if (old_livesource != NULL) {
 						err = 409;
 						break;

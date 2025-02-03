@@ -14,6 +14,7 @@
 #include <string.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include <event2/buffer.h>
@@ -179,6 +180,8 @@ caster_new(struct config *config, const char *config_file) {
 	if (this == NULL)
 		return this;
 
+	gettimeofday(&this->start_date, NULL);
+
 	struct event_base *base;
 	struct evdns_base *dns_base;
 
@@ -211,6 +214,8 @@ caster_new(struct config *config, const char *config_file) {
 	}
 
 	P_RWLOCK_INIT(&this->livesources.lock, NULL);
+	this->livesources.serial = 0;
+
 	P_MUTEX_INIT(&this->livesources.delete_lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
@@ -594,19 +599,6 @@ static int caster_reload_listeners(struct caster_state *this) {
 		return -1;
 	}
 	return 0;
-}
-
-int caster_del_livesource(struct caster_state *this, struct livesource *livesource) {
-	int r = 0;
-	P_MUTEX_LOCK(&this->livesources.delete_lock);
-	P_RWLOCK_WRLOCK(&this->livesources.lock);
-
-	hash_table_del(this->livesources.hash, livesource->mountpoint);
-	r = 1;
-
-	P_RWLOCK_UNLOCK(&this->livesources.lock);
-	P_MUTEX_UNLOCK(&this->livesources.delete_lock);
-	return r;
 }
 
 static int

@@ -441,48 +441,13 @@ void ntrip_deferred_run(struct caster_state *this) {
 
 /*
  * Required lock: ntrip_state
- * Acquires lock: livesources
- *
- */
-struct livesource *ntrip_add_livesource(struct ntrip_state *this, char *mountpoint, struct livesource **existing) {
-	struct livesource *existing_livesource;
-
-	assert(this->own_livesource == NULL && this->subscription == NULL);
-
-	/*
-	 * A deadlock by lock order reversal (livesources then ntrip_state) is not possible here
-	 * since we are not a source subscriber.
-	 */
-	P_RWLOCK_WRLOCK(&this->caster->livesources.lock);
-	existing_livesource = livesource_find_unlocked(this->caster, this, mountpoint, NULL, 0, NULL);
-	if (existing)
-		*existing = existing_livesource;
-	if (existing_livesource) {
-		/* Here, we should perphaps destroy & replace any existing source fetcher. */
-		P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
-		return NULL;
-	}
-	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_RUNNING);
-	if (np == NULL) {
-		P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
-		this->own_livesource = NULL;
-		return NULL;
-	}
-	hash_table_add(this->caster->livesources.hash, mountpoint, np);
-	this->own_livesource = np;
-	P_RWLOCK_UNLOCK(&this->caster->livesources.lock);
-	ntrip_log(this, LOG_INFO, "livesource %s created RUNNING", mountpoint);
-	return np;
-}
-
-/*
- * Required lock: ntrip_state
  */
 void ntrip_unregister_livesource(struct ntrip_state *this) {
 	if (!this->own_livesource)
 		return;
-	ntrip_log(this, LOG_INFO, "Unregister livesource %s", this->mountpoint);
-	caster_del_livesource(this->caster, this->own_livesource);
+	int unreg = livesource_del(this->own_livesource, this->caster);
+	if (unreg)
+		ntrip_log(this, LOG_INFO, "Unregistered livesource %s", this->mountpoint);
 	this->own_livesource = NULL;
 }
 

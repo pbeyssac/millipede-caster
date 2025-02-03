@@ -246,6 +246,54 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	return n;
 }
 
+int livesource_del(struct livesource *this, struct caster_state *caster) {
+	int r = 0;
+	P_MUTEX_LOCK(&caster->livesources.delete_lock);
+	P_RWLOCK_WRLOCK(&caster->livesources.lock);
+	hash_table_del(caster->livesources.hash, this->mountpoint);
+	r = 1;
+	caster->livesources.serial++;
+	P_RWLOCK_UNLOCK(&caster->livesources.lock);
+	P_MUTEX_UNLOCK(&caster->livesources.delete_lock);
+	return r;
+}
+
+/*
+ * Required lock: ntrip_state
+ * Acquires lock: livesources
+ *
+ */
+struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint, struct livesource **existing) {
+	struct livesource *existing_livesource;
+
+	assert(st->own_livesource == NULL && st->subscription == NULL);
+
+	/*
+	 * A deadlock by lock order reversal (livesources then ntrip_state) is not possible here
+	 * since we are not a source subscriber.
+	 */
+	P_RWLOCK_WRLOCK(&st->caster->livesources.lock);
+	existing_livesource = livesource_find_unlocked(st->caster, st, mountpoint, NULL, 0, NULL);
+	if (existing)
+		*existing = existing_livesource;
+	if (existing_livesource) {
+		/* Here, we should perphaps destroy & replace any existing source fetcher. */
+		P_RWLOCK_UNLOCK(&st->caster->livesources.lock);
+		return NULL;
+	}
+	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_RUNNING);
+	if (np == NULL) {
+		P_RWLOCK_UNLOCK(&st->caster->livesources.lock);
+		st->own_livesource = NULL;
+		return NULL;
+	}
+	hash_table_add(st->caster->livesources.hash, mountpoint, np);
+	st->caster->livesources.serial++;
+	st->own_livesource = np;
+	P_RWLOCK_UNLOCK(&st->caster->livesources.lock);
+	ntrip_log(st, LOG_INFO, "livesource %s created RUNNING", mountpoint);
+	return np;
+}
 /*
  * Find a livesource by mountpoint name.
  *
@@ -267,6 +315,7 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, struct nt
 			return NULL;
 		}
 		hash_table_add(this->livesources.hash, mountpoint, np);
+		this->livesources.serial++;
 		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s", mountpoint);
 		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
 		joblist_append_redistribute(this->joblist, redistribute_source_stream, redis_args);
@@ -315,6 +364,11 @@ struct mime_content *livesource_list_json(struct caster_state *caster, struct ha
 
 	jmain = json_object_new_object();
 	json_object_object_add(jmain, "hostname", json_object_new_string(caster->hostname));
+	json_object_object_add(jmain, "serial", json_object_new_int64(caster->livesources.serial));
+
+	char iso_date[30];
+	iso_date_from_timeval(iso_date, sizeof iso_date, &caster->start_date);
+	json_object_object_add(jmain, "start_date", json_object_new_string(iso_date));
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;
