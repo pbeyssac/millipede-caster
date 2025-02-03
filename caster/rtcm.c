@@ -191,7 +191,7 @@ static void handle_1005_1006(struct ntrip_state *st, struct rtcm_info *rp, int t
 		gettimeofday(&rp->posdate, NULL);
 		rp->date1005 = rp->posdate;
 		memcpy(&rp->copy1005, d, sizeof(rp->copy1005));
-	} else if (type == 1005) {
+	} else if (type == 1006) {
 		gettimeofday(&rp->posdate, NULL);
 		rp->date1006 = rp->posdate;
 		memcpy(&rp->copy1006, d, sizeof(rp->copy1006));
