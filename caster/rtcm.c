@@ -242,7 +242,7 @@ static inline void rtcm_info_set_type(struct rtcm_info *this, int type) {
 }
 
 /*
- * Return a string list of marked RTCM types, separated by ';',
+ * Return a string list of marked RTCM types, separated by ',',
  * ended by '\0'
  */
 static char *rtcm_info_types(struct rtcm_info *this) {
@@ -256,7 +256,7 @@ static char *rtcm_info_types(struct rtcm_info *this) {
 	if (n == 0)
 		return NULL;
 
-	// 4 digits + ';' per entry or '\0' after the last,
+	// 4 digits + ',' per entry or '\0' after the last,
 	// + 1 for the extra '\0' stored by snprintf.
 	char *r = (char *)strmalloc(n*5+1);
 	if (r == NULL)
@@ -265,15 +265,15 @@ static char *rtcm_info_types(struct rtcm_info *this) {
 	char *rp = r;
 	for (int i = RTCM_1K_MIN; i <= RTCM_1K_MAX; i++)
 		if (rtcm_info_check_type(this, i)) {
-			snprintf(rp, 6, "%d;", i);
+			snprintf(rp, 6, "%d,", i);
 			rp += 5;
 		}
 	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
 		if (rtcm_info_check_type(this, i)) {
-			snprintf(rp, 6, "%d;", i);
+			snprintf(rp, 6, "%d,", i);
 			rp += 5;
 		}
-	// stomp over the last ';'
+	// stomp over the last ','
 	rp[-1] = '\0';
 	return r;
 }
