@@ -277,7 +277,6 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, struct nt
 
 /*
  * Find a livesource by mountpoint name.
- * Warning: O(n) complexity.
  */
 struct livesource *livesource_find_on_demand(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state) {
 	P_RWLOCK_RDLOCK(&this->livesources.lock);
