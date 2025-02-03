@@ -16,10 +16,11 @@
 #include "queue.h"
 
 static const char *livesource_states[3] = {"INIT", "FETCH_PENDING", "RUNNING"};
+static const char *livesource_types[2] = {"DIRECT", "FETCHED"};
 
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 
-struct livesource *livesource_new(char *mountpoint, enum livesource_state state) {
+struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state) {
 	struct livesource *this = (struct livesource *)malloc(sizeof(struct livesource));
 	if (this == NULL)
 		return NULL;
@@ -32,6 +33,7 @@ struct livesource *livesource_new(char *mountpoint, enum livesource_state state)
 	this->nsubs = 0;
 	this->npackets = 0;
 	this->state = state;
+	this->type = type;
 
 	P_RWLOCK_INIT(&this->lock, NULL);
 	return this;
@@ -281,7 +283,7 @@ struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint
 		P_RWLOCK_UNLOCK(&st->caster->livesources.lock);
 		return NULL;
 	}
-	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_RUNNING);
+	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_TYPE_DIRECT, LIVESOURCE_RUNNING);
 	if (np == NULL) {
 		P_RWLOCK_UNLOCK(&st->caster->livesources.lock);
 		st->own_livesource = NULL;
@@ -310,7 +312,7 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, struct nt
 		result = np;
 
 	if (result == NULL && on_demand && st) {
-		struct livesource *np = livesource_new(mountpoint, LIVESOURCE_FETCH_PENDING);
+		struct livesource *np = livesource_new(mountpoint, LIVESOURCE_TYPE_FETCHED, LIVESOURCE_FETCH_PENDING);
 		if (np == NULL) {
 			return NULL;
 		}
@@ -351,6 +353,7 @@ static json_object *livesource_json(struct livesource *this) {
 	json_object_object_add(j, "nsubscribers", json_object_new_int(this->nsubs));
 	json_object_object_add(j, "npackets", json_object_new_int(this->npackets));
 	json_object_object_add(j, "state", json_object_new_string(livesource_states[this->state]));
+	json_object_object_add(j, "type", json_object_new_string(livesource_types[this->type]));
 	return j;
 }
 
