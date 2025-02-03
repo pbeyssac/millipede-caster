@@ -9,6 +9,7 @@
 #include "adm.h"
 #include "api.h"
 #include "hash.h"
+#include "livesource.h"
 #include "ntripsrv.h"
 
 int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers) {
@@ -75,6 +76,10 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		}
 		if (!strcmp(uri, "/api/v1/mem") && !strcmp(method, "GET")) {
 			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_mem_json, h);
+			return 0;
+		}
+		if (!strcmp(uri, "/api/v1/livesources") && !strcmp(method, "GET")) {
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, livesource_list_json, h);
 			return 0;
 		}
 		if (!strcmp(uri, "/api/v1/reload") && !strcmp(method, "POST")) {

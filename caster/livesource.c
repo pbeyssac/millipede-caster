@@ -4,6 +4,8 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 
+#include <json-c/json.h>
+
 #include "conf.h"
 #include "caster.h"
 #include "jobs.h"
@@ -12,6 +14,8 @@
 #include "ntripsrv.h"
 #include "packet.h"
 #include "queue.h"
+
+static const char *livesource_states[3] = {"INIT", "FETCH_PENDING", "RUNNING"};
 
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 
@@ -287,4 +291,44 @@ struct livesource *livesource_find_on_demand(struct caster_state *this, struct n
 
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos) {
 	return livesource_find_on_demand(this, st, mountpoint, mountpoint_pos, 0, NULL);
+}
+
+/*
+ * Return a livesource structure as JSON.
+ */
+static json_object *livesource_json(struct livesource *this) {
+	json_object *j = json_object_new_object();
+	json_object_object_add(j, "mountpoint", json_object_new_string(this->mountpoint));
+	json_object_object_add(j, "nsubscribers", json_object_new_int(this->nsubs));
+	json_object_object_add(j, "npackets", json_object_new_int(this->npackets));
+	json_object_object_add(j, "state", json_object_new_string(livesource_states[this->state]));
+	return j;
+}
+
+/*
+ * Return the full list of livesources as JSON.
+ */
+struct mime_content *livesource_list_json(struct caster_state *caster, struct hash_table *h) {
+	char *s;
+	json_object *jmain;
+	json_object *new_list;
+
+	jmain = json_object_new_object();
+	json_object_object_add(jmain, "hostname", json_object_new_string(caster->hostname));
+
+	new_list = json_object_new_object();
+	struct hash_iterator hi;
+	struct element *e;
+	P_RWLOCK_RDLOCK(&caster->livesources.lock);
+	HASH_FOREACH(e, caster->livesources.hash, hi) {
+		json_object *j = livesource_json((struct livesource *)e->value);
+		json_object_object_add(new_list, e->key, j);
+	}
+	P_RWLOCK_UNLOCK(&caster->livesources.lock);
+	json_object_object_add(jmain, "livesources", new_list);
+
+	s = mystrdup(json_object_to_json_string(jmain));
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	json_object_put(jmain);
+	return m;
 }

@@ -54,4 +54,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos,int on_demand, enum livesource_state *new_state);
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos);
 
+struct hash_table;
+struct mime_content *livesource_list_json(struct caster_state *caster, struct hash_table *h);
+
 #endif /* __LIVESOURCE_H__ */
