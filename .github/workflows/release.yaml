@@ -21,7 +21,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build $(pwd)/cmake-build --config Release
+          cmake --build $(pwd)/cmake-build --config Release --target caster
 
       - name: Upload release asset
         env:
