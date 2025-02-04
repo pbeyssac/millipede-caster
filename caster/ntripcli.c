@@ -310,7 +310,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 		} else if (st->state == NTRIP_REGISTER_SOURCE) {
 			if (st->own_livesource) {
-				livesource_set_state(st->own_livesource, LIVESOURCE_RUNNING);
+				livesource_set_state(st->own_livesource, st->caster, LIVESOURCE_RUNNING);
 				ntrip_log(st, LOG_INFO, "starting redistribute for %s", st->mountpoint);
 			}
 			st->state = NTRIP_WAIT_STREAM_GET;

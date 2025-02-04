@@ -88,9 +88,12 @@ void livesource_free(struct livesource *this) {
 	free(this);
 }
 
-void livesource_set_state(struct livesource *this, enum livesource_state state) {
+void livesource_set_state(struct livesource *this, struct caster_state *caster, enum livesource_state state) {
 	P_RWLOCK_WRLOCK(&this->lock);
-	this->state = state;
+	if (this->state != state) {
+		this->state = state;
+		caster->livesources.serial++;
+	}
 	P_RWLOCK_UNLOCK(&this->lock);
 }
 

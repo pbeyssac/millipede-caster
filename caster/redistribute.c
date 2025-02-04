@@ -141,7 +141,7 @@ redistribute_end_cb(int ok, void *arg) {
 	this->task->st = NULL;
 	if (!ok && st->own_livesource) {
 		if (this->persistent) {
-			livesource_set_state(this->livesource, LIVESOURCE_FETCH_PENDING);
+			livesource_set_state(this->livesource, this->caster, LIVESOURCE_FETCH_PENDING);
 			ntrip_task_reschedule(this->task, this);
 		} else {
 			ntrip_unregister_livesource(st);
