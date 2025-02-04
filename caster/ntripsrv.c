@@ -403,8 +403,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 					st->type = "client";
 					if (!st->source_virtual) {
-						P_MUTEX_LOCK(&st->caster->livesources.delete_lock);
-						struct livesource *l = livesource_find_on_demand(st->caster, st, mountpoint, &sourceline->pos, st->source_on_demand, NULL);
+						struct livesource *l = livesource_find_and_subscribe(st->caster, st, mountpoint, &sourceline->pos, st->source_on_demand);
 						if (l) {
 							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d", mountpoint, st->source_on_demand);
 							ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
@@ -412,9 +411,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 							/* Regular NTRIP stream client: disable read and write timeouts */
 							bufferevent_set_timeouts(bev, NULL, NULL);
-							livesource_add_subscriber(l, st);
 						} else {
-							P_MUTEX_UNLOCK(&st->caster->livesources.delete_lock);
 							if (st->client_version == 1) {
 								err = ntripsrv_send_sourcetable(st, output);
 								st->state = NTRIP_WAIT_CLOSE;
@@ -422,7 +419,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 								err = 404;
 							break;
 						}
-						P_MUTEX_UNLOCK(&st->caster->livesources.delete_lock);
 					} else {
 						ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 						st->state = NTRIP_WAIT_CLIENT_INPUT;

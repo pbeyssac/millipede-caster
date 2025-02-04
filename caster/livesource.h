@@ -47,12 +47,28 @@ struct livesource {
 	enum livesource_type type;
 };
 
+/*
+ * Table of livesources.
+ */
+struct livesources {
+	// local livesources by mountpoint
+	struct hash_table *hash;
+	// remote tables by hostname
+	struct hash_table *remote;
+	P_RWLOCK_T lock;
+	P_MUTEX_T delete_lock;
+	unsigned long long serial;
+};
+
 struct caster_state;
+struct livesources *livesource_table_new();
+void livesource_table_free(struct livesources *this);
 struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state);
 int livesource_del(struct livesource *this, struct caster_state *caster);
 struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint, struct livesource **existing);
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos);
 struct livesource *livesource_find_on_demand(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state);
+struct livesource *livesource_find_and_subscribe(struct caster_state *caster, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand);
 int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backlogged);
 void livesource_free(struct livesource *this);
 void livesource_set_state(struct livesource *this, struct caster_state *caster, enum livesource_state state);

@@ -72,14 +72,9 @@ struct caster_state {
 	struct timeval start_date;
 
 	/*
-	 * Live sources (currently received) related to this caster
+	 * Live sources, local and remote
 	 */
-	struct {
-		struct hash_table *hash;
-		P_RWLOCK_T lock;
-		P_MUTEX_T delete_lock;
-		unsigned long long serial;
-	} livesources;
+	struct livesources *livesources;
 
 	sourcetable_stack_t sourcetablestack;
 
