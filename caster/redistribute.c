@@ -8,7 +8,8 @@
 #include "ntripcli.h"
 #include "ntrip_task.h"
 
-static void redistribute_end_cb(int ok, void *arg);
+static void redistribute_end_cb(int ok, void *arg, int n);
+static void redistribute_start(void *, int n);
 
 /*
  * Required lock: ntrip_state
@@ -59,7 +60,8 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 	this->task->method = "GET";
 	this->task->end_cb = redistribute_end_cb;
 	this->task->end_cb_arg = this;
-	this->task->restart_cb = (void(*)(void *))redistribute_source_stream;
+	this->task->cb_arg2 = 0;
+	this->task->restart_cb = redistribute_start;
 	this->task->restart_cb_arg = this;
 
 	sprintf(uri, "/%s", mountpoint);
@@ -128,6 +130,16 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
 }
 
 /*
+ * Same as redistribute_source_stream(), with a dummy argument to be
+ * compatible with ntrip_task prototypes.
+ */
+static void
+redistribute_start(void *arg_cb, int n) {
+	struct redistribute_cb_args *this = (struct redistribute_cb_args *)arg_cb;
+	redistribute_source_stream(this);
+}
+
+/*
  * Redistribute source stream.
  * Step 3 -- end of connection.
  * Restart if necessary.
@@ -135,7 +147,7 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
  * Required lock: ntrip_state
  */
 static void
-redistribute_end_cb(int ok, void *arg) {
+redistribute_end_cb(int ok, void *arg, int n) {
 	struct redistribute_cb_args *this = (struct redistribute_cb_args *)arg;
 	struct ntrip_state *st = this->task->st;
 	this->task->st = NULL;

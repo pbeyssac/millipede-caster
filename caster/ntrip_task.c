@@ -13,7 +13,7 @@ _ntrip_task_restart_cb(int fd, short what, void *arg) {
 	struct ntrip_task *a = (struct ntrip_task *)arg;
 	event_free(a->ev);
 	a->ev = NULL;
-	a->restart_cb(a->restart_cb_arg);
+	a->restart_cb(a->restart_cb_arg, a->cb_arg2);
 }
 
 /*

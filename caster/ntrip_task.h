@@ -35,17 +35,19 @@ struct ntrip_task {
 	 */
 
 	/* Called line by line */
-	int (*line_cb)(struct ntrip_state *st, void *, const char *);
+	int (*line_cb)(struct ntrip_state *st, void *, const char *, int);
 	void *line_cb_arg;
 	/* End of connection */
-	void (*end_cb)(int, void *);
+	void (*end_cb)(int, void *, int);
 	void *end_cb_arg;
+	int cb_arg2;
+
 	/* Restart callback and arg called when the reschedule event is triggered */
-	void (*restart_cb)(void *arg);
+	void (*restart_cb)(void *arg, int);
 	void *restart_cb_arg;
 
 	/* HTTP status callback, called as soon as it is received */
-	void (*status_cb)(void *arg, int status);
+	void (*status_cb)(void *arg, int status, int);
 	void *status_cb_arg;
 
 	/* Current ntrip_state, if any */

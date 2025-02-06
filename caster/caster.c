@@ -319,7 +319,7 @@ static int caster_start_graylog(struct caster_state *this) {
 			this->config->graylog[i].queue_max_size,
 			this->config->graylog[i].authorization,
 			this->config->graylog[i].drainfilename);
-		graylog_sender_start(this->graylog[i]);
+		graylog_sender_start(this->graylog[i], 0);
 	}
 	return 0;
 }
@@ -880,7 +880,7 @@ static int caster_start_fetchers(struct caster_state *this) {
 			this->config->proxy[i].table_refresh_delay,
 			this->config->proxy[i].priority);
 		if (fetchers[i])
-			fetcher_sourcetable_start(fetchers[i]);
+			fetcher_sourcetable_start(fetchers[i], 0);
 	}
 
 	return 0;

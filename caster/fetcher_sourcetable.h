@@ -15,6 +15,6 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 void fetcher_sourcetable_free(struct sourcetable_fetch_args *this);
 void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this);
 void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh_delay, int sourcetable_priority);
-void fetcher_sourcetable_start(void *arg_cb);
+void fetcher_sourcetable_start(void *arg_cb, int n);
 
 #endif

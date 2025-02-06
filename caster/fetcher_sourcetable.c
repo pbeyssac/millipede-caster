@@ -5,8 +5,8 @@
 #include "ntripcli.h"
 #include "fetcher_sourcetable.h"
 
-static void sourcetable_end_cb(int ok, void *arg);
-static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char *line);
+static void sourcetable_end_cb(int ok, void *arg, int n);
+static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char *line, int n);
 
 /*
  * Initialize, but don't start, a sourcetable fetcher.
@@ -24,6 +24,7 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 	}
 	this->task->end_cb = sourcetable_end_cb;
 	this->task->end_cb_arg = this;
+	this->task->cb_arg2 = 0;
 	this->task->line_cb = sourcetable_line_cb;
 	this->task->line_cb_arg = this;
 	this->task->restart_cb = fetcher_sourcetable_start;
@@ -67,14 +68,14 @@ void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh
 	task_stop(this);
 	this->task->refresh_delay = refresh_delay;
 	this->priority = sourcetable_priority;
-	fetcher_sourcetable_start(this);
+	fetcher_sourcetable_start(this, 0);
 }
 
 /*
  * Callback called at the end of the ntrip session.
  */
 static void
-sourcetable_end_cb(int ok, void *arg) {
+sourcetable_end_cb(int ok, void *arg, int n) {
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg;
 	struct timeval t1;
 
@@ -93,7 +94,7 @@ sourcetable_end_cb(int ok, void *arg) {
 	ntrip_task_reschedule(a->task, a);
 }
 
-static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char *line) {
+static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char *line, int n) {
 	struct timeval t1;
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
 
@@ -111,7 +112,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 		stack_replace_host(a->task->caster, &a->task->caster->sourcetablestack, a->task->host, a->task->port, sourcetable);
 		a->sourcetable = NULL;
-		sourcetable_end_cb(1, a);
+		sourcetable_end_cb(1, a, 0);
 		return 1;
 	}
 
@@ -119,7 +120,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 		ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d", a->sourcetable->caster, a->sourcetable->port);
 		sourcetable_free(a->sourcetable);
 		a->sourcetable = NULL;
-		sourcetable_end_cb(0, a);
+		sourcetable_end_cb(0, a, 0);
 		return 1;
 	}
 	return 0;
@@ -129,7 +130,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
  * Start a sourcetable fetcher.
  */
 void
-fetcher_sourcetable_start(void *arg_cb) {
+fetcher_sourcetable_start(void *arg_cb, int n) {
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
 	assert(a->sourcetable == NULL);
 	a->sourcetable = sourcetable_new(a->task->host, a->task->port, a->task->tls);

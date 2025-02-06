@@ -203,7 +203,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 
 			if (st->task && st->task->status_cb)
-				st->task->status_cb(st->task->status_cb_arg, status_code);
+				st->task->status_cb(st->task->status_cb_arg, status_code, st->task->cb_arg2);
 
 			st->received_keepalive = 0;
 			st->content_length = 0;
@@ -280,7 +280,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
 			st->received_bytes += len + 1;
 
-			if (st->task && st->task->line_cb(st, st->task->line_cb_arg, line)) {
+			if (st->task && st->task->line_cb(st, st->task->line_cb_arg, line, st->task->cb_arg2)) {
 				st->task = NULL;
 				end = 1;
 			}

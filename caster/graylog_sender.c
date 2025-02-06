@@ -20,7 +20,7 @@ void graylog_sender_queue(struct graylog_sender *this, char *json) {
  * Callback called at the end of the ntrip session.
  */
 static void
-end_cb(int ok, void *arg) {
+end_cb(int ok, void *arg, int n) {
 	struct graylog_sender *a = (struct graylog_sender *)arg;
 	a->task->st = NULL;
 	ntrip_task_reschedule(a->task, a);
@@ -30,7 +30,7 @@ end_cb(int ok, void *arg) {
  * Handle status code in server reply.
  */
 static void
-status_cb(void *arg, int status) {
+status_cb(void *arg, int status, int n) {
 	/* Graylog replies with status=202, force 200 instead */
 	struct graylog_sender *a = (struct graylog_sender *)arg;
 	if (status == 202)
@@ -56,6 +56,7 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	this->task->status_cb_arg = this;
 	this->task->end_cb = end_cb;
 	this->task->end_cb_arg = this;
+	this->task->cb_arg2 = 0;
 	this->task->restart_cb = graylog_sender_start;
 	this->task->restart_cb_arg = this;
 	this->task->connection_keepalive = 1;
@@ -94,7 +95,7 @@ int graylog_sender_reload(struct graylog_sender *this,
 	evhttp_clear_headers(&this->task->headers);
 	evhttp_add_header(&this->task->headers, "Authorization", authkey);
 
-	graylog_sender_start(this);
+	graylog_sender_start(this, 0);
 	return 0;
 }
 
@@ -102,7 +103,7 @@ int graylog_sender_reload(struct graylog_sender *this,
  * Start a graylog sender.
  */
 void
-graylog_sender_start(void *arg_cb) {
+graylog_sender_start(void *arg_cb, int n) {
 	struct graylog_sender *a = (struct graylog_sender *)arg_cb;
 
 	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->uri, a->task->type, a->task, NULL, 0) < 0) {
