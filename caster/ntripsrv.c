@@ -14,6 +14,7 @@
 #include "ntrip_common.h"
 #include "packet.h"
 #include "redistribute.h"
+#include "request.h"
 #include "rtcm.h"
 #include "util.h"
 
@@ -145,18 +146,18 @@ int ntripsrv_send_stream_result_ok(struct ntrip_state *this, struct evbuffer *ou
  */
 void ntripsrv_deferred_output(
 	struct ntrip_state *st,
-	struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
-	struct hash_table *hash) {
+	struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req),
+	struct request *req) {
 
-	struct mime_content *r = content_cb(st->caster, hash);
+	struct mime_content *r = content_cb(st->caster, req);
 	bufferevent_lock(st->bev);
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	ntripsrv_send_result_ok(st, output, r, NULL);
 	ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output WAIT_CLOSE");
 	st->state = NTRIP_WAIT_CLOSE;
 	bufferevent_unlock(st->bev);
-	if (hash)
-		hash_table_free(hash);
+	if (req)
+		request_free(req);
 }
 
 /*

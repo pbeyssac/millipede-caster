@@ -5,6 +5,8 @@
 #include "hash.h"
 #include "queue.h"
 
+struct request;
+
 enum job_type {
 	JOB_LIBEVENT_RW,
 	JOB_LIBEVENT_EVENT,
@@ -75,11 +77,11 @@ struct job {
 		 */
 		struct {
 			void (*cb)(struct ntrip_state *st,
-				struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
-				struct hash_table *hash);
+				struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req),
+				struct request *req);
 			struct ntrip_state *st;
-			struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *h);
-			struct hash_table *hash;
+			struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req);
+			struct request *req;
 		} ntrip_unlocked_content;
 	};
 };
@@ -138,11 +140,11 @@ void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip
 void joblist_append_ntrip_unlocked_content(
 	struct joblist *this,
 	void (*cb)(struct ntrip_state *st,
-			struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
-			struct hash_table *hash),
+			struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req),
+			struct request *req),
 	struct ntrip_state *st,
-	struct mime_content *(*content_cb)(struct caster_state *caster, struct hash_table *hash),
-	struct hash_table *hash);
+	struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req),
+	struct request *req);
 void joblist_append_stop(struct joblist *this);
 void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);

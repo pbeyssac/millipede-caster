@@ -12,6 +12,7 @@
 #include "ip.h"
 #include "livesource.h"
 #include "redistribute.h"
+#include "request.h"
 #include "util.h"
 
 

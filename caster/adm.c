@@ -11,10 +11,15 @@
 #include "hash.h"
 #include "livesource.h"
 #include "ntripsrv.h"
+#include "request.h"
 
 int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
-	struct hash_table *h = NULL;
+	struct request *req = request_new();
+	if (req == NULL) {
+		*err = 503;
+		return -1;
+	}
 
 	st->client_version = 0;		// force a straight HTTP reply regardless of client headers
 
@@ -25,27 +30,30 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 	 */
 	if (!strcmp(method, "POST")) {
 		if (st->content_type && strcmp(st->content_type, "application/x-www-form-urlencoded")) {
+			request_free(req);
 			*err = 503;
 			return -1;
 		}
 		if (!st->content) {
+			request_free(req);
 			*err = 503;
 			return -1;
 		}
-		h = hash_from_urlencoding(st->content);
-		if (!h) {
+		req->hash = hash_from_urlencoding(st->content);
+		if (!req->hash) {
 			*err = 503;
 			return -1;
 		}
 	} else if (!strcmp(method, "GET") && st->query_string) {
-		h = hash_from_urlencoding(st->query_string);
-		if (!h) {
+		req->hash = hash_from_urlencoding(st->query_string);
+		if (!req->hash) {
+			request_free(req);
 			*err = 503;
 			return -1;
 		}
 	}
 
-	if (h) {
+	if (req->hash) {
 		/*
 		 * Found url-encoded key=value pairs in the request, process
 		 */
@@ -54,11 +62,11 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		 * Check credentials
 		 */
 		char *user, *password;
-		user = hash_table_get(h, "user");
-		password = hash_table_get(h, "password");
+		user = hash_table_get(req->hash, "user");
+		password = hash_table_get(req->hash, "password");
 
 		if (!user || !password || !check_password(st, st->caster->config->admin_user, user, password)) {
-			hash_table_free(h);
+			request_free(req);
 			*err = 401;
 			return -1;
 		}
@@ -67,30 +75,31 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		 * Run API calls
 		 */
 		if (!strcmp(uri, "/api/v1/net") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, h);
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, req);
 			return 0;
 		}
 		if (!strcmp(uri, "/api/v1/rtcm") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_rtcm_json, h);
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_rtcm_json, req);
 			return 0;
 		}
 		if (!strcmp(uri, "/api/v1/mem") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_mem_json, h);
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_mem_json, req);
 			return 0;
 		}
 		if (!strcmp(uri, "/api/v1/livesources") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, livesource_list_json, h);
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, livesource_list_json, req);
 			return 0;
 		}
 		if (!strcmp(uri, "/api/v1/reload") && !strcmp(method, "POST")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_reload_json, h);
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_reload_json, req);
 			return 0;
 		}
 		if (!strcmp(uri, "/api/v1/drop") && !strcmp(method, "POST")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_drop_json, h);
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_drop_json, req);
 			return 0;
 		}
 
+		request_free(req);
 		*err = 404;
 		return -1;
 	}
@@ -102,6 +111,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		char *www_auth_value = (char *)strmalloc(www_auth_value_len);
 
 		if (!www_auth_value) {
+			request_free(req);
 			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory");
 			*err = 500;
 			evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
@@ -123,6 +133,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		if (m) {
 			ntripsrv_send_result_ok(st, output, m, NULL);
 		} else {
+			request_free(req);
 			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory");
 			*err = 500;
 			evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
@@ -134,6 +145,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, NULL);
 		return 0;
 	} else {
+		request_free(req);
 		*err = 404;
 		return -1;
 	}

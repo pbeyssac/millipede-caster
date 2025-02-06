@@ -387,7 +387,7 @@ static json_object *livesource_json(struct livesource *this) {
 /*
  * Return the full list of livesources as JSON.
  */
-struct mime_content *livesource_list_json(struct caster_state *caster, struct hash_table *h) {
+struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req) {
 	char *s;
 	json_object *jmain;
 	json_object *new_list;

@@ -62,6 +62,8 @@ struct livesources {
 
 struct caster_state;
 struct livesources *livesource_table_new();
+struct request;
+
 void livesource_table_free(struct livesources *this);
 struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state);
 int livesource_del(struct livesource *this, struct caster_state *caster);
@@ -79,6 +81,6 @@ struct livesource *livesource_find_unlocked(struct caster_state *this, struct nt
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos);
 
 struct hash_table;
-struct mime_content *livesource_list_json(struct caster_state *caster, struct hash_table *h);
+struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req);
 
 #endif /* __LIVESOURCE_H__ */
