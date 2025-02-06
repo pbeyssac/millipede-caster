@@ -149,10 +149,12 @@ void ntripsrv_deferred_output(
 	struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req),
 	struct request *req) {
 
-	struct mime_content *r = content_cb(st->caster, req);
+	struct mime_content *m = content_cb(st->caster, req);
 	bufferevent_lock(st->bev);
 	struct evbuffer *output = bufferevent_get_output(st->bev);
-	ntripsrv_send_result_ok(st, output, r, NULL);
+
+	send_server_reply(st, output, req->status, NULL, NULL, m);
+
 	ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output WAIT_CLOSE");
 	st->state = NTRIP_WAIT_CLOSE;
 	bufferevent_unlock(st->bev);
