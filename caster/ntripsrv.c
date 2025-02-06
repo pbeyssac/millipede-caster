@@ -67,7 +67,8 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 	} else if (m) {
 		len = evbuffer_add_printf(ev, "Content-Length: %lu\r\n", m->len);
 		if (len > 0) sent += len;
-	} if (this->connection_keepalive) {
+	}
+	if (this->connection_keepalive) {
 		evbuffer_add_reference(ev, "Connection: keep-alive\r\n", 24, NULL, NULL);
 		len += 24;
 	} else {
