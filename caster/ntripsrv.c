@@ -101,7 +101,7 @@ static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *
 	if (m == NULL)
 		return 503;
 
-	if (this->client_version == 1)
+	if (this->client_version != 2)
 		mime_set_type(m, "text/plain");
 	send_server_reply(this, output, 200, NULL, "SOURCETABLE", m);
 	return 0;
