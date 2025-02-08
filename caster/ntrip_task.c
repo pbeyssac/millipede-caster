@@ -248,6 +248,7 @@ void ntrip_task_ack_pending(struct ntrip_task *this) {
 		this->st->sent_bytes += m->len;
 		this->queue_size -= m->len;
 		this->pending--;
+		mime_free(m);
 	}
 	assert(this->pending == 0);
 }
