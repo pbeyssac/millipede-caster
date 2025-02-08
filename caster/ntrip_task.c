@@ -111,21 +111,25 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
 	if (this->st != NULL)
 		bufferevent_unlock(this->st->bev);
 
-	if (!this->drainfilename || !r)
+	if (!r)
 		return r;
 
-	char filename[PATH_MAX];
-	filedate(filename, sizeof filename, this->drainfilename);
-	FILE *f = fopen(filename, "a+");
-	if (f == NULL)
-		return -1;
+	FILE *f = NULL;
+	if (this->drainfilename) {
+		char filename[PATH_MAX];
+		filedate(filename, sizeof filename, this->drainfilename);
+		f = fopen(filename, "a+");
+	}
 	while ((m = STAILQ_FIRST(&tmp_mimeq))) {
 		STAILQ_REMOVE_HEAD(&tmp_mimeq, next);
-		fputs(m->s, f);
-		fputs("\n", f);
+		if (f != NULL) {
+			fputs(m->s, f);
+			fputs("\n", f);
+		}
 		mime_free(m);
 	}
-	fclose(f);
+	if (f != NULL)
+		fclose(f);
 	return r;
 }
 
