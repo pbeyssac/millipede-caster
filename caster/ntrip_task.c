@@ -259,6 +259,8 @@ void ntrip_task_free(struct ntrip_task *this) {
 	strfree(this->host);
 	strfree((char *)this->uri);
 	strfree((char *)this->drainfilename);
+	if (this->ev)
+		event_free(this->ev);
 	free(this);
 }
 
