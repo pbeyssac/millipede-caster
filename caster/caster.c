@@ -377,6 +377,7 @@ void caster_free(struct caster_state *this) {
 
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
+	SSL_CTX_free(this->ssl_client_ctx);
 
 	P_RWLOCK_WRLOCK(&this->sourcetablestack.lock);
 	struct sourcetable *s;
