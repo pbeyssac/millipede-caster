@@ -154,6 +154,10 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
+			/* Free args from a previous request in keep-alive mode */
+			for (arg = &st->http_args[0]; arg < &st->http_args[SIZE_HTTP_ARGS] && *arg; arg++)
+				strfree(*arg);
+
 			st->chunk_state = CHUNK_NONE;
 			if (st->chunk_buf) {
 				evbuffer_free(st->chunk_buf);

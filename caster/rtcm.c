@@ -289,6 +289,7 @@ json_object *rtcm_info_json(struct rtcm_info *this) {
 	} else {
 		json_object_object_add(j, "types", json_object_new_null());
 	}
+	strfree(types);
 	if (rtcm_info_check_type(this, 1005) || rtcm_info_check_type(this, 1006)) {
 		pos_t pos;
 		double alt;
