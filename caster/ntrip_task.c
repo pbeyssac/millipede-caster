@@ -85,6 +85,8 @@ void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
 	this->pending = 0;
 	if (this->refresh_delay) {
 		struct timeval timeout_interval = { this->refresh_delay, 0 };
+		if (this->ev != NULL)
+			event_free(this->ev);
 		this->ev = event_new(this->caster->base, -1, 0, _ntrip_task_restart_cb, this);
 		if (this->ev) {
 			logfmt(&this->caster->flog, LOG_INFO, "Starting refresh callback for %s %s:%d in %d seconds", this->type, this->host, this->port, this->refresh_delay);
