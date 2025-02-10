@@ -30,7 +30,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->mountpoint = mystrdup(mountpoint?mountpoint:"");
 	this->uri = uri ? mystrdup(uri) : NULL;
 	this->host = host ? mystrdup(host) : NULL;
-	if ((host && (this->host = mystrdup(host)) == NULL) || this->mountpoint == NULL || (uri && this->uri == NULL)) {
+	if ((host && this->host == NULL) || this->mountpoint == NULL || (uri && this->uri == NULL)) {
 		strfree(this->mountpoint);
 		strfree(this->uri);
 		strfree(this->host);
