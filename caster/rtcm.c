@@ -345,19 +345,14 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		if (p.pos < 0) {
 			unsigned long len = evbuffer_get_length(input);
 			if (len) {
-#if 0
-				char *drain = (char *)strmalloc(len+1);
-				if (drain != NULL) {
-					evbuffer_remove(input, drain, len);
-					drain[len] = '\0';
-					ntrip_log(st, LOG_INFO, "RTCM: draining %zd bytes: \"%s\"", len, drain);
-					free(drain);
-				} else
-#endif
-				{
-					ntrip_log(st, LOG_INFO, "draining %zd bytes", len);
-					evbuffer_drain(input, len);
-				}
+				struct packet *not_rtcmp = packet_new(len, st->caster);
+				evbuffer_remove(input, not_rtcmp->data, len);
+				ntrip_log(st, LOG_INFO, "resending %zd bytes", len);
+				if (livesource_send_subscribers(st->own_livesource, not_rtcmp, st->caster))
+					st->last_send = time(NULL);
+				r = 1;
+				packet_free(not_rtcmp);
+				continue;
 			}
 			return r;
 		}
