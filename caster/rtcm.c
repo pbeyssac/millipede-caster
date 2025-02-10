@@ -347,6 +347,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			if (len) {
 				struct packet *not_rtcmp = packet_new(len, st->caster);
 				evbuffer_remove(input, not_rtcmp->data, len);
+				st->received_bytes += len;
 				ntrip_log(st, LOG_INFO, "resending %zd bytes", len);
 				if (livesource_send_subscribers(st->own_livesource, not_rtcmp, st->caster))
 					st->last_send = time(NULL);
@@ -376,6 +377,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		}
 
 		struct packet *rtcmp = packet_new(len_rtcm, st->caster);
+		st->received_bytes += len_rtcm;
 		if (rtcmp == NULL) {
 			evbuffer_drain(input, len_rtcm);
 			ntrip_log(st, LOG_CRIT, "RTCM: Not enough memory, dropping packet");
