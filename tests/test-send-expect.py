@@ -58,12 +58,13 @@ tests = [
    b'^SOURCETABLE 200 OK\r\n(?s:.)*Content-Type: text/plain\r\n(?s:.)*\r\nCAS;castera\.ntrip\.eu\.org;2101;NTRIP-Caster-2\.0\.45;INRAE;0;FRA;48\.82;2\.34;0\.0\.0\.0;0;http://caster\.centipede\.fr/home\r\nNET;CENTIPEDE-RTK;INRAE;B;N;https://centipede\.fr;https://docs\.centipede\.fr;contact@centipede\.fr;none\r\nSTR;AAA;AAA;(?s:.)*\r\nSTR;NNN;NNN;(?s:.)*\r\nSTR;V;V;RTCM3;1004,1005,1006,1008,1012,1019,1020,1033,1042,1045,1046,1077,1087,1097,1107,1127,1230;;GPS\+GLO\+GAL\+BDS\+QZS;NONE;NONE;48\.824;2\.344;1;0;PB-Virtual,0;NONE;N;N;;\r\nSTR;ZZZ;ZZZ;(?s:.)*\r\nENDSOURCETABLE\r\n$'),
   (b'GET / HTTP/1.1\nUser-Agent: random\n\n',
    b'^HTTP/1\.1 200 OK\r\n(?s:.)*Content-Type: text/plain\r\n(?s:.)*\r\nCAS;castera\.ntrip\.eu\.org;2101;NTRIP-Caster-2\.0\.45;INRAE;0;FRA;48\.82;2\.34;0\.0\.0\.0;0;http://caster\.centipede\.fr/home\r\nNET;CENTIPEDE-RTK;INRAE;B;N;https://centipede\.fr;https://docs\.centipede\.fr;contact@centipede\.fr;none\r\nSTR;AAA;AAA;(?s:.)*\r\nSTR;NNN;NNN;(?s:.)*\r\nSTR;V;V;RTCM3;1004,1005,1006,1008,1012,1019,1020,1033,1042,1045,1046,1077,1087,1097,1107,1127,1230;;GPS\+GLO\+GAL\+BDS\+QZS;NONE;NONE;48\.824;2\.344;1;0;PB-Virtual,0;NONE;N;N;;\r\nSTR;ZZZ;ZZZ;(?s:.)*\r\nENDSOURCETABLE\r\n$'),
+  (b'POST /adm/api/v1/reload HTTP/1.1\r\nContent-Length: 33\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nuser=admin&password=%3dadminpw...',
    b'^HTTP/1\.1 200 OK\r\n(?s:.)*Content-Length: 14\r\nContent-Type: application/json\r\n(?s:.)*\r\n\{"result": 0\}\n$'),
 ]
 
 err = 0
 
-for send, expect in tests:
+for i, (send, expect) in enumerate(tests):
   s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
   s.connect((HOST, PORT))
   s.sendall(send)
