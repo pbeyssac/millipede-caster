@@ -156,8 +156,13 @@ void ntripsrv_deferred_output(
 
 	send_server_reply(st, output, req->status, NULL, NULL, m);
 
-	ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output WAIT_CLOSE");
-	st->state = NTRIP_WAIT_CLOSE;
+	if (st->connection_keepalive && st->received_keepalive) {
+		ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_HTTP_METHOD", st->connection_keepalive, st->received_keepalive);
+		st->state = NTRIP_WAIT_HTTP_METHOD;
+	} else {
+		ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_CLOSE", st->connection_keepalive, st->received_keepalive);
+		st->state = NTRIP_WAIT_CLOSE;
+	}
 	bufferevent_unlock(st->bev);
 	if (req)
 		request_free(req);
@@ -327,6 +332,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				break;
 			}
 			st->state = NTRIP_WAIT_HTTP_HEADER;
+			st->received_keepalive = 0;
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
@@ -345,6 +351,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				} else if (!strcasecmp(key, "transfer-encoding")) {
 					if (!strcasecmp(value, "chunked"))
 						st->chunk_state = CHUNK_INIT;
+				} else if (!strcasecmp(key, "connection")) {
+					if (!strcasecmp(value, "keep-alive"))
+						st->received_keepalive = 1;
 				} else if (!strcasecmp(key, "content-length")) {
 					unsigned long content_length;
 					if (sscanf(value, "%lu", &content_length) == 1) {
@@ -377,6 +386,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				}
 			} else {
 				ntrip_log(st, LOG_EDEBUG, "[End headers]");
+				if (st->client_version == 1)
+					st->connection_keepalive = 0;
 				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
 					err = 503;
 					break;
@@ -404,6 +415,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 
+					st->connection_keepalive = 0;
 					char *mountpoint = st->http_args[1]+1;
 					struct sourceline *sourceline = NULL;
 					if (*mountpoint)
@@ -417,8 +429,16 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (*mountpoint == '\0' || (!sourceline && st->client_version == 1)) {
 						st->type = "client";
 						err = ntripsrv_send_sourcetable(st, output);
-						st->state = NTRIP_WAIT_CLOSE;
-						break;
+						if (st->connection_keepalive && st->received_keepalive) {
+							if (st->content_length)
+								st->state = NTRIP_WAIT_CLIENT_CONTENT;
+							else
+								st->state = NTRIP_WAIT_HTTP_METHOD;
+							continue;
+						} else {
+							st->state = NTRIP_WAIT_CLOSE;
+							break;
+						}
 					}
 					if (!sourceline) {
 						err = 404;
@@ -476,6 +496,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							continue;
 						}
 						method_post_source = 1;
+						st->connection_keepalive = 0;
 						password = st->password;
 						user = st->user;
 						st->client_version = 2;
@@ -486,6 +507,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						mountpoint = st->http_args[1]+1;
 					} else {
 						method_post_source = 1;
+						st->connection_keepalive = 0;
 						password = st->http_args[1];
 						user = NULL;
 						mountpoint = st->http_args[2];
@@ -558,7 +580,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			if (st->content_done == st->content_length) {
 				st->content[st->content_length] = '\0';
 				admsrv(st, "POST", "/adm", st->http_args[1] + 4, &err, &opt_headers);
-				break;
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
 			// will increment st->received_bytes itself
