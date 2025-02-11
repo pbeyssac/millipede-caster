@@ -142,7 +142,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		st->state = NTRIP_WAIT_CLOSE;
 		return 0;
 	} else if (!strcmp(uri, "/net")) {
-		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, NULL);
+		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, req);
 		return 0;
 	} else {
 		request_free(req);
