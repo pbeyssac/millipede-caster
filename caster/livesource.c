@@ -445,47 +445,107 @@ struct livesource *livesource_find_and_subscribe(struct caster_state *caster, st
 }
 
 /*
- * Return a livesource structure as JSON.
+ * Common code for livesource remote/local
  */
-static json_object *livesource_json(struct livesource *this) {
+static json_object *_livesource_common_json(const char *mountpoint, enum livesource_state state, enum livesource_type type) {
 	json_object *j = json_object_new_object();
-	json_object_object_add(j, "mountpoint", json_object_new_string(this->mountpoint));
-	json_object_object_add(j, "nsubscribers", json_object_new_int(this->nsubs));
-	json_object_object_add(j, "npackets", json_object_new_int(this->npackets));
-	json_object_object_add(j, "state", json_object_new_string(livesource_states[this->state]));
-	json_object_object_add(j, "type", json_object_new_string(livesource_types[this->type]));
+	json_object_object_add(j, "mountpoint", json_object_new_string(mountpoint));
+	json_object_object_add(j, "state", json_object_new_string(livesource_states[state]));
+	json_object_object_add(j, "type", json_object_new_string(livesource_types[type]));
 	return j;
 }
 
 /*
- * Return the full list of livesources as JSON.
+ * Return a local livesource structure as JSON.
  */
-struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req) {
-	char *s;
+static json_object *livesource_json(struct livesource *this) {
+	json_object *j = _livesource_common_json(this->mountpoint, this->state, this->type);
+	json_object_object_add(j, "nsubscribers", json_object_new_int(this->nsubs));
+	json_object_object_add(j, "npackets", json_object_new_int(this->npackets));
+	return j;
+}
+
+/*
+ * Return a remote livesource structure as JSON.
+ */
+static json_object *livesource_remote_json(struct livesource_remote *this) {
+	return _livesource_common_json(this->mountpoint, this->state, this->type);
+}
+
+/*
+ * Return the full list of local livesources as JSON.
+ */
+json_object *livesource_list_local_json(struct livesources *this) {
 	json_object *jmain;
 	json_object *new_list;
 
 	jmain = json_object_new_object();
-	json_object_object_add(jmain, "hostname", json_object_new_string(caster->hostname));
-	json_object_object_add(jmain, "serial", json_object_new_int64(caster->livesources->serial));
-
-	char iso_date[30];
-	iso_date_from_timeval(iso_date, sizeof iso_date, &caster->start_date);
-	json_object_object_add(jmain, "start_date", json_object_new_string(iso_date));
+	json_object_object_add(jmain, "hostname", json_object_new_string(this->hostname));
+	json_object_object_add(jmain, "serial", json_object_new_int64(this->serial));
+	json_object_object_add(jmain, "start_date", json_object_new_string(this->start_date));
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;
 	struct element *e;
-	P_RWLOCK_RDLOCK(&caster->livesources->lock);
-	HASH_FOREACH(e, caster->livesources->hash, hi) {
+	P_RWLOCK_RDLOCK(&this->lock);
+	HASH_FOREACH(e, this->hash, hi) {
 		json_object *j = livesource_json((struct livesource *)e->value);
 		json_object_object_add(new_list, e->key, j);
 	}
-	P_RWLOCK_UNLOCK(&caster->livesources->lock);
+	P_RWLOCK_UNLOCK(&this->lock);
 	json_object_object_add(jmain, "livesources", new_list);
+	return jmain;
+}
 
+/*
+ * Return the full list of remote livesources as JSON.
+ */
+static json_object *_livesource_list_remote_json(struct livesources *this, struct livesources_remote *thisr) {
+	json_object *jmain;
+	json_object *new_list;
+
+	jmain = json_object_new_object();
+	json_object_object_add(jmain, "hostname", json_object_new_string(thisr->hostname));
+	json_object_object_add(jmain, "serial", json_object_new_int64(thisr->serial));
+	json_object_object_add(jmain, "start_date", json_object_new_string(thisr->start_date));
+
+	new_list = json_object_new_object();
+	struct hash_iterator hi;
+	struct element *e;
+	P_RWLOCK_RDLOCK(&this->lock);
+	HASH_FOREACH(e, thisr->hash, hi) {
+		json_object *j = livesource_remote_json((struct livesource_remote *)e->value);
+		json_object_object_add(new_list, e->key, j);
+	}
+	P_RWLOCK_UNLOCK(&this->lock);
+	json_object_object_add(jmain, "livesources", new_list);
+	return jmain;
+}
+
+/*
+ * Return the full list of livesources, local + remote, as JSON.
+ */
+static struct mime_content *_livesource_list_json(struct caster_state *caster) {
+	char *s;
+	json_object *jmain = json_object_new_object();
+
+	json_object *j = livesource_list_local_json(caster->livesources);
+	json_object_object_add(jmain, "LOCAL", j);
+
+	P_RWLOCK_RDLOCK(&caster->livesources->lock);
+	struct hash_iterator hi;
+	struct element *e;
+	HASH_FOREACH(e, caster->livesources->remote, hi) {
+		j = _livesource_list_remote_json(caster->livesources, (struct livesources_remote *)e->value);
+		json_object_object_add(jmain, e->key, j);
+	}
+	P_RWLOCK_UNLOCK(&caster->livesources->lock);
 	s = mystrdup(json_object_to_json_string(jmain));
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	json_object_put(jmain);
 	return m;
+}
+
+struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req) {
+	return _livesource_list_json(caster);
 }
