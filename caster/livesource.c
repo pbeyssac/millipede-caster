@@ -18,33 +18,94 @@
 
 static const char *livesource_states[4] = {"INIT", "FETCH_PENDING", "RUNNING", NULL};
 static const char *livesource_types[3] = {"DIRECT", "FETCHED", NULL};
-static const char *livesource_update_types[4] = {"none", "add", "del", "update"};
 
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 static struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state);
 
-struct livesources *livesource_table_new(const char *hostname, struct timeval *start_date) {
-	struct livesources *this = (struct livesources *)malloc(sizeof(struct livesources));
-	P_RWLOCK_INIT(&this->lock, NULL);
-	P_MUTEX_INIT(&this->delete_lock, NULL);
-	this->serial = 0;
-	this->hash = hash_table_new(509, (void(*)(void *))livesource_free);
+/*
+ * Create a remote livesource record
+ */
+static struct livesource_remote *livesource_remote_new(const char *mountpoint) {
+	struct livesource_remote *this = (struct livesource_remote *)malloc(sizeof(struct livesource_remote));
+	if (this != NULL) {
+		this->mountpoint = mystrdup(mountpoint);
+		if (this->mountpoint == NULL) {
+			free(this);
+			return NULL;
+		}
+	}
+	return this;
+}
 
-	char iso_date[40];
-	iso_date_from_timeval(iso_date, sizeof iso_date, start_date);
-	this->start_date = mystrdup(iso_date);
+static void livesource_remote_free(struct livesource_remote *this) {
+	strfree(this->mountpoint);
+	strfree(this);
+}
 
-	this->hostname = mystrdup(hostname);
+static void livesources_remote_free(struct livesources_remote *this) {
+	if (this->hash != NULL)
+		hash_table_free(this->hash);
+	strfree(this->start_date);
+	strfree(this->hostname);
+	free(this);
+}
+
+/*
+ * Create a table of livesources for a remote node
+ */
+static struct livesources_remote *livesources_remote_new(const char *hostname, const char *start_date, unsigned long long serial) {
+	struct livesources_remote *this = (struct livesources_remote *)malloc(sizeof(struct livesources_remote));
+
+	if (this == NULL)
+		return NULL;
+
+	char *dup_start_date = mystrdup(start_date);
+	char *dup_hostname = mystrdup(hostname);
+
+	this->serial = serial;
+	this->hash = hash_table_new(509, (void(*)(void *))livesource_remote_free);
+	if (dup_start_date == NULL || dup_hostname == NULL || this->hash == NULL) {
+		livesources_remote_free(this);
+		return NULL;
+	}
+	this->start_date = dup_start_date;
+	this->hostname = dup_hostname;
 	return this;
 }
 
 void livesource_table_free(struct livesources *this) {
+	if (this->hash != NULL)
+		hash_table_free(this->hash);
+	if (this->remote != NULL)
+		hash_table_free(this->remote);
 	P_RWLOCK_DESTROY(&this->lock);
 	P_MUTEX_DESTROY(&this->delete_lock);
-	hash_table_free(this->hash);
 	strfree(this->start_date);
 	strfree(this->hostname);
 	free(this);
+}
+
+struct livesources *livesource_table_new(const char *hostname, struct timeval *start_date) {
+	struct livesources *this = (struct livesources *)malloc(sizeof(struct livesources));
+
+	if (this == NULL)
+		return NULL;
+
+	P_RWLOCK_INIT(&this->lock, NULL);
+	P_MUTEX_INIT(&this->delete_lock, NULL);
+	this->serial = 0;
+	this->hash = hash_table_new(509, (void(*)(void *))livesource_free);
+	this->remote = hash_table_new(113, (void(*)(void *))livesources_remote_free);
+
+	char iso_date[40];
+	iso_date_from_timeval(iso_date, sizeof iso_date, start_date);
+	this->start_date = mystrdup(iso_date);
+	this->hostname = mystrdup(hostname);
+
+	if (this->start_date == NULL || this->hostname == NULL
+		|| this->hash == NULL || this->remote == NULL)
+		livesource_table_free(this);
+	return this;
 }
 
 struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state) {

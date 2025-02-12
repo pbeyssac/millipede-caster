@@ -48,6 +48,25 @@ struct livesource {
 };
 
 /*
+ * Simplified structure for a remote live source
+ */
+struct livesource_remote {
+	char *mountpoint;
+	enum livesource_state state;
+	enum livesource_type type;
+};
+
+/*
+ * Table of livesources for a remote node
+ */
+struct livesources_remote {
+	struct hash_table *hash;
+	unsigned long long serial;
+	char *start_date;
+	char *hostname;
+};
+
+/*
  * Table of livesources.
  */
 struct livesources {
