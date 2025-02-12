@@ -769,6 +769,7 @@ listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	st->ssl = ssl;
 	st->bev_close_on_free = 1;
+	st->connection_keepalive = 1;
 	ntrip_set_peeraddr(st, sa, socklen);
 	ntrip_set_localaddr(st);
 
