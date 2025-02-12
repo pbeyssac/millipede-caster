@@ -213,7 +213,8 @@ caster_new(struct config *config, const char *config_file) {
 		return NULL;
 	}
 
-	this->livesources = livesource_table_new();
+	gethostname(this->hostname, sizeof(this->hostname));
+	this->livesources = livesource_table_new(this->hostname, &this->start_date);
 
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
@@ -281,7 +282,6 @@ caster_new(struct config *config, const char *config_file) {
 	this->ntrips.n = 0;
 	this->ntrips.nfree = 0;
 	this->rtcm_cache = hash_table_new(509, (void(*)(void *))rtcm_info_free);
-	gethostname(this->hostname, sizeof(this->hostname));
 	this->hostname[sizeof(this->hostname)-1] = '\0';
 	TAILQ_INIT(&this->sourcetablestack.list);
 	return this;

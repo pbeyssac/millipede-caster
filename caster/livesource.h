@@ -58,12 +58,19 @@ struct livesources {
 	P_RWLOCK_T lock;
 	P_MUTEX_T delete_lock;
 	unsigned long long serial;
+
+	// This is used to disambiguate a rolled-back serial sequence
+	char *start_date;
+
+	// Used as a key to identify this table when synchronizing
+	// with other nodes.
+	char *hostname;			// our hostname
 };
 
 struct caster_state;
-struct livesources *livesource_table_new();
 struct request;
 
+struct livesources *livesource_table_new(const char *hostname, struct timeval *start_date);
 void livesource_table_free(struct livesources *this);
 struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state);
 int livesource_del(struct livesource *this, struct caster_state *caster);

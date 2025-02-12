@@ -14,18 +14,25 @@
 #include "ntripsrv.h"
 #include "packet.h"
 #include "queue.h"
+#include "util.h"
 
 static const char *livesource_states[3] = {"INIT", "FETCH_PENDING", "RUNNING"};
 static const char *livesource_types[2] = {"DIRECT", "FETCHED"};
 
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 
-struct livesources *livesource_table_new() {
+struct livesources *livesource_table_new(const char *hostname, struct timeval *start_date) {
 	struct livesources *this = (struct livesources *)malloc(sizeof(struct livesources));
 	P_RWLOCK_INIT(&this->lock, NULL);
 	P_MUTEX_INIT(&this->delete_lock, NULL);
 	this->serial = 0;
 	this->hash = hash_table_new(509, (void(*)(void *))livesource_free);
+
+	char iso_date[40];
+	iso_date_from_timeval(iso_date, sizeof iso_date, start_date);
+	this->start_date = mystrdup(iso_date);
+
+	this->hostname = mystrdup(hostname);
 	return this;
 }
 
@@ -33,6 +40,8 @@ void livesource_table_free(struct livesources *this) {
 	P_RWLOCK_DESTROY(&this->lock);
 	P_MUTEX_DESTROY(&this->delete_lock);
 	hash_table_free(this->hash);
+	strfree(this->start_date);
+	strfree(this->hostname);
 }
 
 struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state) {
