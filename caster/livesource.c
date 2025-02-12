@@ -16,10 +16,12 @@
 #include "queue.h"
 #include "util.h"
 
-static const char *livesource_states[3] = {"INIT", "FETCH_PENDING", "RUNNING"};
-static const char *livesource_types[2] = {"DIRECT", "FETCHED"};
+static const char *livesource_states[4] = {"INIT", "FETCH_PENDING", "RUNNING", NULL};
+static const char *livesource_types[3] = {"DIRECT", "FETCHED", NULL};
+static const char *livesource_update_types[4] = {"none", "add", "del", "update"};
 
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
+static struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state);
 
 struct livesources *livesource_table_new(const char *hostname, struct timeval *start_date) {
 	struct livesources *this = (struct livesources *)malloc(sizeof(struct livesources));

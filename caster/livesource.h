@@ -84,10 +84,10 @@ void livesource_set_state(struct livesource *this, struct caster_state *caster, 
 struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntrip_state *st);
 void livesource_del_subscriber(struct ntrip_state *st);
 int livesource_send_subscribers(struct livesource *this, struct packet *packet, struct caster_state *caster);
-struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos,int on_demand, enum livesource_state *new_state);
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos);
 
 struct hash_table;
 struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req);
+
 
 #endif /* __LIVESOURCE_H__ */
