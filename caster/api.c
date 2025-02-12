@@ -44,7 +44,7 @@ static json_object *api_ntrip_json(struct ntrip_state *st) {
 		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->http_args[1]+1));
 
 	if (st->user_agent)
-		json_object_object_add(new_obj, "user-agent", json_object_new_string(st->user_agent));
+		json_object_object_add(new_obj, "user_agent", json_object_new_string(st->user_agent));
 
 	struct tcp_info ti;
 	socklen_t ti_len = sizeof ti;
