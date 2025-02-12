@@ -42,6 +42,7 @@ void livesource_table_free(struct livesources *this) {
 	hash_table_free(this->hash);
 	strfree(this->start_date);
 	strfree(this->hostname);
+	free(this);
 }
 
 struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state) {
