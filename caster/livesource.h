@@ -18,6 +18,13 @@ enum livesource_type {
 	LIVESOURCE_TYPE_FETCHED
 };
 
+enum livesource_update_type {
+	LIVESOURCE_UPDATE_NONE,
+	LIVESOURCE_UPDATE_ADD,
+	LIVESOURCE_UPDATE_DEL,
+	LIVESOURCE_UPDATE_STATUS
+};
+
 /*
  * A source subscription for a client.
  */
@@ -108,5 +115,7 @@ struct livesource *livesource_find(struct caster_state *this, struct ntrip_state
 struct hash_table;
 struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req);
 
+json_object *livesource_full_update_json(struct livesources *this);
+int livesource_update_execute(struct caster_state *caster, struct livesources *this, json_object *j);
 
 #endif /* __LIVESOURCE_H__ */
