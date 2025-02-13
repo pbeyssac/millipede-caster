@@ -610,7 +610,9 @@ static void livesource_send_json(struct caster_state *caster, json_object *j) {
 	char *s = mystrdup(json_object_to_json_string(j));
 	json_object_put(j);
 
-	// TBD: actual sending
+	logfmt(&caster->flog, LOG_DEBUG, "livesource_send_json syncer %s", s);
+	if (s != NULL && caster->syncers_count >= 1)
+		syncer_queue(caster->syncers[0], s);
 	strfree(s);
 }
 
