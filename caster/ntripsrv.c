@@ -373,7 +373,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_EDEBUG, "Header %s: *****", key);
-					if (http_decode_auth(value, &st->user, &st->password) < 0) {
+					if (http_decode_auth(value, &st->scheme_basic, &st->user, &st->password) < 0) {
 						if (st->caster->config->log_level >= LOG_DEBUG) {
 							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"", value);
 						} else {
@@ -494,6 +494,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							st->state = NTRIP_WAIT_CLIENT_CONTENT;
 							continue;
 						}
+						if (!st->scheme_basic) {
+							err = 401;
+							break;
+						}
 						method_post_source = 1;
 						st->connection_keepalive = 0;
 						password = st->password;
@@ -513,7 +517,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						st->client_version = 1;
 					}
 					struct sourceline *sourceline = stack_find_local_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
-					if (st->client_version == 2 && (!st->user || !st->password)) {
+					if (st->client_version == 2 && (!st->scheme_basic || !st->user || !st->password)) {
 						err = 401;
 						break;
 					}

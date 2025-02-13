@@ -34,29 +34,51 @@ int http_headers_add_auth(struct evkeyvalq *headers, const char *user, const cha
 /*
  * Decode Authorization: header.
  *
- * RFC 2617 section 2, "Basic Authentication Scheme".
+ * "Basic": RFC 2617 section 2, "Basic Authentication Scheme".
+ * "internal": internal millipede auth token
  */
-int http_decode_auth(char *value, char **user, char **password) {
-	char *p;
+int http_decode_auth(char *value, int *scheme_basic, char **user, char **password) {
+	int r_scheme_basic = 0;
+	char *p, *auth;
 	for (p = value; *p && !isspace(*p); p++);
 	if (!*p)
 		return -1;
 	*p++ = '\0';
 
-	if (strcasecmp(value, "Basic"))
+	if (!strcasecmp(value, "Basic"))
+		r_scheme_basic = 1;
+	else if (!strcasecmp(value, "internal"))
+		r_scheme_basic = 0;
+	else
 		return -1;
 
 	while (*p && isspace (*p)) p++;
 	if (!*p)
 		return -1;
 
-	char *auth = b64decode(p, strlen(p), 1);
+	if (!r_scheme_basic) {
+		auth = p;
+		while (*p && !isspace(*p)) p++;
+		*p = '\0';
+		auth = mystrdup(auth);
+		if (auth == NULL)
+			return -1;
+		*scheme_basic = r_scheme_basic;
+
+		// hack: also store in *user due to ntrip_free()
+		*user = auth;
+		*password = auth;
+		return 0;
+	}
+
+	auth = b64decode(p, strlen(p), 1);
 	if (auth) {
 		int colon = strcspn(auth, ":");
 		if (auth[colon] == ':') {
 			auth[colon] = '\0';
 			*user = auth;
 			*password = auth + colon + 1;
+			*scheme_basic = r_scheme_basic;
 			return 0;
 		} else
 			strfree(auth);
