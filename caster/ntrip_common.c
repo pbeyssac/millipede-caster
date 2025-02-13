@@ -250,6 +250,44 @@ static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *be
 }
 
 /*
+ * Common free routine for ntrip_free() and keep-alive mode.
+ */
+static void _ntrip_common_free(struct ntrip_state *this) {
+	if (this->chunk_buf)
+		evbuffer_free(this->chunk_buf);
+
+	for (char **arg = &this->http_args[0]; arg < &this->http_args[SIZE_HTTP_ARGS] && *arg; arg++)
+		strfree(*arg);
+
+	strfree(this->user);
+	/*
+	 * Don't need to explicitly free this->password as it's in the
+	 * same allocation as this->user
+	 */
+
+	strfree(this->content_type);
+	strfree((char *)this->user_agent);
+	strfree(this->query_string);
+}
+
+/*
+ * Clear for the next request, necessary for the keep-alive mode.
+ */
+void ntrip_clear_request(struct ntrip_state *this) {
+	// Cancel chunk encoding from client by default
+	this->chunk_state = CHUNK_NONE;
+	this->chunk_buf = NULL;
+	this->content_type = NULL;
+	this->user_agent = NULL;
+	this->user = NULL;
+	this->password = NULL;
+	this->query_string = NULL;
+	this->received_keepalive = 0;
+	this->content_length = 0;
+	this->content_done = 0;
+}
+
+/*
  * Free a ntrip_state record.
  *
  * Required lock: ntrip_state
@@ -261,25 +299,10 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	strfree(this->uri);
 	strfree(this->virtual_mountpoint);
 	strfree(this->host);
-	strfree(this->content);
-	strfree(this->content_type);
-	strfree(this->query_string);
+
+	_ntrip_common_free(this);
 
 	// this->ssl is freed by the bufferevent.
-
-	for (int i = 0; i < SIZE_HTTP_ARGS; i++) {
-		if (this->http_args[i])
-			strfree(this->http_args[i]);
-	}
-
-	if (this->user)
-		strfree(this->user);
-	/*
-	 * Don't need to explicitly free this->password as it's in the
-	 * same allocation as this->user
-	 */
-
-	strfree((char *)this->user_agent);
 
 	if (this->subscription)
 		livesource_del_subscriber(this);

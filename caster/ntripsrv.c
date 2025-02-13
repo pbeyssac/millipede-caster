@@ -307,8 +307,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
-			// Cancel chunk encoding from client by default
-			st->chunk_state = CHUNK_NONE;
+			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)

@@ -154,15 +154,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
-			/* Free args from a previous request in keep-alive mode */
-			for (arg = &st->http_args[0]; arg < &st->http_args[SIZE_HTTP_ARGS] && *arg; arg++)
-				strfree(*arg);
-
-			st->chunk_state = CHUNK_NONE;
-			if (st->chunk_buf) {
-				evbuffer_free(st->chunk_buf);
-				st->chunk_buf = NULL;
-			}
+			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
@@ -208,14 +200,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 			if (st->task && st->task->status_cb)
 				st->task->status_cb(st->task->status_cb_arg, status_code, st->task->cb_arg2);
-
-			st->received_keepalive = 0;
-			st->content_length = 0;
-			st->content_done = 0;
-			if (st->content_type) {
-				strfree(st->content_type);
-				st->content_type = NULL;
-			}
 
 			if (st->status_code == 200)
 				st->state = NTRIP_WAIT_HTTP_HEADER;
