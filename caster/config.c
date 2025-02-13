@@ -232,6 +232,8 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
 		"threads", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, threads, &threads_schema, 0, 1),
+	CYAML_FIELD_STRING_PTR(
+		"syncer_auth", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config, syncer_auth, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_END
 };
 

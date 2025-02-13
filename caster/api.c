@@ -3,6 +3,7 @@
 #include <json-c/json.h>
 
 #include "conf.h"
+#include "livesource.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
 
@@ -173,6 +174,13 @@ struct mime_content *api_drop_json(struct caster_state *caster, struct request *
 	}
 	snprintf(result, sizeof result, "{\"result\": %d}\n", r);
 	char *s = mystrdup(result);
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	return m;
+}
+
+struct mime_content *api_sync_json(struct caster_state *caster, struct request *req) {
+	req->status = livesource_update_execute(caster, caster->livesources, req->json);
+	char *s = mystrdup("");
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	return m;
 }

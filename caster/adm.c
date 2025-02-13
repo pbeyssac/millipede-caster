@@ -3,7 +3,7 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 
-#include <json-c/json.h>
+#include <json-c/json_tokener.h>
 
 #include "conf.h"
 #include "adm.h"
@@ -15,6 +15,7 @@
 
 int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
+	int json_post = 0;
 	struct request *req = request_new();
 	if (req == NULL) {
 		*err = 503;
@@ -29,20 +30,27 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 	 * Build a hash table from them.
 	 */
 	if (!strcmp(method, "POST")) {
-		if (st->content_type && strcmp(st->content_type, "application/x-www-form-urlencoded")) {
+		if (st->content_type
+		    && (strcmp(st->content_type, "application/x-www-form-urlencoded") && strcmp(st->content_type, "application/json"))) {
 			request_free(req);
 			*err = 503;
 			return -1;
 		}
+		if (!strcmp(st->content_type, "application/json"))
+			json_post = 1;
+
 		if (!st->content) {
 			request_free(req);
 			*err = 503;
 			return -1;
 		}
-		req->hash = hash_from_urlencoding(st->content);
-		if (!req->hash) {
-			*err = 503;
-			return -1;
+		if (!strcmp(st->content_type, "application/x-www-form-urlencoded")) {
+			req->hash = hash_from_urlencoding(st->content);
+			if (!req->hash) {
+				request_free(req);
+				*err = 503;
+				return -1;
+			}
 		}
 	} else if (!strcmp(method, "GET") && st->query_string) {
 		req->hash = hash_from_urlencoding(st->query_string);
@@ -101,6 +109,22 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 
 		request_free(req);
 		*err = 404;
+		return -1;
+	} else if (json_post) {
+		req->json = json_tokener_parse(st->content);
+		if (req->json == NULL) {
+			*err = 400;
+		} else if (!strcmp(uri, "/api/v1/sync") && !strcmp(method, "POST")) {
+			if (st->caster->config->syncer_auth == NULL
+					|| st->password == NULL || st->scheme_basic || strcmp(st->caster->config->syncer_auth, st->password)) {
+				*err = 401;
+			} else {
+				joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_sync_json, req);
+				return 0;
+			}
+		} else
+			*err = 404;
+		request_free(req);
 		return -1;
 	}
 

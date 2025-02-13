@@ -192,6 +192,9 @@ struct config {
 
 	/* Used only for YAML config reading as the CYAML default is 0 */
 	int disable_zero_copy;
+
+	/* Auth key for incoming syncer API connections */
+	char *syncer_auth;
 };
 
 extern int backlog_delay;

@@ -6,6 +6,7 @@ struct json_object;
 
 struct request {
 	struct hash_table *hash;
+	struct json_object *json;
 	unsigned short status;
 };
 
