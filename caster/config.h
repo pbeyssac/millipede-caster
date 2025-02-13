@@ -44,6 +44,15 @@ struct config_proxy {
 	int tls;
 };
 
+struct config_node {
+	/*
+	 * Destination host and port
+	 */
+	char *host;
+	unsigned short port;
+	char *authorization;
+};
+
 struct config_graylog {
 	/*
 	 * Configuration for a graylog server
@@ -89,6 +98,12 @@ struct config {
 	 */
 	struct config_proxy	*proxy;
 	int			proxy_count;
+
+	/*
+	 * Node list definition
+	 */
+	struct config_node	*node;
+	int			node_count;
 
 	/*
 	 * Graylog server definition

@@ -257,6 +257,8 @@ caster_new(struct config *config, const char *config_file) {
 
 	this->graylog = NULL;
 	this->graylog_count = 0;
+	this->syncers = NULL;
+	this->syncers_count = 0;
 
 	fchdir(current_dir);
 	close(current_dir);
@@ -324,6 +326,36 @@ static int caster_start_graylog(struct caster_state *this) {
 	return 0;
 }
 
+static int caster_start_syncers(struct caster_state *this) {
+	if (this->config->node_count == 0) {
+		this->syncers_count = 0;
+		return 0;
+	}
+	this->syncers_count = 1;
+	this->syncers = (struct syncer **)malloc(sizeof(struct syncer *)*this->syncers_count);
+	for (int i = 0; i < this->syncers_count; i++) {
+		this->syncers[i] = syncer_new(this,
+			this->config->node, this->config->node_count, "/adm/api/v1/sync", 1, 10, 0, 1000);
+		syncer_start(this->syncers[i], i);
+	}
+	return 0;
+}
+
+static void caster_free_syncers(struct caster_state *this) {
+	if (this->syncers == NULL)
+		return;
+	for (int i = 0; i < this->syncers_count; i++)
+		syncer_free(this->syncers[i]);
+	free(this->syncers);
+	this->syncers_count = 0;
+	this->syncers = NULL;
+}
+
+static int caster_reload_syncers(struct caster_state *this) {
+	caster_free_syncers(this);
+	return caster_start_syncers(this);
+}
+
 static void caster_free_graylog(struct caster_state *this) {
 	for (int i = 0; i < this->graylog_count; i++)
 		graylog_sender_free(this->graylog[i]);
@@ -363,6 +395,7 @@ void caster_free(struct caster_state *this) {
 		event_free(this->signalint_event);
 
 	caster_free_graylog(this);
+	caster_free_syncers(this);
 	caster_free_listeners(this);
 	hash_table_free(this->ntrips.ipcount);
 	livesource_table_free(this->livesources);
@@ -819,6 +852,8 @@ int caster_reload(struct caster_state *this) {
 		r = -1;
 	if (caster_reload_graylog(this) < 0)
 		r = -1;
+	if (caster_reload_syncers(this) < 0)
+		r = -1;
 	if (caster_chdir_reload(this, 1) < 0)
 		r = -1;
 	return r;
@@ -1007,6 +1042,7 @@ int caster_main(char *config_file) {
 
 	caster_start_fetchers(caster);
 	caster_start_graylog(caster);
+	caster_start_syncers(caster);
 
 	event_base_dispatch(caster->base);
 

@@ -18,6 +18,7 @@
 #include "queue.h"
 #include "rtcm.h"
 #include "sourcetable.h"
+#include "syncer.h"
 #include "util.h"
 #include "graylog_sender.h"
 
@@ -83,6 +84,10 @@ struct caster_state {
 	char hostname[128];
 	struct graylog_sender **graylog;
 	int graylog_count;	/* 0 or 1 */
+
+	/* Table synchronization */
+	struct syncer **syncers;
+	int syncers_count;
 
 	/* Thread id (thread-specific variable) for logs */
 	pthread_key_t thread_id;
