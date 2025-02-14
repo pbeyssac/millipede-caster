@@ -157,7 +157,8 @@ caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list
 static void
 caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	if (level > this->config->log_level && level > this->config->graylog[0].log_level)
+	if (level > this->config->log_level
+	    && this->config->graylog_count && level > this->config->graylog[0].log_level)
 		return;
 	_caster_log(this, g, &this->flog, level, fmt, ap);
 }
