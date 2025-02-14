@@ -69,7 +69,8 @@ static struct config_proxy default_config_proxy = {
 };
 
 static struct config_node default_config_node = {
-	.port = 2443
+	.port = 2443,
+	.tls = 0
 };
 
 static struct config_graylog default_config_graylog = {
@@ -145,6 +146,8 @@ static const cyaml_schema_field_t node_fields_schema[] = {
 		"host", CYAML_FLAG_POINTER, struct config_node, host, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_INT(
 		"port", CYAML_FLAG_DEFAULT, struct config_node, port),
+	CYAML_FIELD_BOOL(
+		"tls", CYAML_FLAG_OPTIONAL, struct config_node, tls),
 	CYAML_FIELD_STRING_PTR(
 		"authorization", CYAML_FLAG_POINTER, struct config_node, authorization, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_END

@@ -51,6 +51,7 @@ struct config_node {
 	char *host;
 	unsigned short port;
 	char *authorization;
+	int tls;
 };
 
 struct config_graylog {
