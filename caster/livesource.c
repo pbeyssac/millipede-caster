@@ -675,7 +675,7 @@ static int livesource_update_execute_fulltable(struct caster_state *caster, stru
 
 	hash_table_del(this->remote, hostname);
 	hash_table_add(this->remote, hostname, remote);
-	logfmt(&caster->flog, LOG_EDEBUG, "reload table %s serial %ld done\n", hostname, serial);
+	logfmt(&caster->flog, LOG_EDEBUG, "reload table %s serial %ld done", hostname, serial);
 
 	return 200;
 }
@@ -709,20 +709,20 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 	struct livesources_remote *lrlist = (struct livesources_remote *)hash_table_get(this->remote, hostname);
 
 	if (lrlist == NULL) {
-		logfmt(&caster->flog, LOG_NOTICE, "update failed, hostname %s not found\n", hostname);
+		logfmt(&caster->flog, LOG_NOTICE, "update failed, hostname %s not found", hostname);
 		json_object_put(j);
 		return 404;
 	}
 
 	if (serial != lrlist->serial) {
-		logfmt(&caster->flog, LOG_NOTICE, "bad serial %llu wanted %llu\n", serial, lrlist->serial);
+		logfmt(&caster->flog, LOG_NOTICE, "bad serial %llu wanted %llu", serial, lrlist->serial);
 		json_object_put(j);
 		return 404;
 	}
 
 	struct json_object *ls = json_object_object_get(j, "livesource");
 	if (ls == NULL) {
-		logfmt(&caster->flog, LOG_NOTICE, "'livesource' not found\n");
+		logfmt(&caster->flog, LOG_NOTICE, "'livesource' not found");
 		json_object_put(j);
 		return 404;
 	}
@@ -732,7 +732,7 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 
 	if (!strcmp(type, "add")) {
 		if (lr) {
-			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s exists\n", mountpoint);
+			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s exists", mountpoint);
 			json_object_put(j);
 			return 404;
 		}
@@ -744,14 +744,14 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 		hash_table_add(lrlist->hash, mountpoint, lr);
 	} else if (!strcmp(type, "del")) {
 		if (!lr) {
-			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s does not exist\n", mountpoint);
+			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s does not exist", mountpoint);
 			json_object_put(j);
 			return 503;
 		}
 		hash_table_del(lrlist->hash, mountpoint);
 	} else if (!strcmp(type, "update")) {
 		if (!lr) {
-			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s does not exist\n", mountpoint);
+			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s does not exist", mountpoint);
 			json_object_put(j);
 			return 503;
 		}
@@ -760,7 +760,7 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 		lr->state = convert_state(lsstate);
 		lr->type = convert_type(lstype);
 	} else {
-		logfmt(&caster->flog, LOG_NOTICE, "update failed: unknown type %s\n", type);
+		logfmt(&caster->flog, LOG_NOTICE, "update failed: unknown type %s", type);
 		json_object_put(j);
 		return 503;
 	}
