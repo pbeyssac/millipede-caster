@@ -733,7 +733,7 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 	}
 
 	const char *start_date = json_object_get_string(jstart_date);
-	if (!strcmp(start_date, lrlist->start_date)) {
+	if (strcmp(start_date, lrlist->start_date)) {
 		logfmt(&caster->flog, LOG_NOTICE, "bad start_date %s wanted %s", start_date, lrlist->start_date);
 		json_object_put(j);
 		return 404;
