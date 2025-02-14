@@ -12,24 +12,42 @@
  */
 
 /*
- * Requeue a full livesources table to all nodes.
+ * Queue a JSON API request to 1 node.
  */
-static void requeue_full(struct syncer *this, int n) {
+static void queue_json(struct syncer *this, int n, json_object *j) {
 	struct ntrip_task *task = this->task[n];
-	json_object *j = livesource_full_update_json(task->caster->livesources);
 	char *s = mystrdup(json_object_get_string(j));
 	json_object_put(j);
 	if (s == NULL) {
-		logfmt(&task->caster->flog, LOG_CRIT, "out of memory for table sync");
+		logfmt(&task->caster->flog, LOG_CRIT, "out of memory in queue_json");
 		return;
 	}
-	logfmt(&task->caster->flog, LOG_DEBUG, "syncer requeue full table, serial %lld", task->caster->livesources->serial);
 	ntrip_task_queue(this->task[n], s);
 	strfree(s);
 }
 
 /*
- * Queue a JSON update.
+ * Queue a full livesources table to 1 node.
+ */
+static void queue_full(struct syncer *this, int n) {
+	struct ntrip_task *task = this->task[n];
+	json_object *j = livesource_full_update_json(task->caster->livesources);
+	logfmt(&task->caster->flog, LOG_DEBUG, "syncer queue full table, serial %lld", task->caster->livesources->serial);
+	queue_json(this, n, j);
+}
+
+/*
+ * Queue a serial check to 1 node.
+ */
+static void queue_checkserial(struct syncer *this, int n) {
+	struct ntrip_task *task = this->task[n];
+	json_object *j = livesource_checkserial_json(task->caster->livesources);
+	logfmt(&task->caster->flog, LOG_DEBUG, "syncer queue checkserial, serial %lld", task->caster->livesources->serial);
+	queue_json(this, n, j);
+}
+
+/*
+ * Queue a JSON update provided as a char *, to all nodes.
  */
 void syncer_queue(struct syncer *this, char *json) {
 	for (int i = 0; i < this->ntask; i++) {
@@ -48,6 +66,13 @@ static void
 end_cb(int ok, void *arg, int n) {
 	struct syncer *a = (struct syncer *)arg;
 	a->task[n]->st = NULL;
+
+	/*
+	 * Queue a serial check for the next connection, to handle
+	 * cases where the node has been rebooted/restarted.
+	 */
+	queue_checkserial(a, n);
+
 	ntrip_task_reschedule(a->task[n], a);
 }
 
@@ -64,7 +89,7 @@ status_cb(void *arg, int status, int n) {
 
 	/* If the call failed, requeue a full table */
 	if (a->task[n]->st->status_code != 200)
-		requeue_full(a, n);
+		queue_full(a, n);
 }
 
 /*
@@ -135,7 +160,7 @@ struct syncer *syncer_new(struct caster_state *caster,
 		task->bulk_content_type = "application/json";
 		task->bulk_max_size = bulk_max_size;
 		task->use_mimeq = 1;
-		requeue_full(this, i);
+		queue_full(this, i);
 	}
 	return this;
 }

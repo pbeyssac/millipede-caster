@@ -116,6 +116,7 @@ struct hash_table;
 struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req);
 
 json_object *livesource_full_update_json(struct livesources *this);
+json_object *livesource_checkserial_json(struct livesources *this);
 int livesource_update_execute(struct caster_state *caster, struct livesources *this, json_object *j);
 
 #endif /* __LIVESOURCE_H__ */

@@ -497,16 +497,24 @@ static json_object *livesource_remote_json(struct livesource_remote *this) {
 }
 
 /*
+ * Return the basic parameters of the local livesource list.
+ */
+static json_object *_livesource_list_base_json(struct livesources *this) {
+	json_object *j = json_object_new_object();
+	json_object_object_add(j, "hostname", json_object_new_string(this->hostname));
+	json_object_object_add(j, "serial", json_object_new_int64(this->serial));
+	json_object_object_add(j, "start_date", json_object_new_string(this->start_date));
+	return j;
+}
+
+/*
  * Return the full list of local livesources as JSON.
  */
 static json_object *livesource_list_local_json(struct livesources *this) {
 	json_object *jmain;
 	json_object *new_list;
 
-	jmain = json_object_new_object();
-	json_object_object_add(jmain, "hostname", json_object_new_string(this->hostname));
-	json_object_object_add(jmain, "serial", json_object_new_int64(this->serial));
-	json_object_object_add(jmain, "start_date", json_object_new_string(this->start_date));
+	jmain = _livesource_list_base_json(this);
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;
@@ -581,6 +589,15 @@ json_object *livesource_full_update_json(struct livesources *this) {
 	json_object *jmain = livesource_list_local_json(this);
 	json_object_object_add(jmain, "type", json_object_new_string("fulltable"));
 	return jmain;
+}
+
+/*
+ * Generate a JSON packet to request a serial + start_date check.
+ */
+json_object *livesource_checkserial_json(struct livesources *this) {
+	json_object *j = _livesource_list_base_json(this);
+	json_object_object_add(j, "type", json_object_new_string("checkserial"));
+	return j;
 }
 
 /*
@@ -698,8 +715,9 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 	}
 
 	struct json_object *jserial = json_object_object_get(j, "serial");
+	struct json_object *jstart_date = json_object_object_get(j, "start_date");
 
-	if (jserial == NULL) {
+	if (jserial == NULL || jstart_date == NULL) {
 		json_object_put(j);
 		return 503;
 	}
@@ -714,11 +732,21 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 		return 404;
 	}
 
+	const char *start_date = json_object_get_string(jstart_date);
+	if (!strcmp(start_date, lrlist->start_date)) {
+		logfmt(&caster->flog, LOG_NOTICE, "bad start_date %s wanted %s", start_date, lrlist->start_date);
+		json_object_put(j);
+		return 404;
+	}
+
 	if (serial != lrlist->serial) {
 		logfmt(&caster->flog, LOG_NOTICE, "bad serial %llu wanted %llu", serial, lrlist->serial);
 		json_object_put(j);
 		return 404;
 	}
+
+	if (!strcmp(type, "checkserial"))
+		return 200;
 
 	struct json_object *ls = json_object_object_get(j, "livesource");
 	if (ls == NULL) {
