@@ -11,8 +11,10 @@
 static void
 _ntrip_task_restart_cb(int fd, short what, void *arg) {
 	struct ntrip_task *a = (struct ntrip_task *)arg;
+	P_RWLOCK_WRLOCK(&a->mimeq_lock);
 	event_free(a->ev);
 	a->ev = NULL;
+	P_RWLOCK_UNLOCK(&a->mimeq_lock);
 	a->restart_cb(a->restart_cb_arg, a->cb_arg2);
 }
 
@@ -53,6 +55,8 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->write_timeout = 0;
 	TAILQ_INIT(&this->headers);
 	STAILQ_INIT(&this->mimeq);
+	P_RWLOCK_INIT(&this->mimeq_lock, NULL);
+	P_RWLOCK_INIT(&this->st_lock, NULL);
 	this->bulk_max_size = bulk_max_size;
 	this->queue_max_size = queue_max_size;
 	this->queue_size = 0;
@@ -67,21 +71,28 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
  */
 void ntrip_task_stop(struct ntrip_task *this) {
 	logfmt(&this->caster->flog, LOG_INFO, "Stopping %s from %s:%d", this->type, this->host, this->port);
+	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	this->pending = 0;
 	if (this->ev) {
 		event_free(this->ev);
 		this->ev = NULL;
 	}
+	P_RWLOCK_UNLOCK(&this->mimeq_lock);
+
+	P_RWLOCK_WRLOCK(&this->st_lock);
 	if (this->st && this->st->state != NTRIP_END) {
 		struct bufferevent *bev = this->st->bev;
 		bufferevent_lock(bev);
+		P_RWLOCK_UNLOCK(&this->st_lock);
 		ntrip_deferred_free(this->st, "task_stop");
 		this->st = NULL;
 		bufferevent_unlock(bev);
-	}
+	} else
+		P_RWLOCK_UNLOCK(&this->st_lock);
 }
 
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
+	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	this->pending = 0;
 	if (this->refresh_delay) {
 		struct timeval timeout_interval = { this->refresh_delay, 0 };
@@ -89,11 +100,15 @@ void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
 			event_free(this->ev);
 		this->ev = event_new(this->caster->base, -1, 0, _ntrip_task_restart_cb, this);
 		if (this->ev) {
-			logfmt(&this->caster->flog, LOG_INFO, "Starting refresh callback for %s %s:%d in %d seconds", this->type, this->host, this->port, this->refresh_delay);
 			event_add(this->ev, &timeout_interval);
-		} else
+			P_RWLOCK_UNLOCK(&this->mimeq_lock);
+			logfmt(&this->caster->flog, LOG_INFO, "Starting refresh callback for %s %s:%d in %d seconds", this->type, this->host, this->port, this->refresh_delay);
+		} else {
+			P_RWLOCK_UNLOCK(&this->mimeq_lock);
 			logfmt(&this->caster->flog, LOG_CRIT, "Can't schedule refresh callback for %s %s:%d, canceling", this->type, this->host, this->port);
-	}
+		}
+	} else
+		P_RWLOCK_UNLOCK(&this->mimeq_lock);
 }
 
 /*
@@ -105,13 +120,14 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
 	struct mime_content *m;
 
 	STAILQ_INIT(&tmp_mimeq);
-	if (this->st != NULL)
-		bufferevent_lock(this->st->bev);
+
+	P_RWLOCK_WRLOCK(&this->mimeq_lock);
+
 	STAILQ_SWAP(&this->mimeq, &tmp_mimeq, mime_content);
 	r = this->queue_size;
 	this->queue_size = 0;
-	if (this->st != NULL)
-		bufferevent_unlock(this->st->bev);
+
+	P_RWLOCK_UNLOCK(&this->mimeq_lock);
 
 	if (!r)
 		return r;
@@ -147,37 +163,53 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 	}
 	size_t len = m->len;
 
+	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	if (len + this->queue_size > this->queue_max_size) {
+		P_RWLOCK_UNLOCK(&this->mimeq_lock);
 		size_t len = ntrip_task_drain_queue(this);
 		logfmt(&this->caster->flog, LOG_CRIT, "Backlog queue was %d bytes, drained", len);
-	}
-
-	if (this->st != NULL)
-		bufferevent_lock(this->st->bev);
+	} else
+		P_RWLOCK_UNLOCK(&this->mimeq_lock);
 
 	if (this->bulk_max_size && len > this->bulk_max_size - 1) {
-		if (this->st)
+		P_RWLOCK_RDLOCK(&this->st_lock);
+		struct ntrip_state *st = this->st;
+		if (st) {
+			bufferevent_lock(st->bev);
+			P_RWLOCK_UNLOCK(&this->st_lock);
 			ntrip_log(this->st, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping",
 				m->len, this->bulk_max_size-1);
-		else
+			bufferevent_unlock(st->bev);
+		} else {
+			P_RWLOCK_UNLOCK(&this->st_lock);
 			logfmt(&this->caster->flog, LOG_ERR, "Log message %d bytes, bigger than max %d bytes, dropping",
 				m->len, this->bulk_max_size-1);
+		}
 		mime_free(m);
-	} else
+	} else {
+		P_RWLOCK_WRLOCK(&this->mimeq_lock);
 		STAILQ_INSERT_TAIL(&this->mimeq, m, next);
-
-	this->queue_size += len;
-
-	if (this->st != NULL) {
-		if (this->st->state == NTRIP_IDLE_CLIENT)
-			ntrip_task_send_next_request(this->st);
-		bufferevent_unlock(this->st->bev);
+		this->queue_size += len;
+		P_RWLOCK_UNLOCK(&this->mimeq_lock);
 	}
+
+	P_RWLOCK_RDLOCK(&this->st_lock);
+	if (this->st != NULL) {
+		struct ntrip_state *st = this->st;
+		bufferevent_lock(st->bev);
+		P_RWLOCK_UNLOCK(&this->st_lock);
+		if (st->state == NTRIP_IDLE_CLIENT)
+			ntrip_task_send_next_request(st);
+		bufferevent_unlock(st->bev);
+	} else
+		P_RWLOCK_UNLOCK(&this->st_lock);
 }
 
 /*
  * Send the next request to the server, if any data is in the queue.
  * Should only be called when in NTRIP_IDLE_CLIENT state.
+ *
+ * Required lock: ntrip_state
  */
 void ntrip_task_send_next_request(struct ntrip_state *st) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
@@ -185,6 +217,8 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 	assert(st->state == NTRIP_IDLE_CLIENT);
 	assert(st->task->pending == 0);
 	size_t size = 0;
+
+	P_RWLOCK_WRLOCK(&st->task->mimeq_lock);
 	if (st->task->bulk_max_size) {
 		/*
 		 * Bulk mode
@@ -202,8 +236,10 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 			n++;
 		}
 
-		if (n == 0)
+		if (n == 0) {
+			P_RWLOCK_UNLOCK(&st->task->mimeq_lock);
 			return;
+		}
 
 		/* Dummy MIME content to pass MIME type and size */
 		struct mime_content mc;
@@ -218,6 +254,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 				break;
 			if (evbuffer_add_reference(output, m->s, m->len, NULL, NULL) < 0
 			 || evbuffer_add_reference(output, "\n", 1, NULL, NULL) < 0) {
+				P_RWLOCK_UNLOCK(&st->task->mimeq_lock);
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
 				ntrip_deferred_free(st, "ntripcli_send_next_request");
 				return;
@@ -238,13 +275,17 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 			st->task->pending = 1;
 		}
 	}
+	P_RWLOCK_UNLOCK(&st->task->mimeq_lock);
 }
 
 /*
  * Acknowledge pending data.
+ *
+ * Required lock: ntrip_state
  */
 void ntrip_task_ack_pending(struct ntrip_task *this) {
 	struct mime_content *m;
+	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	while (this->pending && (m = STAILQ_FIRST(&this->mimeq))) {
 		STAILQ_REMOVE_HEAD(&this->mimeq, next);
 		this->st->sent_bytes += m->len;
@@ -253,16 +294,20 @@ void ntrip_task_ack_pending(struct ntrip_task *this) {
 		mime_free(m);
 	}
 	assert(this->pending == 0);
+	P_RWLOCK_UNLOCK(&this->mimeq_lock);
 }
 
 void ntrip_task_free(struct ntrip_task *this) {
-	evhttp_clear_headers(&this->headers);
 	ntrip_task_drain_queue(this);
+	P_RWLOCK_WRLOCK(&this->mimeq_lock);
+	evhttp_clear_headers(&this->headers);
 	strfree(this->host);
 	strfree((char *)this->uri);
 	strfree((char *)this->drainfilename);
 	if (this->ev)
 		event_free(this->ev);
+	P_RWLOCK_DESTROY(&this->mimeq_lock);
+	P_RWLOCK_DESTROY(&this->st_lock);
 	free(this);
 }
 

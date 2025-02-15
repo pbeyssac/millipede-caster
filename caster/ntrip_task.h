@@ -3,6 +3,7 @@
 
 #include <event2/event_struct.h>
 
+#include "conf.h"
 #include "ntrip_common.h"
 
 /*
@@ -67,6 +68,11 @@ struct ntrip_task {
 	/* Current and maximum MIME queue size */
 	size_t queue_size;
 	size_t queue_max_size;
+
+	/* Lock to protect mimeq access: mimeq, pending, queue_size, ev */
+	P_RWLOCK_T mimeq_lock;
+	/* Lock to protect st access */
+	P_RWLOCK_T st_lock;
 
 	/* Use the above queue instead of hardcoded requests */
 	char use_mimeq;
