@@ -178,14 +178,16 @@ caster_tls_log_cb(const char *str, size_t len, void *u) {
  * Return configured endpoints as JSON.
  */
 json_object *caster_endpoints_json(struct caster_state *caster) {
-	json_object *j = json_object_new_object();
+	json_object *jmain = json_object_new_array_ext(caster->config->endpoint_count);
 	for (int i = 0; i < caster->config->endpoint_count; i++) {
+		json_object *j = json_object_new_object();
 		if (caster->config->endpoint[i].host)
 			json_object_object_add(j, "host", json_object_new_string(caster->config->endpoint[i].host));
 		json_object_object_add(j, "port", json_object_new_int(caster->config->endpoint[i].port));
 		json_object_object_add(j, "tls", json_object_new_boolean(caster->config->endpoint[i].tls));
+		json_object_array_add(jmain, j);
 	}
-	return j;
+	return jmain;
 }
 
 static struct caster_state *
