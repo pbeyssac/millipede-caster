@@ -61,6 +61,8 @@ void syncer_queue(struct syncer *this, char *json) {
 
 /*
  * Callback called at the end of the http session.
+ *
+ * Required lock: ntrip_state
  */
 static void
 end_cb(int ok, void *arg, int n) {

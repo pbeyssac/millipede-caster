@@ -112,7 +112,6 @@ void livesource_del_subscriber(struct ntrip_state *st);
 int livesource_send_subscribers(struct livesource *this, struct packet *packet, struct caster_state *caster);
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos);
 
-struct hash_table;
 struct mime_content *livesource_list_json(struct caster_state *caster, struct request *req);
 
 json_object *livesource_full_update_json(struct caster_state *caster, struct livesources *this);
