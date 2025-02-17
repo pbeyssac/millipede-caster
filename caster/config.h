@@ -52,6 +52,9 @@ struct config_node {
 	unsigned short port;
 	char *authorization;
 	int tls;
+
+	/* Maximum queue size for memory backlog */
+	size_t queue_max_size;
 };
 
 struct config_graylog {

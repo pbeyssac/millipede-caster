@@ -97,7 +97,7 @@ status_cb(void *arg, int status, int n) {
  */
 struct syncer *syncer_new(struct caster_state *caster,
 	struct config_node *node, int node_count, const char *uri,
-	int retry_delay, int bulk_max_size, int queue_max_size) {
+	int retry_delay, int bulk_max_size) {
 
 	if (bulk_max_size != 0)
 		/* Not yet implemented on the API side */
@@ -130,7 +130,7 @@ struct syncer *syncer_new(struct caster_state *caster,
 		snprintf(authkey, authkeylen, "internal %s", node[i].authorization);
 
 		this->task[i] = ntrip_task_new(caster, node[i].host, node[i].port, uri,
-			node[i].tls, 10, bulk_max_size, queue_max_size, "syncer", NULL);
+			node[i].tls, 10, bulk_max_size, node[i].queue_max_size, "syncer", NULL);
 		if (evhttp_add_header(&this->task[i]->headers, "Authorization", authkey) < 0)
 			err = 1;
 		strfree(authkey);

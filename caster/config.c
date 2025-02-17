@@ -70,7 +70,8 @@ static struct config_proxy default_config_proxy = {
 
 static struct config_node default_config_node = {
 	.port = 2443,
-	.tls = 0
+	.tls = 0,
+	.queue_max_size = 4000000
 };
 
 static struct config_graylog default_config_graylog = {
@@ -326,6 +327,8 @@ struct config *config_parse(const char *filename) {
 	for (int i = 0; i < this->node_count; i++) {
 		if (this->node[i].port == 0)
 			this->node[i].port = default_config_node.port;
+		if (this->node[i].queue_max_size == 0)
+			this->node[i].queue_max_size = default_config_node.queue_max_size;
 	}
 
 	for (int i = 0; i < this->graylog_count; i++) {
