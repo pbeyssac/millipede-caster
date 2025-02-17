@@ -74,6 +74,10 @@ static struct config_node default_config_node = {
 	.queue_max_size = 4000000
 };
 
+static struct config_endpoint default_config_endpoint = {
+	.port = 2443
+};
+
 static struct config_graylog default_config_graylog = {
 	.bulk_max_size = 62000,
 	.queue_max_size = 4000000,
@@ -159,6 +163,21 @@ static const cyaml_schema_value_t node_schema = {
 		struct config_node, node_fields_schema),
 };
 
+static const cyaml_schema_field_t endpoint_fields_schema[] = {
+	CYAML_FIELD_STRING_PTR(
+		"host", CYAML_FLAG_POINTER, struct config_endpoint, host, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_INT(
+		"port", CYAML_FLAG_DEFAULT, struct config_endpoint, port),
+	CYAML_FIELD_BOOL(
+		"tls", CYAML_FLAG_OPTIONAL, struct config_endpoint, tls),
+	CYAML_FIELD_END
+};
+
+static const cyaml_schema_value_t endpoint_schema = {
+	CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT,
+		struct config_endpoint, endpoint_fields_schema),
+};
+
 static const cyaml_schema_field_t graylog_fields_schema[] = {
 	CYAML_FIELD_INT(
 		"retry_delay", CYAML_FLAG_OPTIONAL, struct config_graylog, retry_delay),
@@ -214,6 +233,9 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
 		"node", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, node, &node_schema, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_SEQUENCE(
+		"endpoint", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
+		struct config, endpoint, &endpoint_schema, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_SEQUENCE(
 		"graylog", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, graylog, &graylog_schema, 0, 1),
@@ -329,6 +351,11 @@ struct config *config_parse(const char *filename) {
 			this->node[i].port = default_config_node.port;
 		if (this->node[i].queue_max_size == 0)
 			this->node[i].queue_max_size = default_config_node.queue_max_size;
+	}
+
+	for (int i = 0; i < this->endpoint_count; i++) {
+		if (this->endpoint[i].port == 0)
+			this->endpoint[i].port = default_config_endpoint.port;
 	}
 
 	for (int i = 0; i < this->graylog_count; i++) {

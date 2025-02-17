@@ -49,7 +49,11 @@ struct caster_state {
 		int nfree;	// number of items in free_queue
 		struct hash_table *ipcount;	// count by IP
 	} ntrips;
+
 	struct config *config;
+	// Configured endpoints, pre-processed in JSON format.
+	json_object *endpoints_json;
+
 	const char *config_file;
 	char *config_dir;
 	struct joblist *joblist;
@@ -108,6 +112,7 @@ void caster_log_error(struct caster_state *this, char *orig);
 int caster_tls_log_cb(const char *str, size_t len, void *u);
 int caster_main(char *config_file);
 void free_callback(const void *data, size_t datalen, void *extra);
+json_object *caster_endpoints_json(struct caster_state *caster);
 int caster_reload(struct caster_state *this);
 
 #endif

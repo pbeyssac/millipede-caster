@@ -510,11 +510,13 @@ static json_object *_livesource_list_base_json(struct livesources *this) {
 /*
  * Return the full list of local livesources as JSON.
  */
-static json_object *livesource_list_local_json(struct livesources *this) {
+static json_object *livesource_list_local_json(struct caster_state *caster, struct livesources *this) {
 	json_object *jmain;
 	json_object *new_list;
 
 	jmain = _livesource_list_base_json(this);
+	json_object_get(caster->endpoints_json);
+	json_object_object_add(jmain, "endpoints", caster->endpoints_json);
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;
@@ -561,7 +563,7 @@ static struct mime_content *_livesource_list_json(struct caster_state *caster) {
 	char *s;
 	json_object *jmain = json_object_new_object();
 
-	json_object *j = livesource_list_local_json(caster->livesources);
+	json_object *j = livesource_list_local_json(caster, caster->livesources);
 	json_object_object_add(jmain, "LOCAL", j);
 
 	P_RWLOCK_RDLOCK(&caster->livesources->lock);
@@ -585,8 +587,8 @@ struct mime_content *livesource_list_json(struct caster_state *caster, struct re
 /*
  * Generate a JSON packet for a full table update.
  */
-json_object *livesource_full_update_json(struct livesources *this) {
-	json_object *jmain = livesource_list_local_json(this);
+json_object *livesource_full_update_json(struct caster_state *caster, struct livesources *this) {
+	json_object *jmain = livesource_list_local_json(caster, this);
 	json_object_object_add(jmain, "type", json_object_new_string("fulltable"));
 	return jmain;
 }

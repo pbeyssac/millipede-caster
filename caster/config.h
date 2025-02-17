@@ -57,6 +57,13 @@ struct config_node {
 	size_t queue_max_size;
 };
 
+struct config_endpoint {
+	char *ip;
+	char *host;
+	unsigned short port;
+	int tls;
+};
+
 struct config_graylog {
 	/*
 	 * Configuration for a graylog server
@@ -108,6 +115,9 @@ struct config {
 	 */
 	struct config_node	*node;
 	int			node_count;
+
+	struct config_endpoint	*endpoint;
+	int			endpoint_count;
 
 	/*
 	 * Graylog server definition

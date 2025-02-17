@@ -31,7 +31,7 @@ static void queue_json(struct syncer *this, int n, json_object *j) {
  */
 static void queue_full(struct syncer *this, int n) {
 	struct ntrip_task *task = this->task[n];
-	json_object *j = livesource_full_update_json(task->caster->livesources);
+	json_object *j = livesource_full_update_json(task->caster, task->caster->livesources);
 	logfmt(&task->caster->flog, LOG_DEBUG, "syncer queue full table, serial %lld", task->caster->livesources->serial);
 	queue_json(this, n, j);
 }
