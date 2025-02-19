@@ -274,6 +274,7 @@ static void _ntrip_common_free(struct ntrip_state *this) {
  * Clear for the next request, necessary for the keep-alive mode.
  */
 void ntrip_clear_request(struct ntrip_state *this) {
+	_ntrip_common_free(this);
 	// Cancel chunk encoding from client by default
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
