@@ -265,6 +265,7 @@ static void _ntrip_common_free(struct ntrip_state *this) {
 	 * same allocation as this->user
 	 */
 
+	strfree(this->content);
 	strfree(this->content_type);
 	strfree((char *)this->user_agent);
 	strfree(this->query_string);
@@ -278,6 +279,7 @@ void ntrip_clear_request(struct ntrip_state *this) {
 	// Cancel chunk encoding from client by default
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
+	this->content = NULL;
 	this->content_type = NULL;
 	this->user_agent = NULL;
 	this->user = NULL;
