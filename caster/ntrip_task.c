@@ -126,7 +126,7 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
 	STAILQ_SWAP(&this->mimeq, &tmp_mimeq, mime_content);
 	r = this->queue_size;
 	this->queue_size = 0;
-
+	this->pending = 0;
 	P_RWLOCK_UNLOCK(&this->mimeq_lock);
 
 	if (!r)
