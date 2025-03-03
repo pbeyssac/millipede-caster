@@ -131,11 +131,11 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 	/* Legacy access */
 
 	if (!st->user || !check_password(st, st->caster->config->admin_user, st->user, st->password)) {
+		request_free(req);
 		int www_auth_value_len = strlen(root_uri) + 15;
 		char *www_auth_value = (char *)strmalloc(www_auth_value_len);
 
 		if (!www_auth_value) {
-			request_free(req);
 			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory");
 			*err = 500;
 			evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
@@ -150,6 +150,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 	}
 
 	if (!strcmp(uri, "/mem") || !strcmp(uri, "/mem.json")) {
+		request_free(req);
 		int len = strlen(uri);
 		int json = (len >= 5 && !strcmp(uri+len-5, ".json"))?1:0;
 
@@ -157,7 +158,6 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		if (m) {
 			ntripsrv_send_result_ok(st, output, m, NULL);
 		} else {
-			request_free(req);
 			ntrip_log(st, LOG_CRIT, "ntripsrv: out of memory");
 			*err = 500;
 			evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
