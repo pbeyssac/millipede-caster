@@ -59,6 +59,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
+	this->scheme_basic = 0;
 	this->type = "starting";
 	this->user_agent = NULL;
 	this->user_agent_ntrip = 0;
