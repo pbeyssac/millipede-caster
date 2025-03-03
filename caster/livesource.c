@@ -301,6 +301,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
+			ns++;
 		} else if (packet->caster->config->zero_copy) {
 			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed");
