@@ -977,9 +977,10 @@ static int caster_reload_fetchers(struct caster_state *this) {
 				this->config->proxy[i].tls,
 				this->config->proxy[i].table_refresh_delay,
 				this->config->proxy[i].priority);
-			if (p)
+			if (p) {
 				logfmt(&this->flog, LOG_INFO, "New fetcher %s:%d", this->config->proxy[i].host, this->config->proxy[i].port);
-			else {
+				fetcher_sourcetable_start(p, 0);
+			} else {
 				logfmt(&this->flog, LOG_ERR, "Can't start fetcher %s:%d", this->config->proxy[i].host, this->config->proxy[i].port);
 				r = -1;
 			}
