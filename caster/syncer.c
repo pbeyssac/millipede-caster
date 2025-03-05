@@ -172,6 +172,7 @@ void syncer_free(struct syncer *this) {
 		ntrip_task_stop(this->task[i]);
 		ntrip_task_free(this->task[i]);
 	}
+	free(this->task);
 	free(this);
 }
 
