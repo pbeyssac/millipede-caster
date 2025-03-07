@@ -227,6 +227,7 @@ void ntrip_clear_request(struct ntrip_state *this);
 void ntrip_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this);
+int ntrip_drop_by_id(struct caster_state *caster, long long id);
 void ntrip_unregister_livesource(struct ntrip_state *this);
 void ntrip_notify_close(struct ntrip_state *st);
 unsigned short ntrip_peer_port(struct ntrip_state *this);

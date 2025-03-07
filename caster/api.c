@@ -151,27 +151,9 @@ struct mime_content *api_drop_json(struct caster_state *caster, struct request *
 	long long id = -1;
 	char *idval = (char *)hash_table_get(req->hash, "id");
 
-	if (id && sscanf(idval, "%lld", &id) == 1) {
-		struct ntrip_state *st;
-		P_RWLOCK_RDLOCK(&caster->ntrips.lock);
-		TAILQ_FOREACH(st, &caster->ntrips.queue, nextg) {
-			struct bufferevent *bev = st->bev;
-			bufferevent_lock(bev);
-			if (st->id > id) {
-				bufferevent_unlock(bev);
-				break;
-			}
-			if (st->id == id) {
-				ntrip_notify_close(st);
-				ntrip_deferred_free(st, "ntrip_drop_json");
-				bufferevent_unlock(bev);
-				r = 1;
-				break;
-			}
-			bufferevent_unlock(bev);
-		}
-		P_RWLOCK_UNLOCK(&caster->ntrips.lock);
-	}
+	if (id && sscanf(idval, "%lld", &id) == 1)
+		r = ntrip_drop_by_id(caster, id);
+
 	snprintf(result, sizeof result, "{\"result\": %d}\n", r);
 	char *s = mystrdup(result);
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
