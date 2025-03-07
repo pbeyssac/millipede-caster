@@ -263,7 +263,6 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 
 		/* Send the HTTP request followed by the MIME items joined by '\n' */
 		ntripcli_send_request(st, &mc, 0);
-		int nsent = n;
 		STAILQ_FOREACH(m, &st->task->mimeq, next) {
 			if (n == 0)
 				break;
@@ -274,9 +273,9 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 				ntrip_deferred_free(st, "ntripcli_send_next_request");
 				return;
 			}
+			task->pending++;
 			n--;
 		}
-		st->task->pending = nsent;
 	} else {
 		/* Regular mode: 1 request per MIME item */
 		m = STAILQ_FIRST(&st->task->mimeq);
