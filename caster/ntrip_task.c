@@ -113,9 +113,9 @@ void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
 
 /*
  * Drain the queue, possibly storing the content in a file.
+ * Keep the items currently being sent.
  */
 static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
-	size_t r;
 	struct mimeq tmp_mimeq;
 	struct mime_content *m;
 
@@ -124,9 +124,24 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
 	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 
 	STAILQ_SWAP(&this->mimeq, &tmp_mimeq, mime_content);
-	r = this->queue_size;
-	this->queue_size = 0;
-	this->pending = 0;
+
+	size_t r = this->queue_size;
+	size_t len_moved = 0;
+
+	/*
+	 * We need to keep this->pending items at the head
+	 * to avoid use-after-free of sent data.
+	 */
+	int pending = this->pending;
+	while (pending && (m = STAILQ_FIRST(&tmp_mimeq))) {
+		STAILQ_REMOVE_HEAD(&tmp_mimeq, next);
+		len_moved += m->len;
+		STAILQ_INSERT_TAIL(&this->mimeq, m, next);
+		pending--;
+	}
+	assert(pending == 0);
+	r -= len_moved;
+	this->queue_size = len_moved;
 	P_RWLOCK_UNLOCK(&this->mimeq_lock);
 
 	if (!r)
