@@ -273,7 +273,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 				ntrip_deferred_free(st, "ntripcli_send_next_request");
 				return;
 			}
-			task->pending++;
+			st->task->pending++;
 			n--;
 		}
 	} else {
