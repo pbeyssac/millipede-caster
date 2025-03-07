@@ -406,6 +406,8 @@ void caster_free(struct caster_state *this) {
 	if (threads)
 		jobs_stop_threads(this->joblist);
 
+	caster_free_listeners(this);
+
 	if (this->signalpipe_event)
 		event_free(this->signalpipe_event);
 	if (this->signalhup_event)
@@ -413,14 +415,14 @@ void caster_free(struct caster_state *this) {
 	if (this->signalint_event)
 		event_free(this->signalint_event);
 
-	caster_free_graylog(this);
-	caster_free_syncers(this);
-	caster_free_listeners(this);
-	hash_table_free(this->ntrips.ipcount);
-	livesource_table_free(this->livesources);
-	hash_table_free(this->rtcm_cache);
-
 	caster_free_fetchers(this);
+	caster_free_syncers(this);
+	caster_free_graylog(this);
+
+	livesource_table_free(this->livesources);
+
+	hash_table_free(this->ntrips.ipcount);
+	hash_table_free(this->rtcm_cache);
 
 	auth_free(this->host_auth);
 	auth_free(this->source_auth);
