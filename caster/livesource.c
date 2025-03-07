@@ -25,7 +25,6 @@ static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 static json_object *livesource_update_json(struct livesource *this,
 	struct caster_state *caster, enum livesource_update_type utype);
 static struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, enum livesource_state *new_state, json_object **jp);
-static void livesource_send_json(struct caster_state *caster, json_object *j);
 
 /*
  * Create a remote livesource record
@@ -190,7 +189,7 @@ void livesource_set_state(struct livesource *this, struct caster_state *caster, 
 		caster->livesources->serial++;
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
-	livesource_send_json(caster, j);
+	syncer_queue_json(caster, j);
 }
 
 /*
@@ -359,7 +358,7 @@ int livesource_del(struct livesource *this, struct caster_state *caster) {
 	caster->livesources->serial++;
 	P_RWLOCK_UNLOCK(&caster->livesources->lock);
 	P_MUTEX_UNLOCK(&caster->livesources->delete_lock);
-	livesource_send_json(caster, j);
+	syncer_queue_json(caster, j);
 	return r;
 }
 
@@ -399,7 +398,7 @@ struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint
 	st->own_livesource = np;
 	P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
 	ntrip_log(st, LOG_INFO, "livesource %s created RUNNING", mountpoint);
-	livesource_send_json(st->caster, j);
+	syncer_queue_json(st->caster, j);
 	return np;
 }
 
@@ -448,7 +447,7 @@ struct livesource *livesource_find_on_demand(struct caster_state *this, struct n
 	P_RWLOCK_RDLOCK(&this->livesources->lock);
 	struct livesource *result = livesource_find_unlocked(this, st, mountpoint, mountpoint_pos, on_demand, new_state, &j);
 	P_RWLOCK_UNLOCK(&this->livesources->lock);
-	livesource_send_json(this, j);
+	syncer_queue_json(this, j);
 	return result;
 }
 
@@ -619,21 +618,6 @@ static json_object *livesource_update_json(struct livesource *this,
 	json_object_object_add(j, "type", json_object_new_string(livesource_update_types[utype]));
 
 	return j;
-}
-
-/*
- * Send an update packet
- */
-static void livesource_send_json(struct caster_state *caster, json_object *j) {
-	if (j == NULL)
-		return;
-	char *s = mystrdup(json_object_to_json_string(j));
-	json_object_put(j);
-
-	logfmt(&caster->flog, LOG_DEBUG, "livesource_send_json syncer %s", s);
-	if (s != NULL && caster->syncers_count >= 1)
-		syncer_queue(caster->syncers[0], s);
-	strfree(s);
 }
 
 /*

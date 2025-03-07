@@ -60,6 +60,25 @@ void syncer_queue(struct syncer *this, char *json) {
 }
 
 /*
+ * Convert and send a Json object
+ */
+void syncer_queue_json(struct caster_state *caster, json_object *j) {
+	if (j == NULL)
+		return;
+
+	if (caster->syncers_count >= 1) {
+		char *s = mystrdup(json_object_to_json_string(j));
+		if (s != NULL) {
+			logfmt(&caster->flog, LOG_DEBUG, "livesource_send_json syncer %s", s);
+			syncer_queue(caster->syncers[0], s);
+			strfree(s);
+		}
+	}
+
+	json_object_put(j);
+}
+
+/*
  * Callback called at the end of the http session.
  *
  * Required lock: ntrip_state
