@@ -504,7 +504,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
 		char *septmp = line;
 
-		for (; line[linelen-1] == '\n' || line[linelen-1] == '\r'; linelen--)
+		for (; linelen && (line[linelen-1] == '\n' || line[linelen-1] == '\r'); linelen--)
 			line[linelen-1] = '\0';
 
 		if (!line[0])

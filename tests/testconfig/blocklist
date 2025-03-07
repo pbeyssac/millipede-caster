@@ -2,7 +2,13 @@
 #
 # First field: IP prefix
 # Second field: allowed quota, -1 = no limit
+
+# Some empty lines for tests
 #
+
+
 0.0.0.0/0 300
 127.0.0.1 -1
 ::1 2
+
+
