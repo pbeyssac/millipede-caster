@@ -544,7 +544,7 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 	TAILQ_FOREACH(s, &stack->list, next) {
 		P_RWLOCK_WRLOCK(&s->lock);
 		if (!strcmp(s->caster, host) && s->port == port
-		    && (!compare_tv || timercmp(&r->fetch_time, &new_sourcetable->fetch_time, <))) {
+		    && (!compare_tv || timercmp(&s->fetch_time, &new_sourcetable->fetch_time, <))) {
 			r = s;
 			break;
 		}
