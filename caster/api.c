@@ -1,11 +1,12 @@
 #include <netinet/tcp.h>
 
-#include <json-c/json.h>
+#include <json-c/json_object.h>
 
 #include "conf.h"
 #include "livesource.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
+#include "sourcetable.h"
 
 /*
  * JSON API routines.
@@ -161,7 +162,12 @@ struct mime_content *api_drop_json(struct caster_state *caster, struct request *
 }
 
 struct mime_content *api_sync_json(struct caster_state *caster, struct request *req) {
-	req->status = livesource_update_execute(caster, caster->livesources, req->json);
+	const char *type = json_object_get_string(json_object_object_get(req->json, "type"));
+
+	if (!strcmp(type, "sourcetable")) {
+		req->status = sourcetable_update_execute(caster, req->json);
+	} else
+		req->status = livesource_update_execute(caster, caster->livesources, req->json);
 	char *s = mystrdup("");
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	return m;

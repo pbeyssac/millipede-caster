@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <json-c/json_object.h>
+#include <json-c/json_object_iterator.h>
+
 #include "livesource.h"
 #include "ntrip_common.h"
 #include "sourcetable.h"
@@ -47,6 +50,58 @@ struct sourcetable *sourcetable_read(const char *filename, int priority) {
 	}
 	tmp_sourcetable->priority = priority;
 	strfree(line);
+	return tmp_sourcetable;
+}
+
+/*
+ * Parse a sourcetable from a JSON object.
+ */
+static struct sourcetable *sourcetable_from_json(json_object *j) {
+	struct sourcetable *tmp_sourcetable;
+
+	json_object *jhost = json_object_object_get(j, "host");
+	json_object *jport = json_object_object_get(j, "port");
+	json_object *jtls = json_object_object_get(j, "tls");
+	json_object *jpull = json_object_object_get(j, "pullable");
+	json_object *jprio = json_object_object_get(j, "priority");
+	json_object *jdate = json_object_object_get(j, "fetch_time");
+	json_object *tlist = json_object_object_get(j, "mountpoints");
+
+	if (!jhost || !jport || !jdate || !jpull || !tlist)
+		return NULL;
+
+	const char *host = json_object_get_string(jhost);
+	const char *date = json_object_get_string(jdate);
+	unsigned short port = json_object_get_int(jport);
+	unsigned short tls = jtls?json_object_get_boolean(jtls):0;
+
+	tmp_sourcetable = sourcetable_new(host, port, tls);
+	if (tmp_sourcetable == NULL)
+		return NULL;
+
+	tmp_sourcetable->pullable = json_object_get_boolean(jpull);
+	tmp_sourcetable->priority = jprio?json_object_get_int(jprio):0;
+
+	struct json_object_iterator it;
+	struct json_object_iterator itEnd;
+
+	timeval_from_iso_date(&tmp_sourcetable->fetch_time, date);
+
+	it = json_object_iter_begin(tlist);
+	itEnd = json_object_iter_end(tlist);
+
+	while (!json_object_iter_equal(&it, &itEnd)) {
+		//const char *mountpoint = json_object_iter_peek_name(&it);
+		struct json_object *source = json_object_iter_peek_value(&it);
+		const char *str = json_object_get_string(json_object_object_get(source, "str"));
+
+		if (str == NULL || sourcetable_add(tmp_sourcetable, str, 0) < 0) {
+			sourcetable_free(tmp_sourcetable);
+			tmp_sourcetable = NULL;
+			break;
+		}
+		json_object_iter_next(&it);
+	}
 	return tmp_sourcetable;
 }
 
@@ -141,6 +196,49 @@ struct mime_content *sourcetable_get(struct sourcetable *this) {
 		return NULL;
 	struct mime_content *m = mime_new(s, len-1, "gnss/sourcetable", 1);
 	return m;
+}
+
+/*
+ * Return sourcetable as a Json object.
+ */
+json_object *sourcetable_json(struct sourcetable *this) {
+	struct sourceline *n;
+	json_object *jmain = json_object_new_object();
+
+
+	json_object_object_add(jmain, "host", json_object_new_string(this->caster));
+	json_object_object_add(jmain, "port", json_object_new_int(this->port));
+	json_object_object_add(jmain, "tls", json_object_new_boolean(this->tls));
+	json_object_object_add(jmain, "pullable", json_object_new_boolean(this->pullable));
+	json_object_object_add(jmain, "priority", json_object_new_int(this->priority));
+
+	if (strcmp(this->caster, "LOCAL")) {
+		char iso_date[40];
+		iso_date_from_timeval(iso_date, sizeof iso_date, &this->fetch_time);
+		json_object_object_add(jmain, "fetch_time", json_object_new_string(iso_date));
+	}
+
+	json_object *jmnt = json_object_new_object();
+
+	struct element *e;
+	struct hash_iterator hi;
+
+	P_RWLOCK_RDLOCK(&this->lock);
+	HASH_FOREACH(e, this->key_val, hi) {
+		n = (struct sourceline *)e->value;
+		json_object *j = json_object_new_object();
+		json_object_object_add(j, "str", json_object_new_string(n->value));
+		json_object_object_add(j, "lat", json_object_new_double(n->pos.lat));
+		json_object_object_add(j, "lon", json_object_new_double(n->pos.lon));
+		json_object_object_add(j, "virtual", json_object_new_boolean(n->virtual));
+		json_object_object_add(jmnt, n->key, j);
+
+	}
+	P_RWLOCK_UNLOCK(&this->lock);
+
+	json_object_object_add(jmain, "mountpoints", jmnt);
+
+	return jmain;
 }
 
 static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
@@ -437,7 +535,7 @@ struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpo
  * Remove a sourcetable identified by host+port in the sourcetable stack.
  * Insert a new one instead, if new_sourcetable is not NULL.
  */
-void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack, char *host, unsigned port, struct sourcetable *new_sourcetable) {
+static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack, const char *host, unsigned port, struct sourcetable *new_sourcetable, int compare_tv) {
 	struct sourcetable *s;
 	struct sourcetable *r = NULL;
 
@@ -445,7 +543,8 @@ void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack,
 
 	TAILQ_FOREACH(s, &stack->list, next) {
 		P_RWLOCK_WRLOCK(&s->lock);
-		if (!strcmp(s->caster, host) && s->port == port) {
+		if (!strcmp(s->caster, host) && s->port == port
+		    && (!compare_tv || timercmp(&r->fetch_time, &new_sourcetable->fetch_time, <))) {
 			r = s;
 			break;
 		}
@@ -465,6 +564,10 @@ void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack,
 		TAILQ_INSERT_TAIL(&stack->list, new_sourcetable, next);
 
 	P_RWLOCK_UNLOCK(&stack->lock);
+}
+
+void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack, const char *host, unsigned port, struct sourcetable *new_sourcetable) {
+	_stack_replace_host(caster, stack, host, port, new_sourcetable, 0);
 }
 
 /*
@@ -557,4 +660,17 @@ cancel:
 	strfree(header);
 	if (r) sourcetable_free(r);
 	return NULL;
+}
+
+/*
+ * Handle and insert a received sourcetable.
+ */
+int sourcetable_update_execute(struct caster_state *caster, json_object *j) {
+	struct sourcetable *s = sourcetable_from_json(j);
+
+	if (s != NULL) {
+		logfmt(&caster->flog, LOG_DEBUG, "received sourcetable for %s", s->caster);
+		_stack_replace_host(caster, &caster->sourcetablestack, s->caster, s->port, s, 1);
+	}
+	return 200;
 }
