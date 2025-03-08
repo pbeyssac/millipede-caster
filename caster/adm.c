@@ -12,6 +12,7 @@
 #include "livesource.h"
 #include "ntripsrv.h"
 #include "request.h"
+#include "sourcetable.h"
 
 int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
@@ -96,6 +97,10 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		}
 		if (!strcmp(uri, "/api/v1/livesources") && !strcmp(method, "GET")) {
 			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, livesource_list_json, req);
+			return 0;
+		}
+		if (!strcmp(uri, "/api/v1/sourcetables") && !strcmp(method, "GET")) {
+			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, sourcetable_list_json, req);
 			return 0;
 		}
 		if (!strcmp(uri, "/api/v1/reload") && !strcmp(method, "POST")) {

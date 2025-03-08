@@ -663,6 +663,32 @@ cancel:
 }
 
 /*
+ * Return all the sourcetables as a JSON array
+ */
+struct mime_content *sourcetable_list_json(struct caster_state *caster, struct request *req) {
+	sourcetable_stack_t *this = &caster->sourcetablestack;
+	struct sourcetable *s;
+
+	int n = 0;
+	P_RWLOCK_RDLOCK(&this->lock);
+	TAILQ_FOREACH(s, &this->list, next)
+		n++;
+
+	json_object *jmain = json_object_new_array_ext(n);
+
+	TAILQ_FOREACH(s, &this->list, next) {
+		json_object *stj = sourcetable_json(s);
+		json_object_array_add(jmain, stj);
+	}
+	P_RWLOCK_UNLOCK(&this->lock);
+
+	char *rs = mystrdup(json_object_to_json_string(jmain));
+	struct mime_content *m = mime_new(rs, -1, "application/json", 1);
+	json_object_put(jmain);
+	return m;
+}
+
+/*
  * Handle and insert a received sourcetable.
  */
 int sourcetable_update_execute(struct caster_state *caster, json_object *j) {

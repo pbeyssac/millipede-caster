@@ -87,6 +87,7 @@ struct sourceline *stack_find_local_mountpoint(struct caster_state *caster, sour
 struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpoint, struct sourcetable **sourcetable);
 void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack, const char *host, unsigned port, struct sourcetable *new_sourcetable);
 struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack_t *this);
+struct mime_content *sourcetable_list_json(struct caster_state *caster, struct request *req);
 int sourcetable_update_execute(struct caster_state *caster, json_object *j);
 
 #endif

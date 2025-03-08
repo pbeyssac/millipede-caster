@@ -44,6 +44,9 @@ class Mapi(object):
   def livesources(self):
     return self._get("livesources", self._credentials)
 
+  def sourcetables(self):
+    return self._get("sourcetables", self._credentials)
+
   def reload(self):
     return self._post("reload", self._credentials)
 
@@ -73,6 +76,8 @@ def main(argv):
     print(mapi.rtcm())
   elif len(argv) == 2 and argv[1] == 'livesources':
     print(mapi.livesources())
+  elif len(argv) == 2 and argv[1] == 'sourcetables':
+    print(mapi.sourcetables())
   elif len(argv) > 2 and argv[1] == 'drop':
     for id in argv[2:]:
       mapi.drop(id);
@@ -85,6 +90,7 @@ Usage:
 \tmapi drop id1 [id2 ...]
 \tmapi killall
 \tmapi livesources
+\tmapi sourcetables
 \tmapi net
 \tmapi reload
 \tmapi rtcm\n""", file=sys.stderr)
