@@ -543,8 +543,7 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 
 	TAILQ_FOREACH(s, &stack->list, next) {
 		P_RWLOCK_WRLOCK(&s->lock);
-		if (!strcmp(s->caster, host) && s->port == port
-		    && (!compare_tv || timercmp(&s->fetch_time, &new_sourcetable->fetch_time, <))) {
+		if (!strcmp(s->caster, host) && s->port == port) {
 			r = s;
 			break;
 		}
@@ -552,13 +551,21 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 	}
 
 	if (r) {
-		TAILQ_REMOVE(&stack->list, r, next);
-		if (new_sourcetable != NULL) {
+		if (new_sourcetable == NULL || !compare_tv || timercmp(&r->fetch_time, &new_sourcetable->fetch_time, <)) {
+			TAILQ_REMOVE(&stack->list, r, next);
+			if (new_sourcetable != NULL) {
+				P_RWLOCK_UNLOCK(&r->lock);
+				sourcetable_diff(caster, r, new_sourcetable);
+				P_RWLOCK_WRLOCK(&r->lock);
+			}
+			sourcetable_free_unlocked(r);
+		} else {
 			P_RWLOCK_UNLOCK(&r->lock);
-			sourcetable_diff(caster, r, new_sourcetable);
-			P_RWLOCK_WRLOCK(&r->lock);
+			if (new_sourcetable != NULL) {
+				sourcetable_free_unlocked(new_sourcetable);
+				new_sourcetable = NULL;
+			}
 		}
-		sourcetable_free_unlocked(r);
 	}
 	if (new_sourcetable != NULL)
 		TAILQ_INSERT_TAIL(&stack->list, new_sourcetable, next);
