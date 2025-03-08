@@ -361,6 +361,31 @@ void iso_date_from_timeval(char *iso_date, size_t iso_date_len, struct timeval *
 		snprintf(iso_date + 19, 6, ".%03ldZ", t->tv_usec/1000);
 }
 
+void timeval_from_iso_date(struct timeval *t, const char *iso_date) {
+	struct tm date;
+	int tv_usec = 0;
+
+	int len = strlen(iso_date);
+
+	if (len == 24 && iso_date[19] == '.' && iso_date[23] == 'Z') {
+		strptime(iso_date, "%Y-%m-%dT%H:%M:%S", &date);
+
+		char cusec[5];
+		memcpy(cusec+1, iso_date+20, 3);
+		cusec[0] = '1';
+		cusec[4] = '\0';
+		sscanf(cusec, "%d", &tv_usec);
+		tv_usec = (tv_usec - 1000)*1000;
+
+	} else if (len == 20 && iso_date[19] == 'Z') {
+		strptime(iso_date, "%Y-%m-%dT%H:%M:%SZ", &date);
+	}
+
+	time_t tv_sec = timegm(&date);
+	t->tv_sec = tv_sec;
+	t->tv_usec = tv_usec;
+}
+
 #if DEBUG
 int str_alloc = 0;
 
