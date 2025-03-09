@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 
 #include <event2/buffer.h>
 //#include <json-c/json.h>

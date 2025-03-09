@@ -1,10 +1,10 @@
 DEST_DIR	=	/usr/local/sbin/
+
+OPT	= -D_XOPEN_SOURCE -D_GNU_SOURCE
+
+# Enable jemalloc statistics
 #
-# -DDEBUG_JEMALLOC
-#	enable jemalloc statistics
-#
-#OPT	=	-DDEBUG_JEMALLOC
-OPT	=
+#OPT	+=	-DDEBUG_JEMALLOC
 
 CFLAGS	=	-g $(OPT) -I/usr/local/include -Wall
 LDFLAGS	=	-L/usr/local/lib -levent_core -levent_extra -levent_pthreads -levent_openssl -lcyaml -lssl -lcrypto -ljson-c -lpthread -lm

@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <event2/http.h>
 
 #include "conf.h"
