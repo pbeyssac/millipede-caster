@@ -48,4 +48,11 @@
 } while (0)
 #endif
 
+#ifndef SLIST_REMOVE_AFTER
+#define SLIST_REMOVE_AFTER(elm, field) do {				\
+	SLIST_NEXT(elm, field) =					\
+	    SLIST_NEXT(SLIST_NEXT(elm, field), field);			\
+} while (0)
+#endif
+
 #endif

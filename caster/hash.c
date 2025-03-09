@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "hash.h"
+#include "queue.h"
 #include "util.h"
 
 /*

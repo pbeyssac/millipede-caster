@@ -1,4 +1,5 @@
 #include <netinet/tcp.h>
+#include <string.h>
 
 #include <json-c/json_object.h>
 

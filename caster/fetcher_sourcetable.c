@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 
 #include "conf.h"
 #include "ntrip_task.h"
