@@ -111,10 +111,8 @@ static void ecef_to_lat_lon(pos_t *pos, double *palt, long ecef_x, long ecef_y, 
 	double x = (double)ecef_x/1e4;
 	double y = (double)ecef_y/1e4;
 	double z = (double)ecef_z/1e4;
-	double x2 = x*x;
-	double y2 = y*y;
 
-	double p = sqrt(x2+y2);
+	double p = hypot(x, y);
 
 	double theta = atan2(a*z, b*p);
 	double cost = cos(theta);
