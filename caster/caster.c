@@ -528,7 +528,7 @@ static int caster_start_listener(struct caster_state *this, struct config_bind *
 
 	listener->listener = evconnlistener_new_bind(this->base, listener_cb, listener,
 		LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, config->queue_size,
-		(struct sockaddr *)sin, sin->generic.sa_len);
+		(struct sockaddr *)sin, sin->generic.sa_family == AF_INET ? sizeof(sin->v4) : sizeof(sin->v6));
 	if (!listener->listener) {
 		logfmt(&this->flog, LOG_ERR, "Could not create a listener for %s:%d!", config->ip, config->port);
 		return -1;
