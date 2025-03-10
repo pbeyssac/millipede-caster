@@ -95,12 +95,16 @@ int ip_convert(char *ipstr, union sock *sock) {
 	r = inet_pton(AF_INET6, ipstr, &sock->v6.sin6_addr);
 	if (r > 0) {
 		sock->v6.sin6_family = AF_INET6;
+#ifdef _SOCKLEN_T_DECLARED
 		sock->v6.sin6_len = sizeof sock->v6;
+#endif
 	} else {
 		r = inet_pton(AF_INET, ipstr, &sock->v4.sin_addr);
 		if (r > 0) {
 			sock->v4.sin_family = AF_INET;
+#ifdef _SOCKLEN_T_DECLARED
 			sock->v4.sin_len = sizeof sock->v4;
+#endif
 		}
 	}
 	return r;
