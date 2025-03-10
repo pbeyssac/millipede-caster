@@ -71,6 +71,8 @@ struct livesources_remote {
 	unsigned long long serial;
 	char *start_date;
 	char *hostname;
+	struct endpoint *endpoints;
+	int endpoint_count;
 };
 
 /*

@@ -9,6 +9,7 @@
 
 #include "conf.h"
 #include "caster.h"
+#include "endpoints.h"
 #include "jobs.h"
 #include "livesource.h"
 #include "ntrip_common.h"
@@ -51,6 +52,7 @@ static void livesources_remote_free(struct livesources_remote *this) {
 		hash_table_free(this->hash);
 	strfree(this->start_date);
 	strfree(this->hostname);
+	endpoints_free(this->endpoints, this->endpoint_count);
 	free(this);
 }
 
@@ -62,6 +64,9 @@ static struct livesources_remote *livesources_remote_new(const char *hostname, c
 
 	if (this == NULL)
 		return NULL;
+
+	this->endpoints = NULL;
+	this->endpoint_count = 0;
 
 	char *dup_start_date = mystrdup(start_date);
 	char *dup_hostname = mystrdup(hostname);
@@ -551,7 +556,9 @@ static json_object *_livesource_list_remote_json(struct livesources *this, struc
 		json_object *j = livesource_remote_json((struct livesource_remote *)e->value);
 		json_object_object_add(new_list, e->key, j);
 	}
+	json_object *jendpoints = endpoints_to_json(thisr->endpoints, thisr->endpoint_count);
 	P_RWLOCK_UNLOCK(&this->lock);
+	json_object_object_add(jmain, "endpoints", jendpoints);
 	json_object_object_add(jmain, "livesources", new_list);
 	return jmain;
 }
@@ -648,13 +655,22 @@ static enum livesource_type convert_type(const char *type) {
 static int livesource_update_execute_fulltable(struct caster_state *caster, struct livesources *this, json_object *j, const char *hostname) {
 	struct json_object *lslist = json_object_object_get(j, "livesources");
 	struct json_object *jserial = json_object_object_get(j, "serial");
+	struct json_object *jendpoints = json_object_object_get(j, "endpoints");
 	const char *start_date = json_object_get_string(json_object_object_get(j, "start_date"));
 
-	if (lslist == NULL || jserial == NULL || start_date == NULL || hostname == NULL)
+	if (lslist == NULL || jserial == NULL || start_date == NULL || hostname == NULL || jendpoints == NULL)
+		return 503;
+
+	int endpoint_count;
+
+	struct endpoint *pe = endpoints_from_json(jendpoints, &endpoint_count);
+	if (pe == NULL)
 		return 503;
 
 	unsigned long serial = json_object_get_int64(jserial);
 	struct livesources_remote *remote = livesources_remote_new(hostname, start_date, serial);
+	remote->endpoints = pe;
+	remote->endpoint_count = endpoint_count;
 
 	struct json_object_iterator it;
 	struct json_object_iterator itEnd;
