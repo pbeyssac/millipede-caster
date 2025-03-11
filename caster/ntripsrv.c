@@ -392,8 +392,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				}
 			} else {
 				ntrip_log(st, LOG_EDEBUG, "[End headers]");
-				if (st->last_pos_valid)
-					joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
 
 				if (st->client_version == 1)
 					st->connection_keepalive = 0;
@@ -481,6 +479,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						/* Regular NTRIP stream client: disable read and write timeouts */
 						bufferevent_set_timeouts(bev, NULL, NULL);
 					}
+
+					/* If we have a position (Ntrip-gga header), use it */
+
+					if (st->last_pos_valid)
+						joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
 
 					/*
 					 * We only limit the send buffer on NTRIP clients, except for the sourcetable.
