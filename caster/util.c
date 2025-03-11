@@ -185,9 +185,19 @@ int parse_gga(const char *line, pos_t *pos) {
 	int n;
 	int fix_type = 0;
 
+	/* Skip garbage before the initial $, including any Ntrip-GGA: prefix */
+
+	char *dollar = strchr(line, '$');
+
+	if (dollar == NULL)
+		return -1;
+
+	line = dollar;
+
 	if (strlen(line) < 20)
 		return -1;
-	if (line[0] != '$' || line[1] != 'G')
+
+	if (line[1] != 'G')
 		return -1;
 	if (line[3] != 'G' || line[4] != 'G' || line[5] != 'A')
 		return -1;
