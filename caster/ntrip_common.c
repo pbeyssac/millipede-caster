@@ -503,9 +503,7 @@ int ntrip_drop_by_id(struct caster_state *caster, long long id) {
 void ntrip_unregister_livesource(struct ntrip_state *this) {
 	if (!this->own_livesource)
 		return;
-	int unreg = livesource_del(this->own_livesource, this->caster);
-	if (unreg)
-		ntrip_log(this, LOG_INFO, "Unregistered livesource %s", this->mountpoint);
+	livesource_del(this->own_livesource, this, this->caster);
 	this->own_livesource = NULL;
 }
 

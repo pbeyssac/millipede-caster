@@ -352,11 +352,13 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	return n;
 }
 
-int livesource_del(struct livesource *this, struct caster_state *caster) {
+int livesource_del(struct livesource *this, struct ntrip_state *st, struct caster_state *caster) {
 	json_object *j;
 	int r = 0;
+
 	P_MUTEX_LOCK(&caster->livesources->delete_lock);
 	P_RWLOCK_WRLOCK(&caster->livesources->lock);
+	const char *lstype = livesource_types[this->type];
 	j = livesource_update_json(this, caster, LIVESOURCE_UPDATE_DEL);
 	hash_table_del(caster->livesources->hash, this->mountpoint);
 	r = 1;
@@ -364,6 +366,9 @@ int livesource_del(struct livesource *this, struct caster_state *caster) {
 	P_RWLOCK_UNLOCK(&caster->livesources->lock);
 	P_MUTEX_UNLOCK(&caster->livesources->delete_lock);
 	syncer_queue_json(caster, j);
+
+	if (r)
+		ntrip_log(st, LOG_INFO, "Unregistered livesource %s type %s", st->mountpoint, lstype);
 	return r;
 }
 
