@@ -18,11 +18,13 @@ void graylog_sender_queue(struct graylog_sender *this, char *json) {
 
 /*
  * Callback called at the end of the ntrip session.
+ *
+ * Required lock: ntrip_state
  */
 static void
 end_cb(int ok, void *arg, int n) {
 	struct graylog_sender *a = (struct graylog_sender *)arg;
-	a->task->st = NULL;
+	ntrip_task_clear_st(a->task);
 	ntrip_task_reschedule(a->task, a);
 }
 
@@ -106,8 +108,5 @@ void
 graylog_sender_start(void *arg_cb, int n) {
 	struct graylog_sender *a = (struct graylog_sender *)arg_cb;
 
-	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->uri, a->task->type, a->task, NULL, 0) < 0) {
-		a->task->st = NULL;
-		ntrip_task_reschedule(a->task, a);
-	}
+	ntrip_task_start(a->task, arg_cb, NULL, 0);
 }

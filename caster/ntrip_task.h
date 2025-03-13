@@ -1,6 +1,8 @@
 #ifndef __NTRIP_TASK_H__
 #define __NTRIP_TASK_H__
 
+#include <sys/time.h>
+
 #include <event2/event_struct.h>
 
 #include "conf.h"
@@ -53,6 +55,13 @@ struct ntrip_task {
 
 	/* Current ntrip_state, if any */
 	struct ntrip_state *st;
+	struct timeval start;
+	struct bufferevent *bev;
+	int bev_sending;
+	long long st_id;
+	int bev_decref_pending;
+	/* Lock to protect st, bev, bev_sending, st_id, bev_decref_pending access */
+	P_RWLOCK_T st_lock;
 
 	/* event structure for libevent */
 	struct event *ev;
@@ -71,8 +80,6 @@ struct ntrip_task {
 
 	/* Lock to protect mimeq access: mimeq, pending, queue_size, ev */
 	P_RWLOCK_T mimeq_lock;
-	/* Lock to protect st access */
-	P_RWLOCK_T st_lock;
 
 	/* Use the above queue instead of hardcoded requests */
 	char use_mimeq;
@@ -102,6 +109,9 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename);
 void ntrip_task_ack_pending(struct ntrip_task *this);
 void ntrip_task_free(struct ntrip_task *this);
+struct ntrip_state *ntrip_task_clear_st(struct ntrip_task *this);
+void ntrip_task_set_bev(struct ntrip_task *this);
+int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
 void ntrip_task_queue(struct ntrip_task *this, char *json);

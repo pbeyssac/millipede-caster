@@ -124,11 +124,8 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
 	this->task->read_timeout = this->caster->config->on_demand_source_timeout;
 	this->task->write_timeout = this->caster->config->on_demand_source_timeout;
 
-	if (ntripcli_start(this->caster, this->task->host, this->task->port, this->task->tls, this->task->uri,
-		"source_fetcher", this->task, this->livesource, this->persistent) < 0) {
-		logfmt(&this->caster->flog, LOG_CRIT, "ntripcli_start failed, cannot redistribute %s", this->mountpoint);
-		return;
-	}
+	if (ntrip_task_start(this->task, NULL, this->livesource, this->persistent) < 0)
+		logfmt(&this->caster->flog, LOG_CRIT, "ntrip_task_start failed, cannot redistribute %s", this->mountpoint);
 }
 
 /*
@@ -151,9 +148,8 @@ redistribute_start(void *arg_cb, int n) {
 static void
 redistribute_end_cb(int ok, void *arg, int n) {
 	struct redistribute_cb_args *this = (struct redistribute_cb_args *)arg;
-	struct ntrip_state *st = this->task->st;
-	this->task->st = NULL;
-	if (!ok && st->own_livesource) {
+	struct ntrip_state *st = ntrip_task_clear_st(this->task);
+	if (!ok && st && st->own_livesource) {
 		if (this->persistent) {
 			livesource_set_state(this->livesource, this->caster, LIVESOURCE_FETCH_PENDING);
 			ntrip_task_reschedule(this->task, this);

@@ -149,6 +149,9 @@ static int _ntrip_register(struct ntrip_state *this, int quota_check) {
 
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 
+	if (this->task)
+		this->task->st_id = this->id;
+
 	if (quota_check) {
 		P_RWLOCK_RDLOCK(&this->caster->configlock);
 		if (this->caster->blocklist)

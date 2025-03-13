@@ -385,8 +385,8 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 	ntrip_deferred_free(st, "ntripcli_eventcb");
 }
 
-int
-ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri,
+struct ntrip_state *
+ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri,
 	const char *type, struct ntrip_task *task,
 	struct livesource *livesource,
 	int persistent) {
@@ -398,18 +398,18 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 		ssl = SSL_new(caster->ssl_client_ctx);
 		if (ssl == NULL) {
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
-			return -1;
+			return NULL;
 		}
 
 		/* Set the Server Name Indication TLS extension, for virtual server handling */
 		if (SSL_set_tlsext_host_name(ssl, host) < 0) {
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
-			return -1;
+			return NULL;
 		}
 		/* Set hostname for certificate verification. */
 		if (SSL_set1_host(ssl, host) != 1) {
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
-			return -1;
+			return NULL;
 		}
 		SSL_set_verify(ssl, SSL_VERIFY_PEER, NULL);
 
@@ -427,13 +427,13 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 
 	if (bev == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent in ntripcli_start!");
-		return -1;
+		return NULL;
 	}
 	struct ntrip_state *st = ntrip_new(caster, bev, host, port, uri, livesource?livesource->mountpoint:NULL);
 	if (st == NULL) {
 		bufferevent_free(bev);
 		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state in ntripcli_start!");
-		return -1;
+		return NULL;
 	}
 	st->type = type;
 	st->task = task;
@@ -441,12 +441,23 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 	st->client = 1;
 	st->own_livesource = livesource;
 	st->persistent = persistent;
-
-	ntrip_register(st);
-	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d", type, host, port);
 	if (task) {
 		task->st = st;
-		st->connection_keepalive = task->connection_keepalive;
+		task->start = st->start;
+	}
+	return st;
+}
+
+int
+ntripcli_start(struct ntrip_state *st) {
+
+	struct bufferevent *bev = st->bev;
+
+	ntrip_register(st);
+	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d", st->type, st->host, st->port);
+	if (st->task) {
+		ntrip_log(st, LOG_NOTICE, "Connection: (keepalive) %d", st->task->connection_keepalive);
+		st->connection_keepalive = st->task->connection_keepalive;
 	}
 
 	if (threads)
@@ -462,7 +473,7 @@ ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int
 		st->task && st->task->write_timeout ? st->task->write_timeout : st->caster->config->ntripcli_default_write_timeout, 0 };
 	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 
-	bufferevent_socket_connect_hostname(bev, caster->dns_base, AF_UNSPEC, host, port);
+	bufferevent_socket_connect_hostname(bev, st->caster->dns_base, AF_UNSPEC, st->host, st->port);
 
 	return 0;
 }

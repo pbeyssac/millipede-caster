@@ -9,10 +9,11 @@
 void ntripcli_readcb(struct bufferevent *bev, void *arg);
 void ntripcli_writecb(struct bufferevent *bev, void *arg);
 void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg);
-int ntripcli_start(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri,
+struct ntrip_state * ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri,
 	const char *type, struct ntrip_task *task,
 	struct livesource *livesource,
 	int persistent);
+int ntripcli_start(struct ntrip_state *st);
 
 void ntripcli_workers_readcb(struct bufferevent *bev, void *arg);
 void ntripcli_workers_writecb(struct bufferevent *bev, void *arg);

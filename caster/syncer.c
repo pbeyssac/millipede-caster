@@ -88,7 +88,7 @@ void syncer_queue_json(struct caster_state *caster, json_object *j) {
 static void
 end_cb(int ok, void *arg, int n) {
 	struct syncer *a = (struct syncer *)arg;
-	a->task[n]->st = NULL;
+	ntrip_task_clear_st(a->task[n]);
 
 	/*
 	 * Queue a serial check for the next connection, to handle
@@ -205,8 +205,5 @@ syncer_start(void *arg_cb, int n) {
 	struct syncer *a = (struct syncer *)arg_cb;
 	struct ntrip_task *task = a->task[n];
 
-	if (ntripcli_start(task->caster, task->host, task->port, task->tls, task->uri, task->type, task, NULL, 0) < 0) {
-		task->st = NULL;
-		ntrip_task_reschedule(task, a);
-	}
+	ntrip_task_start(task, a, NULL, 0);
 }

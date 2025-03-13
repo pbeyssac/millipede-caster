@@ -74,6 +74,8 @@ void fetcher_sourcetable_reload(struct sourcetable_fetch_args *this, int refresh
 
 /*
  * Callback called at the end of the ntrip session.
+ *
+ * Required lock: ntrip_state
  */
 static void
 sourcetable_end_cb(int ok, void *arg, int n) {
@@ -82,15 +84,15 @@ sourcetable_end_cb(int ok, void *arg, int n) {
 
 	if (!ok) {
 		gettimeofday(&t1, NULL);
-		timersub(&t1, &a->task->st->start, &t1);
+		timersub(&t1, &a->task->start, &t1);
 		if (a->sourcetable) {
 			sourcetable_free(a->sourcetable);
 			a->sourcetable = NULL;
 		}
-		ntrip_log(a->task->st, LOG_NOTICE, "sourcetable load failed, %.3f ms",
+		logfmt(&a->task->caster->flog, LOG_NOTICE, "sourcetable load failed or canceled, %.3f ms",
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 	}
-	a->task->st = NULL;
+	ntrip_task_clear_st(a->task);
 
 	ntrip_task_reschedule(a->task, a);
 }
@@ -98,6 +100,11 @@ sourcetable_end_cb(int ok, void *arg, int n) {
 static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char *line, int n) {
 	struct timeval t1;
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
+
+	if (a->sourcetable == NULL) {
+		sourcetable_end_cb(0, a, 0);
+		return 0;
+	}
 
 	if (!strcmp(line, "ENDSOURCETABLE")) {
 		struct sourcetable *sourcetable = a->sourcetable;
@@ -143,10 +150,8 @@ fetcher_sourcetable_start(void *arg_cb, int n) {
 	assert(a->sourcetable == NULL);
 	a->sourcetable = sourcetable_new(a->task->host, a->task->port, a->task->tls);
 
-	if (ntripcli_start(a->task->caster, a->task->host, a->task->port, a->task->tls, a->task->uri, a->task->type, a->task, NULL, 0) < 0) {
+	if (ntrip_task_start(a->task, a, NULL, 0) < 0) {
 		sourcetable_free(a->sourcetable);
 		a->sourcetable = NULL;
-		a->task->st = NULL;
-		ntrip_task_reschedule(a->task, a);
 	}
 }
