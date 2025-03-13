@@ -43,6 +43,7 @@ tests = [
   (b'GET /V HTTP/1.1\nUser-Agent: NTRIP test\n\n$GNGGA,172829.20,4332.3917404,N,00651.1321922,E,5,12,0.68,158.545,M,47.390,M,1.2,0000*62\n',
    b'^ICY 200 OK\r\n\r\n$'),
   (b'GET /V HTTP/1.1\nUser-Agent: NTRIP test\nNtrip-Version: Ntrip/2.0\n\n$GNGGA,172829.20,4332.3917404,N,00651.1321922,E,5,12,0.68,158.545,M,47.390,M,1.2,0000*62\n',
+   b'^HTTP/1\.1 200 OK\r\nServer: NTRIP Millipede Server \S+\r\nDate: .*\d\d GMT\r\nNtrip-Version: Ntrip/2\.0\r\nConnection: close\r\nContent-Type: gnss/data\r\nCache-Control: no-store, no-cache, max-age=0\r\nPragma: no-cache\r\n\r\n$'),
   (b'GET /V HTTP/1.1\nUser-Agent: NTRIP test\nNtrip-Version: Ntrip/2.0\nNtrip-GGA: $GNGGA,172829.20,4332.3917404,N,00651.1321922,E,5,12,0.68,158.545,M,47.390,M,1.2,0000*62\n\n',
    b'^HTTP/1\.1 200 OK\r\nServer: NTRIP Millipede Server \S+\r\nDate: .*\d\d GMT\r\nNtrip-Version: Ntrip/2\.0\r\nConnection: close\r\nContent-Type: gnss/data\r\nCache-Control: no-store, no-cache, max-age=0\r\nPragma: no-cache\r\n\r\n$'),
   (b'GET /V?test HTTP/1.1\nUser-Agent: NTRIP test\nNtrip-Version: Ntrip/2.0\n\n',
