@@ -17,7 +17,7 @@ void graylog_sender_queue(struct graylog_sender *this, char *json) {
 }
 
 /*
- * Callback called at the end of the ntrip session.
+ * Callback called at the end of the http session.
  *
  * Required lock: ntrip_state
  */

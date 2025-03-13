@@ -45,7 +45,6 @@ int packet_handle_raw(struct ntrip_state *st) {
 	struct evbuffer *input = st->input;
 
 	while (1) {
-
 		unsigned long len_raw = evbuffer_get_length(input);
 		ntrip_log(st, LOG_EDEBUG, "ntrip_handle_raw ready to get %d bytes", len_raw);
 		if (len_raw < st->caster->config->min_raw_packet)

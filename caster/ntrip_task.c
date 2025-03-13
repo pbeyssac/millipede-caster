@@ -80,12 +80,10 @@ struct ntrip_state *ntrip_task_clear_st(struct ntrip_task *this) {
 	struct ntrip_state *rst;
 	struct bufferevent *rbev = NULL;
 	int bev_sending;
-	long long st_id;
 	P_RWLOCK_WRLOCK(&this->st_lock);
 	assert(this->st == NULL || this->st->id == this->st_id);
 
 	rst = this->st;
-	st_id = this->st_id;
 	this->st = NULL;
 	this->st_id = 0;
 	rbev = this->bev;
