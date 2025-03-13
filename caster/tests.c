@@ -235,5 +235,6 @@ int main() {
 	fail += gga_test();
 	fail += b64_test();
 	fail += test_ip_analyze_prefixquota();
+	fail += urldecode_test();
 	return fail != 0;
 }
