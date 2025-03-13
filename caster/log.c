@@ -7,15 +7,15 @@
 #include "log.h"
 
 int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg) {
+	P_RWLOCK_INIT(&this->lock, NULL);
+	this->log_cb = log_cb;
+	this->state = arg;
 	this->logfile = fopen(filename, "a+");
 	if (!this->logfile) {
 		fprintf(stderr, "Can't open log file %s: %s\n", filename, strerror(errno));
 		return -1;
 	}
-	this->log_cb = log_cb;
-	this->state = arg;
 	setlinebuf(this->logfile);
-	P_RWLOCK_INIT(&this->lock, NULL);
 	return this->logfile == NULL ? -1:0;
 }
 
@@ -35,7 +35,8 @@ int log_reopen(struct log *this, const char *filename) {
 
 void log_free(struct log *this) {
 	P_RWLOCK_WRLOCK(&this->lock);
-	fclose(this->logfile);
+	if (this->logfile)
+		fclose(this->logfile);
 	P_RWLOCK_UNLOCK(&this->lock);
 	P_RWLOCK_DESTROY(&this->lock);
 }
