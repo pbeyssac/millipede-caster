@@ -375,6 +375,8 @@ void timeval_from_iso_date(struct timeval *t, const char *iso_date) {
 	struct tm date;
 	int tv_usec = 0;
 
+	memset(&date, 0, sizeof date);
+
 	int len = strlen(iso_date);
 
 	if (len == 24 && iso_date[19] == '.' && iso_date[23] == 'Z') {
