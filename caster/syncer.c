@@ -96,7 +96,8 @@ end_cb(int ok, void *arg, int n) {
 	 */
 	queue_checkserial(a, n);
 
-	ntrip_task_reschedule(a->task[n], a);
+	if (a->task[n]->state != TASK_STOPPED)
+		ntrip_task_reschedule(a->task[n], a);
 }
 
 /*

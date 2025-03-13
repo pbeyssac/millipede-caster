@@ -60,6 +60,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	P_RWLOCK_INIT(&this->mimeq_lock, NULL);
 	P_RWLOCK_INIT(&this->st_lock, NULL);
 	this->bev = NULL;
+	this->state = TASK_INIT;
 	this->bev_sending = 0;
 	this->st_id = -1;
 	this->bev_decref_pending = 0;
@@ -116,6 +117,7 @@ void ntrip_task_set_bev(struct ntrip_task *this) {
 int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent) {
 	int r = -1;
 	assert(this->st == NULL && this->st_id <= 0);
+	this->state = TASK_RUNNING;
 	struct ntrip_state *st =
 		ntripcli_new(this->caster, this->host, this->port, this->tls, this->uri, this->type, this,
 		livesource, persistent);
@@ -143,6 +145,7 @@ void ntrip_task_stop(struct ntrip_task *this) {
 	logfmt(&this->caster->flog, LOG_INFO, "Stopping %s from %s:%d", this->type, this->host, this->port);
 
 	P_RWLOCK_RDLOCK(&this->st_lock);
+	this->state = TASK_STOPPED;
 	long long id = this->st_id;
 	P_RWLOCK_UNLOCK(&this->st_lock);
 

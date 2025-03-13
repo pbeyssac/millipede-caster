@@ -152,7 +152,8 @@ redistribute_end_cb(int ok, void *arg, int n) {
 	if (!ok && st && st->own_livesource) {
 		if (this->persistent) {
 			livesource_set_state(this->livesource, this->caster, LIVESOURCE_FETCH_PENDING);
-			ntrip_task_reschedule(this->task, this);
+			if (this->task->state != TASK_STOPPED)
+				ntrip_task_reschedule(this->task, this);
 		} else {
 			ntrip_unregister_livesource(st);
 			redistribute_args_free(this);

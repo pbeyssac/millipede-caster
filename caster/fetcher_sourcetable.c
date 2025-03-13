@@ -94,7 +94,8 @@ sourcetable_end_cb(int ok, void *arg, int n) {
 	}
 	ntrip_task_clear_st(a->task);
 
-	ntrip_task_reschedule(a->task, a);
+	if (a->task->state != TASK_STOPPED)
+		ntrip_task_reschedule(a->task, a);
 }
 
 static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char *line, int n) {

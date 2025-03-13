@@ -8,6 +8,12 @@
 #include "conf.h"
 #include "ntrip_common.h"
 
+enum task_state {
+	TASK_INIT,
+	TASK_RUNNING,
+	TASK_STOPPED
+};
+
 /*
  * Descriptor for a regularly scheduled outgoing connection task.
  */
@@ -62,6 +68,7 @@ struct ntrip_task {
 	int bev_decref_pending;
 	/* Lock to protect st, bev, bev_sending, st_id, bev_decref_pending access */
 	P_RWLOCK_T st_lock;
+	enum task_state state;
 
 	/* event structure for libevent */
 	struct event *ev;
