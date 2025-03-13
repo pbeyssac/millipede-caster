@@ -79,7 +79,9 @@ The local caster will fetch the sourcetable from the reference caster at `table_
 
 Sources will be fetched and served to clients on-demand from the reference caster.
 
-## "V" base
+## "NEAR" base
+
+(Previously known as the "V" base)
 
 Should be declared in the local sourcetable (see default config) with its "virtual" field (12th field) set to "1".
 
