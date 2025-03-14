@@ -54,7 +54,7 @@ for _ in range(rounds):
   for i in range(n):
     socks[i].close()
 
-  if nok != 2 or nunknown != 0 or (nok + nko) != n:
+  if nok != 3 or nunknown != 0 or (nok + nko) != n:
     print("FAIL ok %d ko %d unknown %d" % (nok, nko, nunknown))
     sys.exit(1)
 
