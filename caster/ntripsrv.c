@@ -69,7 +69,7 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 		len = evbuffer_add_printf(ev, "Content-Length: %lu\r\n", m->len);
 		if (len > 0) sent += len;
 	}
-	if (this->connection_keepalive) {
+	if (this->connection_keepalive && this->received_keepalive) {
 		evbuffer_add_reference(ev, "Connection: keep-alive\r\n", 24, NULL, NULL);
 		len += 24;
 	} else {
@@ -428,7 +428,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							break;
 					}
 
-					st->connection_keepalive = 0;
 					char *mountpoint = st->http_args[1]+1;
 					struct sourceline *sourceline = NULL;
 					if (*mountpoint)
@@ -454,6 +453,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						}
 					}
 					if (!sourceline) {
+					st->connection_keepalive = 0;
 						err = 404;
 						break;
 					}
