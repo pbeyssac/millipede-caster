@@ -98,6 +98,11 @@ struct config_threads {
 	size_t	stacksize;
 };
 
+struct config_webroots {
+	const char *path;
+	const char *uri;
+};
+
 struct config {
 	/*
 	 * Hysteresis distance in meters for virtual source switch.
@@ -221,6 +226,12 @@ struct config {
 
 	/* Used only for YAML config reading as the CYAML default is 0 */
 	int disable_zero_copy;
+
+	/*
+	 * Web root file paths.
+	 */
+	struct config_webroots *webroots;
+	int webroots_count;
 
 	/* Auth key for incoming syncer API connections */
 	char *syncer_auth;

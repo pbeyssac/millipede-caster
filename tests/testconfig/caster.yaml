@@ -13,4 +13,8 @@ sourcetable_file:	sourcetable.dat
 access_log:		../test-access.log
 log:			../test-caster.log
 
+webroots:
+  - uri:		/example-well-known/
+    path:		webroot/
+
 log_level:		EDEBUG

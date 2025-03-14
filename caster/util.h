@@ -62,6 +62,7 @@ void strfree_callback(const void *data, size_t datalen, void *extra);
 void mime_free_callback(const void *data, size_t datalen, void *extra);
 
 float distance(pos_t *p1, pos_t *p2);
+char *path_join(const char *abs, const char **list);
 char *urldecode(char *s);
 char *b64encode(const char *str, size_t len, int add_nul);
 char *b64decode(char *str, size_t len, int add_nul);

@@ -220,6 +220,19 @@ static const cyaml_schema_value_t threads_schema = {
 		struct config_threads, threads_fields_schema),
 };
 
+static const cyaml_schema_field_t webroots_fields_schema[] = {
+	CYAML_FIELD_STRING_PTR(
+		"path", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config_webroots, path, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_STRING_PTR(
+		"uri", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config_webroots, uri, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_END
+};
+
+static const cyaml_schema_value_t webroots_schema = {
+	CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT,
+		struct config_webroots, webroots_fields_schema),
+};
+
 /* CYAML mapping schema fields array for the top level mapping. */
 static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
@@ -280,6 +293,9 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
 		"threads", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, threads, &threads_schema, 0, 1),
+	CYAML_FIELD_SEQUENCE(
+		"webroots", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
+		struct config, webroots, &webroots_schema, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"syncer_auth", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config, syncer_auth, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_END

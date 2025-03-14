@@ -33,6 +33,35 @@ float distance(pos_t *p1, pos_t *p2) {
 }
 
 /*
+ * Join path elements in list.
+ * list is any size, NULL-terminated.
+ * abs is preprended to the result if the path is not absolute.
+ * Returns a malloc'd result.
+ */
+char *path_join(const char *abs, const char **list) {
+	size_t len = 1;
+	const char **p;
+	if (list[0] && list[0][0] != '/')
+		len += strlen(abs);
+	for (p = list; *p; p++)
+		len += strlen(*p);
+	char *r = (char *)strmalloc(len);
+	if (!r)
+		return NULL;
+	r[0] = '\0';
+	if (list[0] && list[0][0] != '/')
+		strcat(r, abs);
+	for (p = list; *p; p++) {
+		/* Separator needed but no trailing '/', add it */
+		if (p[0][1] && r[strlen(r)-1] != '/')
+			strcat(r, "/");
+		/* Add the next element, removing any leading / */
+		strcat(r, p[0] + (p[0][0] == '/'));
+	}
+	return r;
+}
+
+/*
  * %-decode a string in place.
  * In addition, convert '+' to ' '.
  * Return the same string pointer.

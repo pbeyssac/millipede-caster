@@ -9,6 +9,7 @@
 #include "ntripsrv.h"
 #include "adm.h"
 #include "caster.h"
+#include "file.h"
 #include "http.h"
 #include "jobs.h"
 #include "ntrip_common.h"
@@ -420,6 +421,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						st->type = "adm";
 						admsrv(st, "GET", "/adm", st->http_args[1] + 4, &err, &opt_headers);
 						break;
+					}
+
+					if (st->caster->config->webroots_count) {
+						if (filesrv(st, st->http_args[1], &err, &opt_headers) >= 0 || err)
+							break;
 					}
 
 					st->connection_keepalive = 0;
