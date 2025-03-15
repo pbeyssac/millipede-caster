@@ -131,7 +131,9 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
 
 	if (this->task->host == NULL || this->task->uri == NULL) {
 		strfree(this->task->host);
+		this->task->host = NULL;
 		strfree((char *)this->task->uri);
+		this->task->uri = NULL;
 		logfmt(&this->caster->flog, LOG_CRIT, "Can't allocate memory, cannot redistribute %s", this->mountpoint);
 		return;
 	}
