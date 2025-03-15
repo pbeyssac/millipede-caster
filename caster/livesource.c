@@ -412,6 +412,25 @@ struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint
 	return np;
 }
 
+static void livesource_find_remote_endpoint(struct caster_state *this, struct ntrip_state *st, const char *mountpoint, struct endpoint *endpoint) {
+	struct hash_iterator hi;
+	struct element *e;
+
+	HASH_FOREACH(e, this->livesources->remote, hi) {
+		struct livesources_remote *rem = (struct livesources_remote *)e->value;
+		struct livesource_remote *rltmp = NULL;
+
+		if (rem->endpoint_count == 0)
+			continue;
+
+		rltmp = (struct livesource_remote *)hash_table_get(rem->hash, mountpoint);
+		if (rltmp && rltmp->state == LIVESOURCE_RUNNING) {
+			endpoint_copy(endpoint, &rem->endpoints[0]);
+			break;
+		}
+	}
+}
+
 /*
  * Find a livesource by mountpoint name.
  *
@@ -430,6 +449,11 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 		result = np;
 
 	if (result == NULL && on_demand && st) {
+		struct endpoint e;
+		endpoint_init(&e, NULL, 0, 0);
+
+		livesource_find_remote_endpoint(this, st, mountpoint, &e);
+
 		struct livesource *np = livesource_new(mountpoint, LIVESOURCE_TYPE_FETCHED, LIVESOURCE_FETCH_PENDING);
 		if (np == NULL) {
 			return NULL;
@@ -438,7 +462,9 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 		*jp = livesource_update_json(np, this, LIVESOURCE_UPDATE_ADD);
 		this->livesources->serial++;
 		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s", mountpoint);
-		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
+		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np,
+			&e, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
+		endpoint_free(&e);
 		joblist_append_redistribute(this->joblist, redistribute_source_stream, redis_args);
 		result = np;
 	}

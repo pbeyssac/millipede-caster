@@ -476,7 +476,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						pos = sourceline->pos;
 					} else {
 						st->source_virtual = 0;
-						st->source_on_demand = 0;
+						st->source_on_demand = 1;
 						pos.lat = 0.0;
 						pos.lon = 0.0;
 					}
