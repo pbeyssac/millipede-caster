@@ -6,12 +6,29 @@
 #include "util.h"
 
 /*
- * Handle endpoint arrays
+ * Handle endpoint arrays and structures
  */
+
+void endpoint_init(struct endpoint *this, const char *host, unsigned short port, int tls) {
+	if (host)
+		this->host = mystrdup(host);
+	else
+		this->host = host;
+	this->tls = tls;
+	this->port = port;
+}
+
+void endpoint_copy(struct endpoint *this, struct endpoint *orig) {
+	endpoint_init(this, orig->host, orig->port, orig->tls);
+}
+
+void endpoint_free(struct endpoint *this) {
+	strfree((char *)this->host);
+}
 
 void endpoints_free(struct endpoint *pe, int n) {
 	for (int i = 0; i < n; i++)
-		strfree(pe[i].host);
+		strfree((char *)pe[i].host);
 	free(pe);
 }
 
@@ -29,9 +46,7 @@ struct endpoint *endpoints_from_json(json_object *j, int *pn) {
 			pe = NULL;
 			break;
 		}
-		pe[i].host = mystrdup(host);
-		pe[i].tls = json_object_get_boolean(jtls);
-		pe[i].port = json_object_get_int(jport);
+		endpoint_init(pe+i, host, json_object_get_int(jport), json_object_get_boolean(jtls));
 	}
 	*pn = n;
 	return pe;
