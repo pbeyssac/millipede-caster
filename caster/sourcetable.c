@@ -95,7 +95,7 @@ static struct sourcetable *sourcetable_from_json(json_object *j) {
 		struct json_object *source = json_object_iter_peek_value(&it);
 		const char *str = json_object_get_string(json_object_object_get(source, "str"));
 
-		if (str == NULL || sourcetable_add(tmp_sourcetable, str, 0) < 0) {
+		if (str == NULL || sourcetable_add(tmp_sourcetable, str, tmp_sourcetable->pullable) < 0) {
 			sourcetable_free(tmp_sourcetable);
 			tmp_sourcetable = NULL;
 			break;
