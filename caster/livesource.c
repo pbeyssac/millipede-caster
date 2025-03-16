@@ -493,7 +493,7 @@ struct livesource *livesource_find(struct caster_state *this, struct ntrip_state
 
 struct livesource *livesource_find_and_subscribe(struct caster_state *caster, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand) {
 	P_MUTEX_LOCK(&st->caster->livesources->delete_lock);
-	struct livesource *l = livesource_find_on_demand(caster, st, mountpoint, mountpoint_pos, st->source_on_demand, NULL);
+	struct livesource *l = livesource_find_on_demand(caster, st, mountpoint, mountpoint_pos, on_demand, NULL);
 	if (l)
 		livesource_add_subscriber(l, st);
 	P_MUTEX_UNLOCK(&st->caster->livesources->delete_lock);

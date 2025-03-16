@@ -440,7 +440,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							 * Not in the sourcetables, try to use a current live source (probably a wildcard),
 							 * if any.
 							 */
-							l = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 0);
+							l = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 1);
 					}
 
 					/*
@@ -484,8 +484,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->type = "client";
 
 					if (!st->source_virtual) {
-						if (l == NULL)
-							l = livesource_find_and_subscribe(st->caster, st, mountpoint, &pos, st->source_on_demand);
 						if (l) {
 							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d", mountpoint, st->source_on_demand);
 							ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
