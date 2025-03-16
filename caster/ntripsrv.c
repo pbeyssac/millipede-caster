@@ -433,14 +433,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					struct livesource *l = NULL;
 
 					if (*mountpoint) {
+						/*
+						 * Find both a relevant source line and a live source (actually live or on-demand).
+						 */
 						sourceline = stack_find_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
-
-						if (!sourceline)
-							/*
-							 * Not in the sourcetables, try to use a current live source (probably a wildcard),
-							 * if any.
-							 */
-							l = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 1);
+						l = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 1);
 					}
 
 					/*
