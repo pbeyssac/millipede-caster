@@ -270,7 +270,7 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *arg) {
 				ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
 			} else {
 				enum livesource_state source_state;
-				struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, s->dist_array[0].on_demand, &source_state);
+				struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, 1, s->dist_array[0].on_demand, &source_state);
 				if (l && (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING))) {
 					if (redistribute_switch_source(st, m, &s->dist_array[0].pos, l) < 0)
 						ntrip_log(st, LOG_NOTICE, "Unable to switch source from %s to %s", st->virtual_mountpoint, m);
@@ -437,7 +437,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						 * Find both a relevant source line and a live source (actually live or on-demand).
 						 */
 						sourceline = stack_find_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
-						l = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 1);
+						l = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 1, sourceline?sourceline->on_demand:0);
 					}
 
 					/*
