@@ -166,6 +166,9 @@ struct config {
 	struct config_bind	*bind;
 	int 			bind_count;
 
+	/* Maximal size of received content length */
+	size_t http_content_length_max;
+
 	/*
 	 * Threads configuration
 	 */

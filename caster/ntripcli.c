@@ -252,7 +252,15 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 						st->received_keepalive = 1;
 				} else if (!strcasecmp(key, "content-length")) {
 					unsigned long content_length;
+					int length_err;
 					if (sscanf(value, "%lu", &content_length) == 1) {
+						length_err = (content_length > st->caster->config->http_content_length_max);
+						if (length_err) {
+							ntrip_log(st, LOG_NOTICE, "Content-Length %d: exceeds max configured value %d",
+									content_length, st->caster->config->http_content_length_max);
+							end = 1;
+							break;
+						}
 						st->content_length = content_length;
 						st->content_done = 0;
 					}
