@@ -33,6 +33,7 @@ static struct httpcode httpcodes[] = {
 	{404, "Not Found"},
 	{409, "Conflict"},
 	{413, "Content Too Large"},
+	{431, "Request Header Fields Too Large"},
 	{500, "Internal Server Error"},
 	{501, "Not Implemented"},
 	{503, "Service Unavailable"},
@@ -292,6 +293,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	char *line = NULL;
 	size_t len;
+	size_t waiting_len;
 	int err = 0;
 	struct evbuffer *output = bufferevent_get_output(bev);
 	struct evkeyvalq opt_headers;
@@ -305,13 +307,17 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	if (ntrip_filter_run_input(st) < 0)
 		return;
 
-	while (!err && st->state != NTRIP_WAIT_CLOSE && evbuffer_get_length(st->input) > 0) {
+	while (!err && st->state != NTRIP_WAIT_CLOSE && (waiting_len = evbuffer_get_length(st->input)) > 0) {
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
 			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+				err = 400;
+				break;
+			}
 			if (!line)
 				break;
 			st->received_bytes += len;
@@ -336,6 +342,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			st->received_keepalive = 0;
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+				err = 431;
+				break;
+			}
 			if (!line)
 				break;
 			st->received_bytes += len;

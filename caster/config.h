@@ -166,6 +166,8 @@ struct config {
 	struct config_bind	*bind;
 	int 			bind_count;
 
+	/* Maximal size of received HTTP header line */
+	size_t http_header_max_size;
 	/* Maximal size of received content length */
 	size_t http_content_length_max;
 

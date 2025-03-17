@@ -70,6 +70,10 @@ tests = [
    b'^HTTP/1\.1 200 OK\r\n(?s:.)*Content-Length: 14\r\nContent-Type: application/json\r\n(?s:.)*\r\n\{"result": 0\}\n$'),
   (b'POST /adm/api/v1/reload HTTP/1.1\r\nContent-Length: 1000\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nuser=admin&password=%3dadminpw...',
    b'^HTTP/1\.1 413 Content Too Large\r\n'),
+  (b'GET / HTTP/1.1\nLong-Header-Line: 0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789\n\n',
+   b'HTTP/1\.1 431 Request Header Fields Too Large\r\n'),
+  (b'GET / HTTP/1.10123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789\n\n',
+   b'HTTP/1\.1 400 Bad Request\r\n'),
 ]
 
 err = 0

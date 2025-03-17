@@ -46,6 +46,7 @@ static struct config default_config = {
 	.ntripcli_default_write_timeout = 60,
 	.ntripsrv_default_read_timeout = 60,
 	.ntripsrv_default_write_timeout = 60,
+	.http_header_max_size = 8192,
 	.http_content_length_max = 4000000,
 	.access_log = "/var/log/millipede/access.log",
 	.log = "/var/log/millipede/caster.log",
@@ -282,6 +283,8 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_INT(
 		"ntripsrv_default_write_timeout", CYAML_FLAG_OPTIONAL, struct config, ntripsrv_default_write_timeout),
 	CYAML_FIELD_INT(
+		"http_header_max_size", CYAML_FLAG_OPTIONAL, struct config, http_header_max_size),
+	CYAML_FIELD_INT(
 		"http_content_length_max", CYAML_FLAG_OPTIONAL, struct config, http_content_length_max),
 	CYAML_FIELD_STRING_PTR(
 		"access_log", CYAML_FLAG_POINTER, struct config, access_log, 0, CYAML_UNLIMITED),
@@ -350,6 +353,7 @@ struct config *config_parse(const char *filename) {
 	DEFAULT_ASSIGN(this, admin_user);
 	DEFAULT_ASSIGN(this, sourcetable_priority);
 	DEFAULT_ASSIGN(this, sourcetable_fetch_timeout);
+	DEFAULT_ASSIGN(this, http_header_max_size);
 	DEFAULT_ASSIGN(this, http_content_length_max);
 
 	// Undocumented

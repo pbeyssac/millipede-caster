@@ -144,19 +144,24 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 	char *line;
 	size_t len;
+	size_t waiting_len;
 
 	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
 
 	if (ntrip_filter_run_input(st) < 0)
 		return;
 
-	while (!end && st->state != NTRIP_WAIT_CLOSE && (len = evbuffer_get_length(st->input)) > 0) {
+	while (!end && st->state != NTRIP_WAIT_CLOSE && (waiting_len = evbuffer_get_length(st->input)) > 0) {
 		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
 			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+				end = 1;
+				break;
+			}
 			if (!line)
 				break;
 			ntrip_log(st, LOG_DEBUG, "Status \"%s\" on %s", line, st->uri);
@@ -210,6 +215,10 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+				end = 1;
+				break;
+			}
 			if (!line)
 				break;
 			st->received_bytes += len + 2;
@@ -282,6 +291,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 			free(line);
 		} else if (st->state == NTRIP_WAIT_SERVER_CONTENT) {
+			len = waiting_len;
 			if (len > st->content_length - st->content_done)
 				len = st->content_length - st->content_done;
 			if (len) {
@@ -295,6 +305,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			} else
 				end = 1;
 		} else if (st->state == NTRIP_IDLE_CLIENT) {
+			len = waiting_len;
 			if (len) {
 				st->received_bytes += len;
 				char data[65];
