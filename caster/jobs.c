@@ -35,6 +35,7 @@ struct joblist *joblist_new(struct caster_state *caster) {
 		STAILQ_INIT(&this->append_queue);
 		STAILQ_INIT(&this->jobq);
 		STAILQ_INIT(&this->append_jobq);
+		P_MUTEX_INIT(&this->condlock, NULL);
 		P_MUTEX_INIT(&this->mutex, NULL);
 		P_MUTEX_INIT(&this->append_mutex, NULL);
 	}
@@ -76,6 +77,7 @@ void joblist_free(struct joblist *this) {
 	P_MUTEX_UNLOCK(&this->append_mutex);
 	P_MUTEX_DESTROY(&this->mutex);
 	P_MUTEX_DESTROY(&this->append_mutex);
+	P_MUTEX_DESTROY(&this->condlock);
 	if (pthread_cond_destroy(&this->condjob) != 0)
 		caster_log_error(this->caster, "pthread_cond_signal");
 	free(this);
@@ -153,8 +155,12 @@ void joblist_run(struct joblist *this) {
 				/*
 				 * All queues empty => wait.
 				 */
-				if (pthread_cond_wait(&this->condjob, &this->mutex) != 0)
+				P_MUTEX_UNLOCK(&this->mutex);
+				P_MUTEX_LOCK(&this->condlock);
+				if (pthread_cond_wait(&this->condjob, &this->condlock) != 0)
 					caster_log_error(this->caster, "pthread_cond_wait");
+				P_MUTEX_UNLOCK(&this->condlock);
+				P_MUTEX_LOCK(&this->mutex);
 				continue;
 			}
 			/*
@@ -164,8 +170,10 @@ void joblist_run(struct joblist *this) {
 			int tmpn = this->ntrip_njobs;
 			this->ntrip_njobs = this->append_ntrip_njobs;
 			this->append_ntrip_njobs = tmpn;
-			pthread_cond_broadcast(&this->condjob);
 			P_MUTEX_UNLOCK(&this->append_mutex);
+			P_MUTEX_LOCK(&this->condlock);
+			pthread_cond_broadcast(&this->condjob);
+			P_MUTEX_UNLOCK(&this->condlock);
 		}
 
 		/*
@@ -268,8 +276,10 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 		STAILQ_INSERT_TAIL(&this->append_jobq, j, next);
 		this->append_njobs++;
 		P_MUTEX_UNLOCK(&this->append_mutex);
+		P_MUTEX_LOCK(&this->condlock);
 		if (pthread_cond_signal(&this->condjob) != 0)
 			caster_log_error(this->caster, "pthread_cond_signal");
+		P_MUTEX_UNLOCK(&this->condlock);
 		return;
 	}
 
@@ -345,9 +355,11 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	/*
 	 * Signal waiting workers there is a new job.
 	 */
+	P_MUTEX_UNLOCK(&this->append_mutex);
+	P_MUTEX_LOCK(&this->condlock);
 	if (pthread_cond_signal(&this->condjob) != 0)
 		caster_log_error(this->caster, "pthread_cond_signal");
-	P_MUTEX_UNLOCK(&this->append_mutex);
+	P_MUTEX_UNLOCK(&this->condlock);
 }
 
 /*

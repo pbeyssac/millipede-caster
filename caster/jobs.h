@@ -121,6 +121,7 @@ struct joblist {
 	 * or the work queue has been refilled.
 	 */
 	pthread_cond_t condjob;
+	pthread_mutex_t condlock;
 
 	/* The associated caster */
 	struct caster_state *caster;
