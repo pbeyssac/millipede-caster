@@ -247,43 +247,40 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *arg) {
 	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
 	dist_table_display(st, s, 10);
 
-	if (st->source_virtual) {
-		if (s->dist_array[0].dist > st->max_min_dist) {
-			st->max_min_dist = s->dist_array[0].dist;
-			ntrip_log(st, LOG_DEBUG, "New maximum distance to source: %.2f", st->max_min_dist);
-		} else
-			ntrip_log(st, LOG_DEBUG, "Current maximum distance to source: %.2f", st->max_min_dist);
+	if (s->dist_array[0].dist > st->max_min_dist) {
+		st->max_min_dist = s->dist_array[0].dist;
+		ntrip_log(st, LOG_DEBUG, "New maximum distance to source: %.2f", st->max_min_dist);
+	} else
+		ntrip_log(st, LOG_DEBUG, "Current maximum distance to source: %.2f", st->max_min_dist);
 
-		char *m = s->dist_array[0].mountpoint;
+	char *m = s->dist_array[0].mountpoint;
 
-		if (!st->virtual_mountpoint || strcmp(m, st->virtual_mountpoint)) {
-			/*
-			 * The closest base has changed.
-			 */
+	if (!st->virtual_mountpoint || strcmp(m, st->virtual_mountpoint)) {
+		/*
+		 * The closest base has changed.
+		 */
 
-			/*
-			 * Recheck with some hysteresis to favor the current station and avoid useless switching
-			 * between very close stations.
-			 */
+		/*
+		 * Recheck with some hysteresis to favor the current station and avoid useless switching
+		 * between very close stations.
+		 */
 
-			float current_dist = st->virtual_mountpoint ? (distance(&st->mountpoint_pos, &st->last_pos)-st->caster->config->hysteresis_m) : 1e10;
+		float current_dist = st->virtual_mountpoint ? (distance(&st->mountpoint_pos, &st->last_pos)-st->caster->config->hysteresis_m) : 1e10;
 
-			if (current_dist < s->dist_array[0].dist) {
-				ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
-			} else {
-				enum livesource_state source_state;
-				struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, 1, s->dist_array[0].on_demand, &source_state);
-				if (l && (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING))) {
-					if (redistribute_switch_source(st, m, &s->dist_array[0].pos, l) < 0)
-						ntrip_log(st, LOG_NOTICE, "Unable to switch source from %s to %s", st->virtual_mountpoint, m);
-				}
+		if (current_dist < s->dist_array[0].dist) {
+			ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
+		} else {
+			enum livesource_state source_state;
+			struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, 1, s->dist_array[0].on_demand, &source_state);
+			if (l && (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING))) {
+				if (redistribute_switch_source(st, m, &s->dist_array[0].pos, l) < 0)
+					ntrip_log(st, LOG_NOTICE, "Unable to switch source from %s to %s", st->virtual_mountpoint, m);
 			}
 		}
 	}
 
 	sourcetable_free(pos_sourcetable);
 	dist_table_free(s);
-	return;
 }
 
 /*
@@ -460,7 +457,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					}
 
 					/*
-					 * Source not found either in the sourcetables or a a live source:
+					 * Source not found either in the sourcetables or as a live source:
 					 * reply with the sourcetable in NTRIP1, error 404 in NTRIP2.
 					 *
 					 * Empty mountpoint name: always reply with the sourcetable.
