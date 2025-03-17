@@ -16,6 +16,8 @@ log:			../test-caster.log
 http_content_length_max:	100
 http_header_max_size:		100
 
+syncer_auth:		'587e5bbadbc6186fad0d6177eb10a6cd9d5cb934d3d5f155107592535bd20290'
+
 webroots:
   - uri:		/example-well-known/
     path:		webroot/

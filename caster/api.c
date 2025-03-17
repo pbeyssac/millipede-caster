@@ -165,7 +165,9 @@ struct mime_content *api_drop_json(struct caster_state *caster, struct request *
 struct mime_content *api_sync_json(struct caster_state *caster, struct request *req) {
 	const char *type = json_object_get_string(json_object_object_get(req->json, "type"));
 
-	if (!strcmp(type, "sourcetable")) {
+	if (type == NULL) {
+		req->status = 400;
+	} else if (!strcmp(type, "sourcetable")) {
 		req->status = sourcetable_update_execute(caster, req->json);
 	} else
 		req->status = livesource_update_execute(caster, caster->livesources, req->json);
