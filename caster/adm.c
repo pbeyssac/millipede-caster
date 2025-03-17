@@ -124,7 +124,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 					|| st->password == NULL || st->scheme_basic || strcmp(st->caster->config->syncer_auth, st->password)) {
 				*err = 401;
 			} else {
-				joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_sync_json, req);
+				ntripsrv_deferred_output(st, api_sync_json, req);
 				return 0;
 			}
 		} else
