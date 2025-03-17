@@ -231,7 +231,7 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
  */
 void ntripsrv_redo_virtual_pos(struct ntrip_state *arg) {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
-	if (!st->last_pos_valid)
+	if (!st->last_pos_valid || !st->source_virtual)
 		return;
 
 	struct sourcetable *pos_sourcetable = stack_flatten(st->caster, &st->caster->sourcetablestack);
