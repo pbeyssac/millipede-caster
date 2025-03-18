@@ -1,4 +1,4 @@
-Millipede 0.7
+Millipede 0.8
 =============
 
 
@@ -38,7 +38,7 @@ FreeBSD: `sudo pkg install libevent libcyaml json-c`
 Building
 ========
 
-`cd caster; make`
+`cd caster; make clean depend all`
 
 Installation (FreeBSD)
 ======================

@@ -21,8 +21,8 @@
 /*
  * Server and client version strings for HTTP
  */
-#define	SERVER_VERSION_STRING	"Millipede Server 0.7"		// For Server: header
-#define	CLIENT_VERSION_STRING	"Millipede Client 0.7"		// User-Agent header, prepended with "NTRIP "
+#define	SERVER_VERSION_STRING	"Millipede Server 0.8"		// For Server: header
+#define	CLIENT_VERSION_STRING	"Millipede Client 0.8"		// User-Agent header, prepended with "NTRIP "
 
 extern int threads;
 extern int nthreads;
