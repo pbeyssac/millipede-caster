@@ -4,6 +4,7 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <pthread.h>
+#include <sched.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -543,7 +544,7 @@ int jobs_start_threads(struct joblist *this, int nthreads) {
 void jobs_stop_threads(struct joblist *this) {
 	for (int i = 0; i < this->nthreads; i++) {
 		joblist_append_stop(this);
-		pthread_yield();
+		sched_yield();
 	}
 
 	int r, nlive;
