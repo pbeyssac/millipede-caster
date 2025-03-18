@@ -79,6 +79,9 @@ struct ntrip_state {
 	struct timeval start;	// time the connection was established
 	unsigned long long received_bytes, sent_bytes;
 
+	// reference count used in threaded mode for deferred calls
+	int ref;
+
 	/* linked-list pointers for main job queue */
 	STAILQ_ENTRY(ntrip_state) next;
 	/* job list for this particular session */
