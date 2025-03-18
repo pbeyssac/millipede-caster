@@ -153,7 +153,7 @@ struct mime_content *api_drop_json(struct caster_state *caster, struct request *
 	long long id = -1;
 	char *idval = (char *)hash_table_get(req->hash, "id");
 
-	if (id && sscanf(idval, "%lld", &id) == 1)
+	if (idval && sscanf(idval, "%lld", &id) == 1)
 		r = ntrip_drop_by_id(caster, id);
 
 	snprintf(result, sizeof result, "{\"result\": %d}\n", r);

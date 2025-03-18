@@ -76,6 +76,8 @@ tests = [
    b'HTTP/1\.1 400 Bad Request\r\n'),
   (b'POST /adm/api/v1/sync HTTP/1.1\r\nContent-Length: 11\r\nAuthorization: internal 587e5bbadbc6186fad0d6177eb10a6cd9d5cb934d3d5f155107592535bd20290\r\nContent-Type: application/json\r\n\r\n{"a":null}\n',
    b'HTTP/1\.1 400 Bad Request\r\n'),
+  (b'POST /adm/api/v1/drop HTTP/1.1\r\nContent-Length: 33\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nuser=admin&password=%3dadminpw...',
+   b'^HTTP/1\.1 200 OK\r\nServer: NTRIP Millipede Server \S+\r\nDate: .* GMT\r\nNtrip-Version: Ntrip/2\.0\r\nContent-Length: 14\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n\{"result": 0\}\n$'),
 ]
 
 err = 0
