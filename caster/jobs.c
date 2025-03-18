@@ -447,6 +447,7 @@ void joblist_append_ntrip_unlocked_content(
 		tmpj.ntrip_unlocked_content.st = st;
 		tmpj.ntrip_unlocked_content.content_cb = content_cb;
 		tmpj.ntrip_unlocked_content.req = req;
+		st->ref++;
 		_joblist_append_generic(this, NULL, &tmpj);
 	} else
 		cb(st, content_cb, req);
