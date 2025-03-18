@@ -229,20 +229,36 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 /*
  * Required lock: ntrip_state
  */
-void ntripsrv_redo_virtual_pos(struct ntrip_state *arg) {
-	struct ntrip_state *st = (struct ntrip_state *)arg;
+void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 	if (!st->last_pos_valid || !st->source_virtual)
+		return;
+
+	struct timeval t0, t1;
+	gettimeofday(&t0, NULL);
+	timersub(&t0, &st->last_recompute_date, &t1);
+
+	/* Ignore if too soon since last recompute */
+	if (t1.tv_sec < st->caster->config->min_nearest_recompute_interval)
+		return;
+
+	/* Ignore if too close to last recompute, and max interval not reached */
+	if (st->last_recompute_date.tv_sec
+		&& t1.tv_sec < st->caster->config->max_nearest_recompute_interval
+		&& distance(&st->last_pos, &st->last_recompute_pos) < st->caster->config->min_nearest_recompute_pos_delta)
 		return;
 
 	struct sourcetable *pos_sourcetable = stack_flatten(st->caster, &st->caster->sourcetablestack);
 	if (pos_sourcetable == NULL)
 		return;
 
+
 	struct dist_table *s = sourcetable_find_pos(pos_sourcetable, &st->last_pos);
 	if (s == NULL) {
 		sourcetable_free(pos_sourcetable);
 		return;
 	}
+	st->last_recompute_pos = st->last_pos;
+	st->last_recompute_date = t0;
 
 	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
 	dist_table_display(st, s, 10);

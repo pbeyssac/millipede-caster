@@ -28,6 +28,9 @@ int backlog_delay = 60;
 
 static struct config default_config = {
 	.hysteresis_m = 500,
+	.min_nearest_recompute_interval = 10,
+	.max_nearest_recompute_interval = 120,
+	.min_nearest_recompute_pos_delta = 10,
 	.idle_max_delay = 60,
 	.reconnect_delay = 10,
 	.min_raw_packet = 100,
@@ -336,6 +339,9 @@ struct config *config_parse(const char *filename) {
 #define	DEFAULT_ASSIGN(this, field)	{if (!(this)->field) {(this)->field = default_config.field;}}
 
 	DEFAULT_ASSIGN(this, hysteresis_m);
+	DEFAULT_ASSIGN(this, min_nearest_recompute_interval);
+	DEFAULT_ASSIGN(this, max_nearest_recompute_interval);
+	DEFAULT_ASSIGN(this, min_nearest_recompute_pos_delta);
 	DEFAULT_ASSIGN(this, idle_max_delay);
 	DEFAULT_ASSIGN(this, reconnect_delay);
 	DEFAULT_ASSIGN(this, max_raw_packet);

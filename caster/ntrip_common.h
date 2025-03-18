@@ -209,6 +209,9 @@ struct ntrip_state {
 	pos_t last_pos;				// last known position
 	float last_dist;			// last known base distance (for hysteresis)
 	float max_min_dist;			// maximum distance to the closest base
+	// date and position last used for recomputing the nearest base
+	struct timeval last_recompute_date;
+	pos_t last_recompute_pos;
 
 	/*
 	 * Virtual mountpoint handling

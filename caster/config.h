@@ -110,6 +110,15 @@ struct config {
 	float hysteresis_m;
 
 	/*
+	 * Min & max recompute interval for nearest base, in seconds.
+	 */
+	int			min_nearest_recompute_interval;
+	int			max_nearest_recompute_interval;
+
+	/* Minimal delta in meters for nearest base recompute */
+	float			min_nearest_recompute_pos_delta;
+
+	/*
 	 * Proxy definition
 	 */
 	struct config_proxy	*proxy;
