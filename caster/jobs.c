@@ -136,7 +136,7 @@ void joblist_run(struct joblist *this) {
 				if (st->ref == 0)
 					ntrip_deferred_free(st, "joblist_run");
 				bufferevent_unlock(bev);
-			else if (j->type == JOB_STOP_THREAD) {
+			} else if (j->type == JOB_STOP_THREAD) {
 				logfmt(&this->caster->flog, LOG_INFO, "Exiting thread %d", (long)pthread_getspecific(this->caster->thread_id));
 				pthread_exit(NULL);
 			}
