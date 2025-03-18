@@ -302,7 +302,7 @@ static int _in_prefix(struct prefix_quota *prefix, union sock *addr) {
  * -1 (no quota) if not found.
  */
 static int _monofamily_prefix_table_get_quota(struct _monofamily_prefix_table *this, union sock *addr) {
-	for (int i = 0; i < this->nentries; i++)
+	for (int i = this->nentries-1; i >= 0; i--)
 		if (_in_prefix(this->entries[i], addr))
 			return this->entries[i]->quota;
 	return -1;
