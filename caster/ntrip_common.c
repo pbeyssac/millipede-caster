@@ -56,6 +56,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->source_virtual = 0;
 	this->source_on_demand = 0;
 	this->last_pos_valid = 0;
+	memset(&this->last_recompute_date, 0, sizeof(this->last_recompute_date));
 	this->max_min_dist = 0;
 	this->user = NULL;
 	this->password = NULL;
