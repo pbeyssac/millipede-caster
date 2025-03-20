@@ -658,7 +658,7 @@ caster_reload_sourcetables(struct caster_state *caster) {
 	struct sourcetable *stmp;
 
 	struct sourcetable *local_table
-		= sourcetable_read(caster->config->sourcetable_filename, caster->config->sourcetable_priority);
+		= sourcetable_read(caster, caster->config->sourcetable_filename, caster->config->sourcetable_priority);
 
 	if (local_table == NULL)
 		return -1;

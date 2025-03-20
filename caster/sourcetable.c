@@ -9,13 +9,14 @@
 #include <json-c/json_object_iterator.h>
 
 #include "livesource.h"
+#include "log.h"
 #include "ntrip_common.h"
 #include "sourcetable.h"
 
 /*
  * Read a sourcetable file
  */
-struct sourcetable *sourcetable_read(const char *filename, int priority) {
+struct sourcetable *sourcetable_read(struct caster_state *caster, const char *filename, int priority) {
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
@@ -23,7 +24,7 @@ struct sourcetable *sourcetable_read(const char *filename, int priority) {
 
 	FILE *fp = fopen(filename, "r+");
 	if (fp == NULL) {
-		fprintf(stderr, "Can't open %s\n", filename);
+		logfmt(&caster->flog, LOG_ERR, "Can't open %s", filename);
 		return NULL;
 	}
 
@@ -42,7 +43,7 @@ struct sourcetable *sourcetable_read(const char *filename, int priority) {
 			/* Skip comment line */
 			continue;
 		if (sourcetable_add(tmp_sourcetable, line, 0) < 0) {
-			fprintf(stderr, "Can't parse line %d in sourcetable\n", nlines);
+			logfmt(&caster->flog, LOG_ERR, "Can't parse line %d in sourcetable", nlines);
 			sourcetable_free(tmp_sourcetable);
 			return NULL;
 		}
