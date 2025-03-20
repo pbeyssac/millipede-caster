@@ -860,11 +860,6 @@ signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	event_base_loopexit(base, &delay);
 }
 
-static void
-signalpipe_cb(evutil_socket_t sig, short events, void *user_data) {
-	printf("Caught SIGPIPE\n");
-}
-
 int caster_reload(struct caster_state *this) {
 	int r = 0;
 	if (caster_reload_config(this) < 0)
@@ -906,11 +901,7 @@ static int caster_set_signals(struct caster_state *this) {
 		return -1;
 	}
 
-	this->signalpipe_event = evsignal_new(this->base, SIGPIPE, signalpipe_cb, (void *)this->base);
-	if (!this->signalpipe_event || event_add(this->signalpipe_event, NULL) < 0) {
-		fprintf(stderr, "Could not create/add a signal event!\n");
-		return -1;
-	}
+	signal(SIGPIPE, SIG_IGN);
 
 	this->signalhup_event = evsignal_new(this->base, SIGHUP, signalhup_cb, (void *)this);
 	if (!this->signalhup_event || event_add(this->signalhup_event, 0) < 0) {
