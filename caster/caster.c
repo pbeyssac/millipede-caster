@@ -654,7 +654,6 @@ static int caster_reload_listeners(struct caster_state *this) {
 
 static int
 caster_reload_sourcetables(struct caster_state *caster) {
-	int r = 0;
 	struct sourcetable *s;
 	struct sourcetable *stmp;
 
@@ -662,7 +661,7 @@ caster_reload_sourcetables(struct caster_state *caster) {
 		= sourcetable_read(caster->config->sourcetable_filename, caster->config->sourcetable_priority);
 
 	if (local_table == NULL)
-		r = -1;
+		return -1;
 
 	P_RWLOCK_WRLOCK(&caster->sourcetablestack.lock);
 
@@ -683,7 +682,7 @@ caster_reload_sourcetables(struct caster_state *caster) {
 
 	P_RWLOCK_UNLOCK(&caster->sourcetablestack.lock);
 
-	return r;
+	return 0;
 }
 
 static int
