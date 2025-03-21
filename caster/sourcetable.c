@@ -20,7 +20,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
-	int nlines = 1;
+	int nlines = 0;
 
 	FILE *fp = fopen(filename, "r+");
 	if (fp == NULL) {
@@ -32,6 +32,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 	tmp_sourcetable->local = 1;
 	tmp_sourcetable->filename = mystrdup(filename);
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
+		nlines++;
 		for (; line[linelen-1] == '\n' || line[linelen-1] == '\r'; linelen--)
 			line[linelen-1] = '\0';
 		if (linelen == 0)
@@ -47,7 +48,6 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 			sourcetable_free(tmp_sourcetable);
 			return NULL;
 		}
-		nlines++;
 	}
 	tmp_sourcetable->priority = priority;
 	strfree(line);
