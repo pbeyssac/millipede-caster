@@ -43,7 +43,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 		if (*p == '#')
 			/* Skip comment line */
 			continue;
-		if (sourcetable_add(tmp_sourcetable, line, 0) < 0) {
+		if (sourcetable_add(tmp_sourcetable, line, 0, caster) < 0) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse line %d in sourcetable", nlines);
 			sourcetable_free(tmp_sourcetable);
 			return NULL;
@@ -57,7 +57,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 /*
  * Parse a sourcetable from a JSON object.
  */
-static struct sourcetable *sourcetable_from_json(json_object *j) {
+static struct sourcetable *sourcetable_from_json(json_object *j, struct caster_state *caster) {
 	struct sourcetable *tmp_sourcetable;
 
 	json_object *jhost = json_object_object_get(j, "host");
@@ -96,7 +96,7 @@ static struct sourcetable *sourcetable_from_json(json_object *j) {
 		struct json_object *source = json_object_iter_peek_value(&it);
 		const char *str = json_object_get_string(json_object_object_get(source, "str"));
 
-		if (str == NULL || sourcetable_add(tmp_sourcetable, str, tmp_sourcetable->pullable) < 0) {
+		if (str == NULL || sourcetable_add(tmp_sourcetable, str, tmp_sourcetable->pullable, caster) < 0) {
 			sourcetable_free(tmp_sourcetable);
 			tmp_sourcetable = NULL;
 			break;
@@ -252,17 +252,21 @@ static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *
 	return r;
 }
 
-int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand) {
+int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand, struct caster_state *caster) {
 	int r = 0;
 	if (!strncmp(sourcetable_entry, "STR;", 4)) {
 		struct sourceline *n1 = sourceline_new_parse(sourcetable_entry,
 			this->caster, this->port, this->tls,
 			this->priority, on_demand);
-		if (n1 == NULL)
+		if (n1 == NULL) {
+			logfmt(&caster->flog, LOG_ERR, "Can't parse sourcetable line or out of memory: %s", sourcetable_entry);
 			return -1;
+		}
 		r = _sourcetable_add_direct(this, n1);
-		if (r < 0)
+		if (r < 0) {
+			logfmt(&caster->flog, LOG_ERR, "Can't add sourcetable line (possibly duplicate key): %s", sourcetable_entry);
 			sourceline_free(n1);
+		}
 	} else {
 		P_RWLOCK_WRLOCK(&this->lock);
 		int new_len = strlen(this->header) + strlen(sourcetable_entry) + 3;
@@ -700,7 +704,7 @@ struct mime_content *sourcetable_list_json(struct caster_state *caster, struct r
  * Handle and insert a received sourcetable.
  */
 int sourcetable_update_execute(struct caster_state *caster, json_object *j) {
-	struct sourcetable *s = sourcetable_from_json(j);
+	struct sourcetable *s = sourcetable_from_json(j, caster);
 
 	if (s != NULL) {
 		logfmt(&caster->flog, LOG_DEBUG, "received sourcetable for %s", s->caster);

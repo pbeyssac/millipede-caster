@@ -132,7 +132,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 		return 1;
 	}
 
-	if (sourcetable_add(a->sourcetable, line, 1) < 0) {
+	if (sourcetable_add(a->sourcetable, line, 1, st->caster) < 0) {
 		ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d", a->sourcetable->caster, a->sourcetable->port);
 		sourcetable_free(a->sourcetable);
 		a->sourcetable = NULL;

@@ -75,7 +75,7 @@ void sourcetable_free(struct sourcetable *this);
 struct mime_content *sourcetable_get(struct sourcetable *this);
 json_object *sourcetable_json(struct sourcetable *this);
 void sourcetable_del_mountpoint(struct sourcetable *this, char *mountpoint);
-int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand);
+int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand, struct caster_state *caster);
 int sourcetable_nentries(struct sourcetable *this, int omit_virtual);
 void sourcetable_diff(struct caster_state *caster, struct sourcetable *t1, struct sourcetable *t2);
 struct sourceline *sourcetable_find_mountpoint(struct sourcetable *this, char *mountpoint);
