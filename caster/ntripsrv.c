@@ -334,7 +334,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			if (!line)
 				break;
 			st->received_bytes += len;
-			ntrip_log(st, LOG_EDEBUG, "Method \"%s\", %zd bytes", line, len);
+			ntrip_log(st, LOG_DEBUG, "Method \"%s\", %zd bytes", line, len);
 			int i = 0;
 			char *septmp = line;
 			while ((token = strsep(&septmp, " \t")) != NULL && i < SIZE_HTTP_ARGS) {
@@ -410,7 +410,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						if (st->caster->config->log_level >= LOG_DEBUG) {
 							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"", value);
 						} else {
-							ntrip_log(st, LOG_INFO, "Can't decode Authorization");
+							ntrip_log(st, LOG_NOTICE, "Can't decode Authorization");
 						}
 					}
 				} else if (!strcasecmp(key, "ntrip-gga")) {
