@@ -34,6 +34,8 @@ tests = [
    b'^HTTP/1\.1 200 OK\r\n'),
   (b'SOURCE testpw! TEST1\nUser-Agent: NTRIP test\n\n',
    b'^ICY 200 OK\r\n'),
+  (b'SOURCE testpw! /TEST1\nUser-Agent: NTRIP test\n\n',
+   b'^ICY 200 OK\r\n'),
   (b'POST /WILDCARD HTTP/1.1\nUser-Agent: NTRIP test\n\n',
    b'^HTTP/1\.1 401 Unauthorized\r\n'),
   (b'POST /WILDCARD HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic d2lsZGNhcmRfdXNlcjp3aWxkY2FyZF9wdy8v\n\n',

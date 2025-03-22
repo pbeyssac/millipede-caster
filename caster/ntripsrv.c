@@ -583,6 +583,14 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						password = st->http_args[1];
 						user = NULL;
 						mountpoint = st->http_args[2];
+
+						/*
+						 * Drop the leading /, if any.
+						 * The / should always be present as per the Ntrip1 spec, but most implementations
+						 * don't send it.
+						 */
+						if (st->http_args[2][0] == '/')
+							mountpoint++;
 						st->client_version = 1;
 					}
 					struct sourceline *sourceline = stack_find_local_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
