@@ -635,6 +635,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->state = NTRIP_WAIT_STREAM_SOURCE;
 					ntrip_set_rtcm_cache(st);
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
+				} else {
+					err = 501;
+					break;
 				}
 			}
 		} else if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
