@@ -31,6 +31,7 @@ static struct httpcode httpcodes[] = {
 	{400, "Bad Request"},
 	{401, "Unauthorized"},
 	{404, "Not Found"},
+	{405, "Method Not Allowed"},
 	{409, "Conflict"},
 	{413, "Content Too Large"},
 	{431, "Request Header Fields Too Large"},
@@ -451,7 +452,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					}
 					if (strlen(st->http_args[1]) >= 5 && !memcmp(st->http_args[1], "/adm/", 5)) {
 						st->type = "adm";
-						admsrv(st, "GET", "/adm", st->http_args[1] + 4, &err, &opt_headers);
+						admsrv(st, st->http_args[0], "/adm", st->http_args[1] + 4, &err, &opt_headers);
 						break;
 					}
 
@@ -662,7 +663,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			st->received_bytes += len;
 			if (st->content_done == st->content_length) {
 				st->content[st->content_length] = '\0';
-				admsrv(st, "POST", "/adm", st->http_args[1] + 4, &err, &opt_headers);
+				if (strlen(st->http_args[1]) >= 5 && !memcmp(st->http_args[1], "/adm/", 5)) {
+					st->type = "adm";
+					admsrv(st, st->http_args[0], "/adm", st->http_args[1] + 4, &err, &opt_headers);
+				}
+				st->state = NTRIP_WAIT_HTTP_METHOD;
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
 			// will increment st->received_bytes itself

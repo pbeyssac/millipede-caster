@@ -80,41 +80,45 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 			return -1;
 		}
 
-		/*
-		 * Run API calls
-		 */
-		if (!strcmp(uri, "/api/v1/net") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, req);
-			return 0;
-		}
-		if (!strcmp(uri, "/api/v1/rtcm") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_rtcm_json, req);
-			return 0;
-		}
-		if (!strcmp(uri, "/api/v1/mem") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_mem_json, req);
-			return 0;
-		}
-		if (!strcmp(uri, "/api/v1/livesources") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, livesource_list_json, req);
-			return 0;
-		}
-		if (!strcmp(uri, "/api/v1/sourcetables") && !strcmp(method, "GET")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, sourcetable_list_json, req);
-			return 0;
-		}
-		if (!strcmp(uri, "/api/v1/reload") && !strcmp(method, "POST")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_reload_json, req);
-			return 0;
-		}
-		if (!strcmp(uri, "/api/v1/drop") && !strcmp(method, "POST")) {
-			joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_drop_json, req);
-			return 0;
+		struct uri_calls {
+			const char *uri;
+			const char *method;
+			struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req);
+		};
+		const struct uri_calls calls[] = {
+			{"/api/v1/net",	"GET", api_ntrip_list_json},
+			{"/api/v1/rtcm", "GET", api_rtcm_json},
+			{"/api/v1/mem","GET", api_mem_json},
+			{"/api/v1/livesources", "GET", livesource_list_json},
+			{"/api/v1/sourcetables", "GET", sourcetable_list_json},
+			{"/api/v1/reload", "POST", api_reload_json},
+			{"/api/v1/drop", "POST", api_drop_json},
+			{NULL, NULL, NULL}
+		};
+
+		int i;
+		for (i = 0; calls[i].uri; i++) {
+			if (!strcmp(uri, calls[i].uri))
+				break;
 		}
 
-		request_free(req);
-		*err = 404;
-		return -1;
+		/* Check the URI */
+		if (calls[i].uri == NULL) {
+			request_free(req);
+			*err = 404;
+			return -1;
+		}
+
+		/* Check the method */
+		if (strcmp(method, calls[i].method)) {
+			request_free(req);
+			*err = 405;
+			return -1;
+		}
+
+		/* Execute */
+		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, calls[i].content_cb, req);
+		return 0;
 	} else if (json_post) {
 		req->json = json_tokener_parse(st->content);
 		if (req->json == NULL) {
