@@ -22,54 +22,54 @@ static json_object *api_ntrip_json(struct ntrip_state *st) {
 		json_object *jip = st->local_addr[0] ? json_object_new_string(st->local_addr) : json_object_new_null();
 		json_object *jport = json_object_new_int(ip_port(&st->myaddr));
 		json_object *j = json_object_new_object();
-		json_object_object_add(j, "ip", jip);
-		json_object_object_add(j, "port", jport);
-		json_object_object_add(new_obj, "local", j);
+		json_object_object_add_ex(j, "ip", jip, JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "port", jport, JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(new_obj, "local", j, JSON_C_CONSTANT_NEW);
 	}
 	if (st->remote) {
 		json_object *jip = st->remote_addr[0] ? json_object_new_string(st->remote_addr) : json_object_new_null();
 		json_object *jport = json_object_new_int(ip_port(&st->peeraddr));
-		json_object_object_add(new_obj, "ip", jip);
-		json_object_object_add(new_obj, "port", jport);
+		json_object_object_add_ex(new_obj, "ip", jip, JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(new_obj, "port", jport, JSON_C_CONSTANT_NEW);
 	}
 
 	json_object *jsonid = json_object_new_int64(st->id);
 	json_object *received_bytes = json_object_new_int64(st->received_bytes);
 	json_object *sent_bytes = json_object_new_int64(st->sent_bytes);
-	json_object_object_add(new_obj, "id", jsonid);
-	json_object_object_add(new_obj, "received_bytes", received_bytes);
-	json_object_object_add(new_obj, "sent_bytes", sent_bytes);
-	json_object_object_add(new_obj, "type", json_object_new_string(st->type));
-	json_object_object_add(new_obj, "wildcard", json_object_new_boolean(st->wildcard));
+	json_object_object_add_ex(new_obj, "id", jsonid, JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(new_obj, "received_bytes", received_bytes, JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(new_obj, "sent_bytes", sent_bytes, JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(new_obj, "type", json_object_new_string(st->type), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(new_obj, "wildcard", json_object_new_boolean(st->wildcard), JSON_C_CONSTANT_NEW);
 	if (!strcmp(st->type, "source") || !strcmp(st->type, "source_fetcher"))
-		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->mountpoint));
+		json_object_object_add_ex(new_obj, "mountpoint", json_object_new_string(st->mountpoint), JSON_C_CONSTANT_NEW);
 	else if (!strcmp(st->type, "client"))
-		json_object_object_add(new_obj, "mountpoint", json_object_new_string(st->http_args[1]+1));
+		json_object_object_add_ex(new_obj, "mountpoint", json_object_new_string(st->http_args[1]+1), JSON_C_CONSTANT_NEW);
 
 	if (st->user_agent)
-		json_object_object_add(new_obj, "user_agent", json_object_new_string(st->user_agent));
+		json_object_object_add_ex(new_obj, "user_agent", json_object_new_string(st->user_agent), JSON_C_CONSTANT_NEW);
 
 	struct tcp_info ti;
 	socklen_t ti_len = sizeof ti;
 	if (getsockopt(st->fd, IPPROTO_TCP, TCP_INFO, &ti, &ti_len) >= 0) {
 		json_object *tcpi_obj = json_object_new_object();
-		json_object_object_add(tcpi_obj, "rtt", json_object_new_int64(ti.tcpi_rtt));
-		json_object_object_add(tcpi_obj, "rttvar", json_object_new_int64(ti.tcpi_rttvar));
-		json_object_object_add(tcpi_obj, "snd_mss", json_object_new_int64(ti.tcpi_snd_mss));
-		json_object_object_add(tcpi_obj, "rcv_mss", json_object_new_int64(ti.tcpi_rcv_mss));
-		json_object_object_add(tcpi_obj, "last_data_recv", json_object_new_int64(ti.tcpi_last_data_recv));
-		json_object_object_add(tcpi_obj, "rcv_wnd", json_object_new_int64(ti.tcpi_rcv_space));
+		json_object_object_add_ex(tcpi_obj, "rtt", json_object_new_int64(ti.tcpi_rtt), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(tcpi_obj, "rttvar", json_object_new_int64(ti.tcpi_rttvar), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(tcpi_obj, "snd_mss", json_object_new_int64(ti.tcpi_snd_mss), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(tcpi_obj, "rcv_mss", json_object_new_int64(ti.tcpi_rcv_mss), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(tcpi_obj, "last_data_recv", json_object_new_int64(ti.tcpi_last_data_recv), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(tcpi_obj, "rcv_wnd", json_object_new_int64(ti.tcpi_rcv_space), JSON_C_CONSTANT_NEW);
 #ifdef __FreeBSD__
 		// FreeBSD-specific
-		json_object_object_add(tcpi_obj, "snd_wnd", json_object_new_int64(ti.tcpi_snd_wnd));
-		json_object_object_add(tcpi_obj, "snd_rexmitpack", json_object_new_int64(ti.tcpi_snd_rexmitpack));
+		json_object_object_add_ex(tcpi_obj, "snd_wnd", json_object_new_int64(ti.tcpi_snd_wnd), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(tcpi_obj, "snd_rexmitpack", json_object_new_int64(ti.tcpi_snd_rexmitpack), JSON_C_CONSTANT_NEW);
 #endif
-		json_object_object_add(new_obj, "tcp_info", tcpi_obj);
+		json_object_object_add_ex(new_obj, "tcp_info", tcpi_obj, JSON_C_CONSTANT_NEW);
 	}
 
 	char iso_date[30];
 	iso_date_from_timeval(iso_date, sizeof iso_date, &st->start);
-	json_object_object_add(new_obj, "start", json_object_new_string(iso_date));
+	json_object_object_add_ex(new_obj, "start", json_object_new_string(iso_date), JSON_C_CONSTANT_NEW);
 
 	bufferevent_unlock(st->bev);
 	return new_obj;

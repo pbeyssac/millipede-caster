@@ -207,16 +207,16 @@ json_object *sourcetable_json(struct sourcetable *this) {
 	json_object *jmain = json_object_new_object();
 
 
-	json_object_object_add(jmain, "host", json_object_new_string(this->caster));
-	json_object_object_add(jmain, "port", json_object_new_int(this->port));
-	json_object_object_add(jmain, "tls", json_object_new_boolean(this->tls));
-	json_object_object_add(jmain, "pullable", json_object_new_boolean(this->pullable));
-	json_object_object_add(jmain, "priority", json_object_new_int(this->priority));
+	json_object_object_add_ex(jmain, "host", json_object_new_string(this->caster), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "port", json_object_new_int(this->port), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "tls", json_object_new_boolean(this->tls), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "pullable", json_object_new_boolean(this->pullable), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "priority", json_object_new_int(this->priority), JSON_C_CONSTANT_NEW);
 
 	if (strcmp(this->caster, "LOCAL")) {
 		char iso_date[40];
 		iso_date_from_timeval(iso_date, sizeof iso_date, &this->fetch_time);
-		json_object_object_add(jmain, "fetch_time", json_object_new_string(iso_date));
+		json_object_object_add_ex(jmain, "fetch_time", json_object_new_string(iso_date), JSON_C_CONSTANT_NEW);
 	}
 
 	json_object *jmnt = json_object_new_object();
@@ -228,16 +228,16 @@ json_object *sourcetable_json(struct sourcetable *this) {
 	HASH_FOREACH(e, this->key_val, hi) {
 		n = (struct sourceline *)e->value;
 		json_object *j = json_object_new_object();
-		json_object_object_add(j, "str", json_object_new_string(n->value));
-		json_object_object_add(j, "lat", json_object_new_double(n->pos.lat));
-		json_object_object_add(j, "lon", json_object_new_double(n->pos.lon));
-		json_object_object_add(j, "virtual", json_object_new_boolean(n->virtual));
+		json_object_object_add_ex(j, "str", json_object_new_string(n->value), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "lat", json_object_new_double(n->pos.lat), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "lon", json_object_new_double(n->pos.lon), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "virtual", json_object_new_boolean(n->virtual), JSON_C_CONSTANT_NEW);
 		json_object_object_add(jmnt, n->key, j);
 
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
 
-	json_object_object_add(jmain, "mountpoints", jmnt);
+	json_object_object_add_ex(jmain, "mountpoints", jmnt, JSON_C_CONSTANT_NEW);
 
 	return jmain;
 }

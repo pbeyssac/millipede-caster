@@ -515,10 +515,10 @@ struct livesource *livesource_find_and_subscribe(struct caster_state *caster, st
  */
 static json_object *_livesource_common_json(const char *mountpoint, enum livesource_state state, enum livesource_type type, int add_state_type) {
 	json_object *j = json_object_new_object();
-	json_object_object_add(j, "mountpoint", json_object_new_string(mountpoint));
+	json_object_object_add_ex(j, "mountpoint", json_object_new_string(mountpoint), JSON_C_CONSTANT_NEW);
 	if (add_state_type) {
-		json_object_object_add(j, "state", json_object_new_string(livesource_states[state]));
-		json_object_object_add(j, "type", json_object_new_string(livesource_types[type]));
+		json_object_object_add_ex(j, "state", json_object_new_string(livesource_states[state]), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "type", json_object_new_string(livesource_types[type]), JSON_C_CONSTANT_NEW);
 	}
 	return j;
 }
@@ -529,8 +529,8 @@ static json_object *_livesource_common_json(const char *mountpoint, enum livesou
 static json_object *livesource_json(struct livesource *this, enum livesource_update_type utype) {
 	json_object *j = _livesource_common_json(this->mountpoint, this->state, this->type, utype != LIVESOURCE_UPDATE_DEL);
 	if (utype == LIVESOURCE_UPDATE_NONE) {
-		json_object_object_add(j, "nsubscribers", json_object_new_int(this->nsubs));
-		json_object_object_add(j, "npackets", json_object_new_int(this->npackets));
+		json_object_object_add_ex(j, "nsubscribers", json_object_new_int(this->nsubs), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "npackets", json_object_new_int(this->npackets), JSON_C_CONSTANT_NEW);
 	}
 	return j;
 }
@@ -547,9 +547,9 @@ static json_object *livesource_remote_json(struct livesource_remote *this) {
  */
 static json_object *_livesource_list_base_json(struct livesources *this) {
 	json_object *j = json_object_new_object();
-	json_object_object_add(j, "hostname", json_object_new_string(this->hostname));
-	json_object_object_add(j, "serial", json_object_new_int64(this->serial));
-	json_object_object_add(j, "start_date", json_object_new_string(this->start_date));
+	json_object_object_add_ex(j, "hostname", json_object_new_string(this->hostname), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(j, "serial", json_object_new_int64(this->serial), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(j, "start_date", json_object_new_string(this->start_date), JSON_C_CONSTANT_NEW);
 	return j;
 }
 
@@ -562,7 +562,7 @@ static json_object *livesource_list_local_json(struct caster_state *caster, stru
 
 	jmain = _livesource_list_base_json(this);
 	json_object_get(caster->endpoints_json);
-	json_object_object_add(jmain, "endpoints", caster->endpoints_json);
+	json_object_object_add_ex(jmain, "endpoints", caster->endpoints_json, JSON_C_CONSTANT_NEW);
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;
@@ -573,7 +573,7 @@ static json_object *livesource_list_local_json(struct caster_state *caster, stru
 		json_object_object_add(new_list, e->key, j);
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
-	json_object_object_add(jmain, "livesources", new_list);
+	json_object_object_add_ex(jmain, "livesources", new_list, JSON_C_CONSTANT_NEW);
 	return jmain;
 }
 
@@ -585,9 +585,9 @@ static json_object *_livesource_list_remote_json(struct livesources *this, struc
 	json_object *new_list;
 
 	jmain = json_object_new_object();
-	json_object_object_add(jmain, "hostname", json_object_new_string(thisr->hostname));
-	json_object_object_add(jmain, "serial", json_object_new_int64(thisr->serial));
-	json_object_object_add(jmain, "start_date", json_object_new_string(thisr->start_date));
+	json_object_object_add_ex(jmain, "hostname", json_object_new_string(thisr->hostname), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "serial", json_object_new_int64(thisr->serial), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "start_date", json_object_new_string(thisr->start_date), JSON_C_CONSTANT_NEW);
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;
@@ -599,8 +599,8 @@ static json_object *_livesource_list_remote_json(struct livesources *this, struc
 	}
 	json_object *jendpoints = endpoints_to_json(thisr->endpoints, thisr->endpoint_count);
 	P_RWLOCK_UNLOCK(&this->lock);
-	json_object_object_add(jmain, "endpoints", jendpoints);
-	json_object_object_add(jmain, "livesources", new_list);
+	json_object_object_add_ex(jmain, "endpoints", jendpoints, JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "livesources", new_list, JSON_C_CONSTANT_NEW);
 	return jmain;
 }
 
@@ -612,7 +612,7 @@ static struct mime_content *_livesource_list_json(struct caster_state *caster) {
 	json_object *jmain = json_object_new_object();
 
 	json_object *j = livesource_list_local_json(caster, caster->livesources);
-	json_object_object_add(jmain, "LOCAL", j);
+	json_object_object_add_ex(jmain, "LOCAL", j, JSON_C_CONSTANT_NEW);
 
 	P_RWLOCK_RDLOCK(&caster->livesources->lock);
 	struct hash_iterator hi;
@@ -637,7 +637,7 @@ struct mime_content *livesource_list_json(struct caster_state *caster, struct re
  */
 json_object *livesource_full_update_json(struct caster_state *caster, struct livesources *this) {
 	json_object *jmain = livesource_list_local_json(caster, this);
-	json_object_object_add(jmain, "type", json_object_new_string("fulltable"));
+	json_object_object_add_ex(jmain, "type", json_object_new_string("fulltable"), JSON_C_CONSTANT_NEW);
 	return jmain;
 }
 
@@ -646,7 +646,7 @@ json_object *livesource_full_update_json(struct caster_state *caster, struct liv
  */
 json_object *livesource_checkserial_json(struct livesources *this) {
 	json_object *j = _livesource_list_base_json(this);
-	json_object_object_add(j, "type", json_object_new_string("checkserial"));
+	json_object_object_add_ex(j, "type", json_object_new_string("checkserial"), JSON_C_CONSTANT_NEW);
 	return j;
 }
 
@@ -658,12 +658,12 @@ static json_object *livesource_update_json(struct livesource *this,
 
 	json_object *j = json_object_new_object();
 	json_object *jl = livesource_json(this, utype);
-	json_object_object_add(j, "livesource", jl);
+	json_object_object_add_ex(j, "livesource", jl, JSON_C_CONSTANT_NEW);
 
-	json_object_object_add(j, "start_date", json_object_new_string(caster->livesources->start_date));
-	json_object_object_add(j, "hostname", json_object_new_string(caster->livesources->hostname));
-	json_object_object_add(j, "serial", json_object_new_int64(caster->livesources->serial));
-	json_object_object_add(j, "type", json_object_new_string(livesource_update_types[utype]));
+	json_object_object_add_ex(j, "start_date", json_object_new_string(caster->livesources->start_date), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(j, "hostname", json_object_new_string(caster->livesources->hostname), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(j, "serial", json_object_new_int64(caster->livesources->serial), JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(j, "type", json_object_new_string(livesource_update_types[utype]), JSON_C_CONSTANT_NEW);
 
 	return j;
 }

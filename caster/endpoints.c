@@ -56,9 +56,9 @@ json_object *endpoints_to_json(struct endpoint *pe, int n) {
 	json_object *j = json_object_new_array_ext(n);
 	for (int i = 0; i < n; i++) {
 		json_object *ji = json_object_new_object();
-		json_object_object_add(ji, "host", json_object_new_string(pe[i].host));
-		json_object_object_add(ji, "tls", json_object_new_boolean(pe[i].tls));
-		json_object_object_add(ji, "port", json_object_new_int(pe[i].port));
+		json_object_object_add_ex(ji, "host", json_object_new_string(pe[i].host), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(ji, "tls", json_object_new_boolean(pe[i].tls), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(ji, "port", json_object_new_int(pe[i].port), JSON_C_CONSTANT_NEW);
 		json_object_array_add(j, ji);
 	}
 	return j;

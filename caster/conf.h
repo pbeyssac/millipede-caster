@@ -18,6 +18,9 @@
 #define	P_MUTEX_UNLOCK(arg)		{if (threads) pthread_mutex_unlock(arg);}
 #define	P_MUTEX_DESTROY(arg)		{if (threads) pthread_mutex_destroy(arg);}
 
+// General constant for shorter calls to json-c's API json_object_object_add_ex()
+#define JSON_C_CONSTANT_NEW	(JSON_C_OBJECT_ADD_CONSTANT_KEY|JSON_C_OBJECT_ADD_KEY_IS_NEW)
+
 /*
  * Server and client version strings for HTTP
  */

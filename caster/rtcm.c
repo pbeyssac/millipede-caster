@@ -284,27 +284,27 @@ json_object *rtcm_info_json(struct rtcm_info *this) {
 	json_object *j = json_object_new_object();
 	char *types = rtcm_info_types(this);
 	if (types) {
-		json_object_object_add(j, "types", json_object_new_string(types));
+		json_object_object_add_ex(j, "types", json_object_new_string(types), JSON_C_CONSTANT_NEW);
 	} else {
-		json_object_object_add(j, "types", json_object_new_null());
+		json_object_object_add_ex(j, "types", json_object_new_null(), JSON_C_CONSTANT_NEW);
 	}
 	strfree(types);
 	if (rtcm_info_check_type(this, 1005) || rtcm_info_check_type(this, 1006)) {
 		pos_t pos;
 		double alt;
 		json_object *jpos = json_object_new_object();
-		json_object_object_add(jpos, "x", json_object_new_int64(this->x));
-		json_object_object_add(jpos, "y", json_object_new_int64(this->y));
-		json_object_object_add(jpos, "z", json_object_new_int64(this->z));
+		json_object_object_add_ex(jpos, "x", json_object_new_int64(this->x), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(jpos, "y", json_object_new_int64(this->y), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(jpos, "z", json_object_new_int64(this->z), JSON_C_CONSTANT_NEW);
 		ecef_to_lat_lon(&pos, &alt, this->x, this->y, this->z);
-		json_object_object_add(jpos, "lat", json_object_new_double(pos.lat));
-		json_object_object_add(jpos, "lon", json_object_new_double(pos.lon));
-		json_object_object_add(jpos, "alt", json_object_new_double(alt));
-		json_object_object_add(j, "pos", jpos);
+		json_object_object_add_ex(jpos, "lat", json_object_new_double(pos.lat), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(jpos, "lon", json_object_new_double(pos.lon), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(jpos, "alt", json_object_new_double(alt), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "pos", jpos, JSON_C_CONSTANT_NEW);
 
 		char iso_date[30];
 		iso_date_from_timeval(iso_date, sizeof iso_date, &this->posdate);
-		json_object_object_add(jpos, "date", json_object_new_string(iso_date));
+		json_object_object_add_ex(jpos, "date", json_object_new_string(iso_date), JSON_C_CONSTANT_NEW);
 	}
 	return j;
 }

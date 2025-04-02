@@ -182,9 +182,9 @@ json_object *caster_endpoints_json(struct caster_state *caster) {
 	for (int i = 0; i < caster->config->endpoint_count; i++) {
 		json_object *j = json_object_new_object();
 		if (caster->config->endpoint[i].host)
-			json_object_object_add(j, "host", json_object_new_string(caster->config->endpoint[i].host));
-		json_object_object_add(j, "port", json_object_new_int(caster->config->endpoint[i].port));
-		json_object_object_add(j, "tls", json_object_new_boolean(caster->config->endpoint[i].tls));
+			json_object_object_add_ex(j, "host", json_object_new_string(caster->config->endpoint[i].host), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "port", json_object_new_int(caster->config->endpoint[i].port), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "tls", json_object_new_boolean(caster->config->endpoint[i].tls), JSON_C_CONSTANT_NEW);
 		json_object_array_add(jmain, j);
 	}
 	return jmain;
