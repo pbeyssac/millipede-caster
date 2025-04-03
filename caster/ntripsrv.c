@@ -684,33 +684,14 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		free(line);
 
 	if (err) {
-		if (err == 400)
-			send_server_reply(st, output, 400, NULL, NULL, NULL);
-		else if (err == 401) {
-			if (st->client_version == 1 && method_post_source)
-				evbuffer_add_reference(output, "ERROR - Bad Password\r\n", 22, NULL, NULL);
-			else {
-				send_server_reply(st, output, 401, &opt_headers, NULL, NULL);
-				evbuffer_add_reference(output, "401\r\n", 5, NULL, NULL);
-			}
-		} else if (err == 404) {
-			if (st->client_version == 1 && method_post_source)
-				evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
-			else
-				send_server_reply(st, output, 404, NULL, NULL, NULL);
-		} else if (err == 409) {
-			if (st->client_version == 1 && method_post_source)
-				evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
-			else
-				send_server_reply(st, output, 409, NULL, NULL, NULL);
-		} else if (err == 500)
-			send_server_reply(st, output, 500, NULL, NULL, NULL);
-		else if (err == 501)
-			send_server_reply(st, output, 501, NULL, NULL, NULL);
-		else if (err == 503)
-			send_server_reply(st, output, 503, NULL, NULL, NULL);
+		if (err == 401 && st->client_version == 1 && method_post_source)
+			evbuffer_add_reference(output, "ERROR - Bad Password\r\n", 22, NULL, NULL);
+		else if (err == 404 && st->client_version == 1 && method_post_source)
+			evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
+		else if (err == 409 && st->client_version == 1 && method_post_source)
+			evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
 		else
-			send_server_reply(st, output, err, NULL, NULL, NULL);
+			send_server_reply(st, output, err, &opt_headers, NULL, NULL);
 		ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb err %d", err);
 		st->state = NTRIP_WAIT_CLOSE;
 	}
