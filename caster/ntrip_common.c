@@ -264,6 +264,7 @@ static void _ntrip_common_free(struct ntrip_state *this) {
 
 	for (char **arg = &this->http_args[0]; arg < &this->http_args[SIZE_HTTP_ARGS] && *arg; arg++)
 		strfree(*arg);
+	memset(&this->http_args, 0, sizeof(this->http_args));
 
 	strfree(this->user);
 	/*
