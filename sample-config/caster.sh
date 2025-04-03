@@ -20,8 +20,10 @@ load_rc_config $name
 : ${caster_group:=caster}
 : ${caster_enable:=NO}
 : ${caster_args:=-d}
+: ${caster_chdir:=/tmp}
 
 command="/usr/local/sbin/caster"
 command_args="${caster_args}"
 
+cd ${caster_chdir}
 run_rc_command "$1"
