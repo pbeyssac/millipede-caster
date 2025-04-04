@@ -33,7 +33,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 	tmp_sourcetable->filename = mystrdup(filename);
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
 		nlines++;
-		for (; line[linelen-1] == '\n' || line[linelen-1] == '\r'; linelen--)
+		for (; linelen && (line[linelen-1] == '\n' || line[linelen-1] == '\r'); linelen--)
 			line[linelen-1] = '\0';
 		if (linelen == 0)
 			/* Skip empty line */
