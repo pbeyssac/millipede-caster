@@ -22,7 +22,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 	ssize_t linelen;
 	int nlines = 0;
 
-	FILE *fp = fopen(filename, "r+");
+	FILE *fp = fopen(filename, "r");
 	if (fp == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Can't open %s", filename);
 		return NULL;

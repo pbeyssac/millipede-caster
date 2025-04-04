@@ -551,7 +551,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	int nlines = 0;
 	int err = 0;
 
-	FILE *fp = fopen(filename, "r+");
+	FILE *fp = fopen(filename, "r");
 
 	if (fp == NULL) {
 		logfmt(log, LOG_ERR, "Can't open %s", filename);
