@@ -29,6 +29,12 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 	}
 
 	struct sourcetable *tmp_sourcetable = sourcetable_new("LOCAL", 0, 0);
+	if (tmp_sourcetable == NULL) {
+		logfmt(&caster->flog, LOG_ERR, "Can't read %s: out of memory", filename);
+		fclose(fp);
+		return NULL;
+	}
+
 	tmp_sourcetable->local = 1;
 	tmp_sourcetable->filename = mystrdup(filename);
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
