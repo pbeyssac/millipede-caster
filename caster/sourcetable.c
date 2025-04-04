@@ -46,9 +46,11 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 		if (sourcetable_add(tmp_sourcetable, line, 0, caster) < 0) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse line %d in sourcetable", nlines);
 			sourcetable_free(tmp_sourcetable);
+			fclose(fp);
 			return NULL;
 		}
 	}
+	fclose(fp);
 	tmp_sourcetable->priority = priority;
 	strfree(line);
 	return tmp_sourcetable;
