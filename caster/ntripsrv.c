@@ -368,7 +368,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				char *key, *value;
 				if (!parse_header(line, &key, &value)) {
 					ntrip_log(st, LOG_EDEBUG, "parse_header failed on %s", line);
-					err = 1;
+					err = 400;
 					break;
 				}
 				if (!strcasecmp(key, "host")) {

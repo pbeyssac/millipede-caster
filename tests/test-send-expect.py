@@ -88,6 +88,8 @@ tests = [
    b'^HTTP/1\.1 200 OK\r\nServer: NTRIP Millipede Server \S+\r\nDate: .* GMT\r\nNtrip-Version: Ntrip/2\.0\r\nContent-Length: 14\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n\{"result": 0\}\n$'),
   (b'MCDU / HTTP/1.1\r\n\r\n',
    b'^HTTP/1\.1 501 Not Implemented\r\n'),
+  (b'GET / HTTP/1.1\r\nBad Header Line\r\n\r\n',
+   b'^HTTP/1\.1 400 Bad Request\r\n'),
 ]
 
 err = 0
