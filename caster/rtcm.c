@@ -341,24 +341,20 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		 */
 		evbuffer_ptr_set(input, &p, 0, EVBUFFER_PTR_SET);
 		p = evbuffer_search(input, "\xd3", 1, &p);
-		if (p.pos < 0) {
-			unsigned long len = evbuffer_get_length(input);
-			if (len) {
-				struct packet *not_rtcmp = packet_new(len, st->caster);
-				evbuffer_remove(input, not_rtcmp->data, len);
-				st->received_bytes += len;
-				ntrip_log(st, LOG_INFO, "resending %zd bytes", len);
-				if (livesource_send_subscribers(st->own_livesource, not_rtcmp, st->caster))
-					st->last_send = time(NULL);
-				r = 1;
-				packet_free(not_rtcmp);
-				continue;
-			}
-			return r;
-		}
-		if (p.pos > 0) {
-			ntrip_log(st, LOG_DEBUG, "RTCM: found packet start, draining %zd bytes", p.pos);
-			evbuffer_drain(input, p.pos);
+		int max_len = evbuffer_get_length(input);
+		int len = p.pos < 0 ? max_len : p.pos;
+		if (len) {
+			struct packet *not_rtcmp = packet_new(len, st->caster);
+			evbuffer_remove(input, not_rtcmp->data, len);
+			st->received_bytes += len;
+			ntrip_log(st, LOG_INFO, "resending %zd bytes", len);
+			if (livesource_send_subscribers(st->own_livesource, not_rtcmp, st->caster))
+				st->last_send = time(NULL);
+			r = 1;
+			packet_free(not_rtcmp);
+			max_len -= len;
+			if (max_len == 0)
+				return r;
 		}
 
 		unsigned char *mem = evbuffer_pullup(input, 3);
@@ -371,7 +367,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		 * Compute RTCM length from packet header
 		 */
 		len_rtcm = (mem[1] & 3)*256 + mem[2] + 6;
-		if (len_rtcm > evbuffer_get_length(input)) {
+		if (len_rtcm > max_len) {
 			return r;
 		}
 
