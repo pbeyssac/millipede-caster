@@ -311,7 +311,9 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				char data[65];
 				data[64] = '\0';
 				ntrip_log(st, LOG_NOTICE, "Server sent %d bytes on idle connection, closing", len);
-				evbuffer_remove(st->input, data, len > 64 ? 64:len);
+				int rlen = len > 64 ? 64:len;
+				evbuffer_remove(st->input, data, rlen);
+				data[rlen] = '\0';
 				ntrip_log(st, LOG_INFO, "Data (truncated to 64 bytes): \"%s\"", data);
 				end = 1;
 			}
