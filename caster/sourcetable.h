@@ -54,10 +54,11 @@ struct spos {
  * Table to determine the closest base from a rover
  */
 struct dist_table {
-	struct sourcetable *sourcetable;	// original sourcetable
 	pos_t pos;				// known rover position
 	struct spos *dist_array;		// array of distances
 	int size_dist_array;
+	const char *host;
+	unsigned short port;
 };
 
 /*

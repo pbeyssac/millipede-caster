@@ -357,6 +357,31 @@ void sourcetable_diff(struct caster_state *caster, struct sourcetable *t1, struc
 	hash_array_free(keys2);
 }
 
+static struct dist_table *dist_table_new(int n, const char *host, unsigned short port) {
+	struct dist_table *this = (struct dist_table *)malloc(sizeof(struct dist_table));
+	if (this == NULL)
+		return NULL;
+
+	struct spos *dist_array = (struct spos *)malloc(sizeof(struct spos)*n);
+	if (dist_array == NULL) {
+		free(this);
+		return NULL;
+	}
+
+	this->size_dist_array = 0;
+	this->port = port;
+	this->host = mystrdup(host);
+	return this;
+}
+
+static void dist_table_add(struct dist_table *this, double dist, pos_t *pos, char *mountpoint, int on_demand) {
+	int i = ++this->size_dist_array;
+	this->dist_array[i].dist = dist;
+	this->dist_array[i].pos = *pos;
+	this->dist_array[i].mountpoint = mountpoint;
+	this->dist_array[i].on_demand = on_demand;
+}
+
 static int _cmp_dist(const void *pos1, const void *pos2) {
 	struct spos *p1 = (struct spos *)pos1;
 	struct spos *p2 = (struct spos *)pos2;
@@ -393,15 +418,9 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
 	/*
 	 * Allocate the table structures.
 	 */
-	struct dist_table *d = (struct dist_table *)malloc(sizeof(struct dist_table));
+	struct dist_table *d = dist_table_new(n, this->caster, this->port);
 	if (d == NULL) {
 		P_RWLOCK_UNLOCK(&this->lock);
-		return NULL;
-	}
-	struct spos *dist_array = (struct spos *)malloc(sizeof(struct spos)*n);
-	if (dist_array == NULL) {
-		P_RWLOCK_UNLOCK(&this->lock);
-		free(d);
 		return NULL;
 	}
 
@@ -415,31 +434,22 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
 	HASH_FOREACH(e, this->key_val, hi) {
 		np = (struct sourceline *)e->value;
 		// printf("%d: %s pos (%f, %f)\n", i, np->key, np->pos.lat, np->pos.lon);
-		if (!np->virtual) {
-			dist_array[i].dist = distance(&np->pos, pos);
-			dist_array[i].pos = np->pos;
-			dist_array[i].mountpoint = np->key;
-			dist_array[i].on_demand = np->on_demand;
-			i++;
-		}
+		if (!np->virtual)
+			dist_table_add(d, distance(&np->pos, pos), &np->pos, np->key, np->on_demand);
 	}
 
 	P_RWLOCK_UNLOCK(&this->lock);
 
 	/*
 	 * Keep some useful additional info
-	 *
-	 * Use i instead of n as the table size, in case they differ.
 	 */
-	d->dist_array = dist_array;
-	d->size_dist_array = i;
 	d->pos = *pos;
-	d->sourcetable = this;
 
 	/*
 	 * Sort the distance array
+	 * Use i instead of n as the table size, in case they differ.
 	 */
-	qsort(dist_array, i, sizeof(struct spos), _cmp_dist);
+	qsort(d->dist_array, i, sizeof(struct spos), _cmp_dist);
 	return d;
 }
 
@@ -458,13 +468,14 @@ struct sourceline *sourcetable_find_mountpoint(struct sourcetable *this, char *m
 
 void dist_table_free(struct dist_table *this) {
 	free(this->dist_array);
+	strfree((char *)this->host);
 	free(this);
 }
 
 void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max) {
 	float max_dist = this->size_dist_array ? this->dist_array[this->size_dist_array-1].dist : 40000;
 
-	ntrip_log(st, LOG_INFO, "dist_table from (%f, %f) %s:%d, furthest base dist %.2f:", this->pos.lat, this->pos.lon, this->sourcetable->caster, this->sourcetable->port, max_dist);
+	ntrip_log(st, LOG_INFO, "dist_table from (%f, %f) %s:%d, furthest base dist %.2f:", this->pos.lat, this->pos.lon, this->host, this->port, max_dist);
 	for (int i = 0; i < max && i < this->size_dist_array; i++) {
 		ntrip_log(st, LOG_INFO, "%.2f: %s", this->dist_array[i].dist, this->dist_array[i].mountpoint);
 	}
