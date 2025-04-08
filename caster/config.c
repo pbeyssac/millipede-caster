@@ -276,6 +276,8 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_INT(
 		"on_demand_source_timeout", CYAML_FLAG_OPTIONAL, struct config, on_demand_source_timeout),
 	CYAML_FIELD_INT(
+		"idle_max_delay", CYAML_FLAG_OPTIONAL, struct config, idle_max_delay),
+	CYAML_FIELD_INT(
 		"source_read_timeout", CYAML_FLAG_OPTIONAL, struct config, source_read_timeout),
 	CYAML_FIELD_INT(
 		"ntripcli_default_read_timeout", CYAML_FLAG_OPTIONAL, struct config, ntripcli_default_read_timeout),
@@ -346,6 +348,7 @@ struct config *config_parse(const char *filename) {
 	DEFAULT_ASSIGN(this, reconnect_delay);
 	DEFAULT_ASSIGN(this, max_raw_packet);
 	DEFAULT_ASSIGN(this, on_demand_source_timeout);
+	DEFAULT_ASSIGN(this, idle_max_delay);
 	DEFAULT_ASSIGN(this, source_read_timeout);
 	DEFAULT_ASSIGN(this, backlog_socket);
 	DEFAULT_ASSIGN(this, backlog_evbuffer);
