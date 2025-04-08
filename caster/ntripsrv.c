@@ -321,6 +321,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	if (ntrip_filter_run_input(st) < 0)
 		return;
 
+	if (st->chunk_state == CHUNK_END && evbuffer_get_length(st->input) == 0) {
+		st->state = NTRIP_FORCE_CLOSE;
+		err = 1;
+	}
+
 	while (!err && st->state != NTRIP_WAIT_CLOSE && (waiting_len = evbuffer_get_length(st->input)) > 0) {
 		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
@@ -670,6 +675,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				st->state = NTRIP_WAIT_HTTP_METHOD;
 			}
 		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
+			if (st->chunk_state == CHUNK_END) {
+				st->state = NTRIP_FORCE_CLOSE;
+				err = 1;
+				break;
+			}
 			// will increment st->received_bytes itself
 			rtcm_packet_handle(st);
 			break;
@@ -690,7 +700,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
 		else if (err == 409 && st->client_version == 1 && method_post_source)
 			evbuffer_add_reference(output, "ERROR - Mount Point Taken or Invalid\r\n", 38, NULL, NULL);
-		else
+		else if (err >= 100)
 			send_server_reply(st, output, err, &opt_headers, NULL, NULL);
 		ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb err %d", err);
 		st->state = NTRIP_WAIT_CLOSE;

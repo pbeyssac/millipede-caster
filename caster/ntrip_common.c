@@ -702,8 +702,11 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 				ntrip_log(st, LOG_INFO, "Wrong chunk trailer 0x%02x 0x%02x", data[0], data[1]);
 
 			if (st->chunk_state == CHUNK_LAST) {
-				st->state = NTRIP_FORCE_CLOSE;
 				st->chunk_state = CHUNK_END;
+				st->filter.in_filter = NULL;
+				evbuffer_free(st->chunk_buf);
+				st->chunk_buf = NULL;
+				st->input = st->filter.raw_input;
 				ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode 0-length done %d, closing", len_done);
 				return BEV_OK;
 			}

@@ -29,6 +29,7 @@ enum ntrip_session_state {
 	NTRIP_WAIT_CLIENT_INPUT,	// Server waiting for GGA lines from client
 	NTRIP_WAIT_CLIENT_CONTENT,	// Server waiting for content
 	NTRIP_WAIT_SERVER_CONTENT,	// Client waiting for content
+	NTRIP_WAIT_CHUNKED_CONTENT,	// Client waiting for content with chunked encoding
 	NTRIP_WAIT_CLOSE,		// End of connection, drain output then close
 	NTRIP_FORCE_CLOSE,		// End of connection, force close now
 	NTRIP_IDLE_CLIENT,		// client connection, waiting for something to send
