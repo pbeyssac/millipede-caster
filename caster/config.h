@@ -55,6 +55,8 @@ struct config_node {
 
 	/* Maximum queue size for memory backlog */
 	size_t queue_max_size;
+
+	int retry_delay;
 };
 
 struct config_endpoint {

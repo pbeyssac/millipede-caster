@@ -353,7 +353,7 @@ static int caster_start_syncers(struct caster_state *this) {
 	this->syncers = (struct syncer **)malloc(sizeof(struct syncer *)*this->syncers_count);
 	for (int i = 0; i < this->syncers_count; i++) {
 		this->syncers[i] = syncer_new(this,
-			this->config->node, this->config->node_count, "/adm/api/v1/sync", 10, 0);
+			this->config->node, this->config->node_count, "/adm/api/v1/sync", 0);
 		for (int j = 0; j < this->config->node_count; j++)
 			syncer_start(this->syncers[i], j);
 	}

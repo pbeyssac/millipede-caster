@@ -76,7 +76,8 @@ static struct config_proxy default_config_proxy = {
 static struct config_node default_config_node = {
 	.port = 2443,
 	.tls = 0,
-	.queue_max_size = 4000000
+	.queue_max_size = 4000000,
+	.retry_delay = 30
 };
 
 static struct config_endpoint default_config_endpoint = {
@@ -160,6 +161,8 @@ static const cyaml_schema_field_t node_fields_schema[] = {
 		"tls", CYAML_FLAG_OPTIONAL, struct config_node, tls),
 	CYAML_FIELD_STRING_PTR(
 		"authorization", CYAML_FLAG_POINTER, struct config_node, authorization, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_INT(
+		"retry_delay", CYAML_FLAG_OPTIONAL, struct config_node, retry_delay),
 	CYAML_FIELD_END
 };
 
@@ -384,6 +387,8 @@ struct config *config_parse(const char *filename) {
 			this->node[i].port = default_config_node.port;
 		if (this->node[i].queue_max_size == 0)
 			this->node[i].queue_max_size = default_config_node.queue_max_size;
+		if (this->node[i].retry_delay == 0)
+			this->node[i].retry_delay = default_config_node.retry_delay;
 	}
 
 	for (int i = 0; i < this->endpoint_count; i++) {
