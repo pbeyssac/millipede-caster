@@ -258,6 +258,12 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 		sourcetable_free(pos_sourcetable);
 		return;
 	}
+	if (s->size_dist_array == 0) {
+		dist_table_free(s);
+		sourcetable_free(pos_sourcetable);
+		return;
+	}
+
 	st->last_recompute_pos = st->last_pos;
 	st->last_recompute_date = t0;
 

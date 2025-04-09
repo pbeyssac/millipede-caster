@@ -367,10 +367,11 @@ static struct dist_table *dist_table_new(int n, const char *host, unsigned short
 		free(this);
 		return NULL;
 	}
+	this->dist_array = dist_array;
 
 	this->size_dist_array = 0;
 	this->port = port;
-	this->host = mystrdup(host);
+	this->host = host?mystrdup(host):NULL;
 	return this;
 }
 
@@ -409,11 +410,6 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
 	 * Count how many entries we need to reserve.
 	 */
 	n = _sourcetable_nentries_unlocked(this, 1);
-
-	if (n == 0) {
-		P_RWLOCK_UNLOCK(&this->lock);
-		return NULL;
-	}
 
 	/*
 	 * Allocate the table structures.
