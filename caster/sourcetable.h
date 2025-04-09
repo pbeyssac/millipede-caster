@@ -61,14 +61,6 @@ struct dist_table {
 	unsigned short port;
 };
 
-/*
- * Priority structure for sourcetable_stack_flatten.
- */
-struct mp_prio {
-	struct sourceline *sourceline;
-	int priority;
-};
-
 struct sourcetable *sourcetable_read(struct caster_state *caster, const char *filename, int priority);
 struct sourcetable *sourcetable_new(const char *host, unsigned short port, int tls);
 void sourcetable_free_unlocked(struct sourcetable *this);
