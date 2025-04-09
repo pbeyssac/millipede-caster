@@ -15,7 +15,7 @@ struct caster_state;
  * A source table
  */
 struct sourcetable {
-	TAILQ_ENTRY(sourcetable) next;
+	TAILQ_ENTRY(sourcetable) next;	// ordered by decreasing priority
 	P_RWLOCK_T lock;
 
 	char *caster;                   // from which caster hostname did we get this table

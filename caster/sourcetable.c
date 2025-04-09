@@ -37,6 +37,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 
 	tmp_sourcetable->local = 1;
 	tmp_sourcetable->filename = mystrdup(filename);
+	tmp_sourcetable->priority = priority;
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
 		nlines++;
 		for (; linelen && (line[linelen-1] == '\n' || line[linelen-1] == '\r'); linelen--)
@@ -58,7 +59,6 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 		}
 	}
 	fclose(fp);
-	tmp_sourcetable->priority = priority;
 	strfree(line);
 	return tmp_sourcetable;
 }
@@ -495,7 +495,6 @@ static struct sourceline *_stack_find_mountpoint(struct caster_state *caster, so
 
 	struct sourceline *r = NULL;
 	struct sourcetable *s;
-	int priority = -10000;
 
 	P_RWLOCK_RDLOCK(&stack->lock);
 
@@ -503,15 +502,15 @@ static struct sourceline *_stack_find_mountpoint(struct caster_state *caster, so
 		if (local && strcmp(s->caster, "LOCAL"))
 			continue;
 		np = sourcetable_find_mountpoint(s, mountpoint);
+		if (!np)
+			continue;
 		/*
 		 * If the mountpoint is from our local table, and other non-local tables are to
-		 * be looked-up, skip if not live.
+		 * be looked-up (local == 0), skip if not live.
 		 */
-		if (!local && np && !strcmp(s->caster, "LOCAL") && (!np->virtual && !livesource_find(caster, NULL, np->key, &np->pos)))
-			continue;
-		if (np && s->priority > priority) {
-			priority = s->priority;
+		if (local || strcmp(s->caster, "LOCAL") || np->virtual || livesource_find(caster, NULL, np->key, &np->pos)) {
 			r = np;
+			break;
 		}
 	}
 
@@ -592,8 +591,20 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 			}
 		}
 	}
-	if (new_sourcetable != NULL)
-		TAILQ_INSERT_TAIL(&stack->list, new_sourcetable, next);
+	if (new_sourcetable != NULL) {
+		/*
+		 * Insert at the right place to keep the stack sorted by decreasing priority.
+		 */
+		TAILQ_FOREACH(s, &stack->list, next) {
+			if (new_sourcetable->priority >= s->priority) {
+				TAILQ_INSERT_BEFORE(s, new_sourcetable, next);
+				new_sourcetable = NULL;
+				break;
+			}
+		}
+		if (new_sourcetable)
+			TAILQ_INSERT_TAIL(&stack->list, new_sourcetable, next);
+	}
 
 	P_RWLOCK_UNLOCK(&stack->lock);
 }
@@ -654,23 +665,10 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 			struct element *e = hash_table_get_element(r->key_val, sp->key);
 			struct sourceline *mp;
 
-			if (e) {
-				mp = (struct sourceline *)e->value;
+			if (e == NULL) {
 				/*
-				 * Mountpoint already in table, keep the highest priority entry
-				 */
-				if (mp->priority < sp->priority) {
-					mp = sourceline_copy(sp);
-					if (mp == NULL) {
-						P_RWLOCK_UNLOCK(&s->lock);
-						P_RWLOCK_UNLOCK(&this->lock);
-						goto cancel;
-					}
-					hash_table_replace(r->key_val, e, mp);
-				}
-			} else {
-				/*
-				 * Entry not found, add.
+				 * Entry not found, meaning it has the highest priority:
+				 * add it.
 				 */
 				mp = sourceline_copy(sp);
 				if (mp == NULL) {

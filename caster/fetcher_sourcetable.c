@@ -115,7 +115,6 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 		gettimeofday(&sourcetable->fetch_time, NULL);
 
 		sourcetable->pullable = 1;
-		sourcetable->priority = a->priority;
 		ntrip_log(st, LOG_INFO, "sourcetable loaded, %d entries, %.3f ms",
 			sourcetable_nentries(sourcetable, 0),
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
@@ -150,6 +149,7 @@ fetcher_sourcetable_start(void *arg_cb, int n) {
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
 	assert(a->sourcetable == NULL);
 	a->sourcetable = sourcetable_new(a->task->host, a->task->port, a->task->tls);
+	a->sourcetable->priority = a->priority;
 
 	if (ntrip_task_start(a->task, a, NULL, 0) < 0) {
 		sourcetable_free(a->sourcetable);
