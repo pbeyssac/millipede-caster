@@ -376,7 +376,7 @@ static struct dist_table *dist_table_new(int n, const char *host, unsigned short
 }
 
 static void dist_table_add(struct dist_table *this, double dist, pos_t *pos, char *mountpoint, int on_demand) {
-	int i = ++this->size_dist_array;
+	int i = this->size_dist_array++;
 	this->dist_array[i].dist = dist;
 	this->dist_array[i].pos = *pos;
 	this->dist_array[i].mountpoint = mountpoint;
