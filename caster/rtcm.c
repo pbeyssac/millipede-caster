@@ -351,9 +351,9 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			r = 1;
 			packet_free(not_rtcmp);
 			max_len -= len;
-			if (max_len == 0)
-				return r;
 		}
+		if (max_len == 0)
+			return r;
 
 		unsigned char *mem = evbuffer_pullup(input, 3);
 		if (mem == NULL) {
