@@ -166,11 +166,9 @@ uint64_t getbits(unsigned char *d, int beg, int len) {
 	return r;
 }
 
-/*
- * Get and return a int38 as a long
- */
-static inline long get_int38(unsigned char *d, int beg, int len) {
-	long r = getbits(d, beg, len);
+/* Get a int38 as a uint64_t */
+static inline uint64_t get_int38(unsigned char *d, int beg) {
+	uint64_t r = getbits(d, beg, 38);
 	if (r & (1L<<37)) r |= 0xffffffc000000000;
 	return r;
 }
@@ -180,11 +178,11 @@ static inline long get_int38(unsigned char *d, int beg, int len) {
  */
 static void handle_1005_1006(struct ntrip_state *st, struct rtcm_info *rp, int type, unsigned char *d, int len) {
 	unsigned char *data = d+3;
-	long ecef_x, ecef_y, ecef_z;
+	uint64_t ecef_x, ecef_y, ecef_z;
 
-	ecef_x = get_int38(data, 34, 38);
-	ecef_y = get_int38(data, 74, 38);
-	ecef_z = get_int38(data, 114, 38);
+	ecef_x = get_int38(data, 34);
+	ecef_y = get_int38(data, 74);
+	ecef_z = get_int38(data, 114);
 
 	if (type == 1005) {
 		gettimeofday(&rp->posdate, NULL);
