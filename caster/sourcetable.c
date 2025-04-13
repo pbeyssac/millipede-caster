@@ -423,7 +423,6 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
 	/*
 	 * Prepare the table to be sorted.
 	 */
-	int i = 0;
 
 	struct hash_iterator hi;
 	struct element *e;
@@ -445,7 +444,7 @@ struct dist_table *sourcetable_find_pos(struct sourcetable *this, pos_t *pos) {
 	 * Sort the distance array
 	 * Use i instead of n as the table size, in case they differ.
 	 */
-	qsort(d->dist_array, i, sizeof(struct spos), _cmp_dist);
+	qsort(d->dist_array, d->size_dist_array, sizeof(struct spos), _cmp_dist);
 	return d;
 }
 
