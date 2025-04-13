@@ -135,7 +135,7 @@ static void ecef_to_lat_lon(pos_t *pos, double *palt, long ecef_x, long ecef_y, 
  * Extract a bit field in a RTCM packet.
  * beg and len are counted in bits.
  */
-static inline long getbits(unsigned char *d, int beg, int len) {
+uint64_t getbits(unsigned char *d, int beg, int len) {
 	long r;
 	unsigned char mask;
 
@@ -152,7 +152,7 @@ static inline long getbits(unsigned char *d, int beg, int len) {
 	r = d[offset_first] & mask;
 
 	if (offset_first == offset_last)
-		return r >> (8-beg-len);
+		return r >> ((-beg-len) & 7);
 
 	int offset = offset_first+1;
 

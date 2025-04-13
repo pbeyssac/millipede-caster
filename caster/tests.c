@@ -5,6 +5,7 @@
 
 #include "conf.h"
 #include "ip.h"
+#include "rtcm.h"
 #include "util.h"
 
 static int urldecode_test() {
@@ -112,6 +113,82 @@ static int gga_test() {
 		putchar('.');
 	}
 	putchar('\n');
+	return fail;
+}
+
+static int test_getbits() {
+	puts("getbits");
+	int fail = 0;
+
+	unsigned char data[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+				0xff, 0xff};
+
+	struct gbtest {
+		char beg, len;
+		uint64_t result;
+	};
+	struct gbtest gblist[] = {
+		{0, 24, 0x102}, {1, 23, 0x102}, {2, 22, 0x102}, {3, 21, 0x102},
+		{4, 20, 0x102}, {5, 19, 0x102}, {6, 18, 0x102}, {7, 17, 0x102},
+		{8, 16, 0x102}, {0, 25, 0x204}, {1, 24, 0x204}, {2, 23, 0x204},
+		{3, 22, 0x204}, {4, 21, 0x204}, {5, 20, 0x204}, {6, 19, 0x204},
+		{7, 18, 0x204}, {7, 19, 0x408}, {6, 20, 0x408}, {5, 21, 0x408},
+		{4, 22, 0x408}, {3, 23, 0x408}, {2, 24, 0x408}, {1, 25, 0x408},
+		{0, 26, 0x408},
+		{0, 64, 0x01020304050607},
+		{1, 64, 0x020406080a0c0e},
+		{2, 64, 0x04080c1014181c},
+		{0, 1, 0}, {1, 1, 0}, {2, 1, 0}, {3, 1, 0}, {4, 1, 0}, {5, 1, 0}, {6, 1, 0}, {7, 1, 0},
+		{8, 1, 0}, {9, 1, 0}, {10, 1, 0}, {11, 1, 0}, {12, 1, 0}, {13, 1, 0}, {14, 1, 0}, {15, 1, 1},
+		{16, 1, 0}, {17, 1, 0}, {18, 1, 0}, {19, 1, 0}, {20, 1, 0}, {21, 1, 0}, {22, 1, 1}, {23, 1, 0},
+		{24, 1, 0}, {25, 1, 0}, {26, 1, 0}, {27, 1, 0}, {28, 1, 0}, {29, 1, 0}, {30, 1, 1}, {31, 1, 1},
+		{32, 1, 0}, {33, 1, 0}, {34, 1, 0}, {35, 1, 0}, {36, 1, 0}, {37, 1, 1}, {38, 1, 0}, {39, 1, 0},
+		{40, 1, 0}, {41, 1, 0}, {42, 1, 0}, {43, 1, 0}, {44, 1, 0}, {45, 1, 1}, {46, 1, 0}, {47, 1, 1},
+		{0,0,0}
+	};
+
+	for (struct gbtest *gb = gblist; gb->len; gb++) {
+		uint64_t r = getbits(data, gb->beg, gb->len);
+		if (r == gb->result)
+			putchar('.');
+		else {
+			printf("\nFAIL: getbits(data, %d, %d) returned 0x%016lx vs 0x%016lx\n", gb->beg, gb->len, r, gb->result);
+			fail++;
+		}
+	}
+
+	unsigned char datapattern[16];
+	uint16_t patterns[] = {0x5555, 0x55aa, 0x1122, 0x1234, 0xffff, 0x0303, 0x0f0f, 0x1f1f, 0xff00, 0};
+
+	for (uint16_t *ppat = patterns; *ppat; ppat++) {
+		uint16_t pattern = *ppat;
+		for (int k = 0; k < 16; k++) {
+			if (k & 1)
+				datapattern[k] = pattern;
+			else
+				datapattern[k] = pattern >> 8;
+		}
+		for (int len = 0; len <= 64; len++) {
+			for (int beg = 0; beg < 64; beg++) {
+				uint64_t expect;
+				expect = (pattern << (beg & 0xf)) | (pattern >> (16 - (beg & 0xf)));
+				expect &= 0xffff;
+				expect |= (expect << 16);
+				expect |= (expect << 32);
+				if (len == 0)
+					expect = 0;
+				else
+					expect >>= (64 - len);
+				uint64_t r = getbits(datapattern, beg, len);
+				if (r == expect)
+					putchar('.');
+				else {
+					printf("\nFAIL: getbits(data, %d, %d) returned 0x%016lx vs 0x%016lx\n", beg, len, r, expect);
+					fail++;
+				}
+			}
+		}
+	}
 	return fail;
 }
 
@@ -236,5 +313,6 @@ int main() {
 	fail += b64_test();
 	fail += test_ip_analyze_prefixquota();
 	fail += urldecode_test();
+	fail += test_getbits();
 	return fail != 0;
 }
