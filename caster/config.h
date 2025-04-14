@@ -112,6 +112,18 @@ struct config {
 	float hysteresis_m;
 
 	/*
+	 * Max distance to prune the sourcetable when computing the
+	 * nearest bases.
+	 */
+	float max_nearest_lookup_distance_m;
+
+	/*
+	 * Number of bases to aim for (by adjusting the lookup distance)
+	 * for nearest base computation.
+	 */
+	int nearest_base_count_target;
+
+	/*
 	 * Min & max recompute interval for nearest base, in seconds.
 	 */
 	int			min_nearest_recompute_interval;

@@ -248,16 +248,31 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 		&& distance(&st->last_pos, &st->last_recompute_pos) < st->caster->config->min_nearest_recompute_pos_delta)
 		return;
 
-	struct sourcetable *pos_sourcetable = stack_flatten(st->caster, &st->caster->sourcetablestack);
+	struct sourcetable *pos_sourcetable = stack_flatten_dist(st->caster, &st->caster->sourcetablestack, &st->last_pos, st->lookup_dist);
 	if (pos_sourcetable == NULL)
 		return;
 
+	gettimeofday(&t1, NULL);
+	timersub(&t1, &t0, &t1);
+	ntrip_log(st, LOG_EDEBUG, "stack_flatten_dist %.3f ms", t1.tv_sec*1000+t1.tv_usec/1000.);
 
 	struct dist_table *s = sourcetable_find_pos(pos_sourcetable, &st->last_pos);
 	if (s == NULL) {
 		sourcetable_free(pos_sourcetable);
 		return;
 	}
+
+	float last_lookup_dist = st->lookup_dist;
+
+	if (st->caster->config->nearest_base_count_target > 0) {
+		if (s->size_dist_array < st->caster->config->nearest_base_count_target) {
+			st->lookup_dist *= 2;
+			if (st->lookup_dist > st->caster->config->max_nearest_lookup_distance_m)
+				st->lookup_dist = st->caster->config->max_nearest_lookup_distance_m;
+		} else
+			st->lookup_dist = s->dist_array[st->caster->config->nearest_base_count_target-1].dist + 1000;
+	}
+
 	if (s->size_dist_array == 0) {
 		dist_table_free(s);
 		sourcetable_free(pos_sourcetable);
@@ -267,7 +282,10 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 	st->last_recompute_pos = st->last_pos;
 	st->last_recompute_date = t0;
 
-	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d", st->last_pos.lat, st->last_pos.lon, s->size_dist_array);
+	gettimeofday(&t1, NULL);
+	timersub(&t1, &t0, &t1);
+
+	ntrip_log(st, LOG_DEBUG, "GGAOK pos (%f, %f) list of %d lookup dist %.3f km, %.3f ms", st->last_pos.lat, st->last_pos.lon, s->size_dist_array, last_lookup_dist/1000, t1.tv_sec*1000+t1.tv_usec/1000.);
 	dist_table_display(st, s, 10);
 
 	if (s->dist_array[0].dist > st->max_min_dist) {

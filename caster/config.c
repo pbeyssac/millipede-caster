@@ -28,6 +28,8 @@ int backlog_delay = 60;
 
 static struct config default_config = {
 	.hysteresis_m = 500,
+	.max_nearest_lookup_distance_m = 1000000,
+	.nearest_base_count_target = 10,
 	.min_nearest_recompute_interval = 10,
 	.max_nearest_recompute_interval = 120,
 	.min_nearest_recompute_pos_delta = 10,
@@ -248,6 +250,10 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 		struct config, bind, &bind_schema, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_FLOAT(
 		"hysteresis_m", CYAML_FLAG_DEFAULT|CYAML_FLAG_OPTIONAL, struct config, hysteresis_m),
+	CYAML_FIELD_FLOAT(
+		"max_nearest_lookup_distance_m", CYAML_FLAG_DEFAULT|CYAML_FLAG_OPTIONAL, struct config, max_nearest_lookup_distance_m),
+	CYAML_FIELD_INT(
+		"nearest_base_count_target", CYAML_FLAG_DEFAULT|CYAML_FLAG_OPTIONAL, struct config, nearest_base_count_target),
 	CYAML_FIELD_SEQUENCE(
 		"proxy", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, proxy, &proxy_schema, 0, CYAML_UNLIMITED),
@@ -344,6 +350,8 @@ struct config *config_parse(const char *filename) {
 #define	DEFAULT_ASSIGN(this, field)	{if (!(this)->field) {(this)->field = default_config.field;}}
 
 	DEFAULT_ASSIGN(this, hysteresis_m);
+	DEFAULT_ASSIGN(this, max_nearest_lookup_distance_m);
+	DEFAULT_ASSIGN(this, nearest_base_count_target);
 	DEFAULT_ASSIGN(this, min_nearest_recompute_interval);
 	DEFAULT_ASSIGN(this, max_nearest_recompute_interval);
 	DEFAULT_ASSIGN(this, min_nearest_recompute_pos_delta);

@@ -58,6 +58,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->last_pos_valid = 0;
 	memset(&this->last_recompute_date, 0, sizeof(this->last_recompute_date));
 	this->max_min_dist = 0;
+	this->lookup_dist = caster->config->max_nearest_lookup_distance_m;
 	this->user = NULL;
 	this->password = NULL;
 	this->scheme_basic = 0;

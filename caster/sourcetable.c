@@ -610,8 +610,9 @@ void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack,
 
 /*
  * Return an aggregated sourcetable as computed from our sourcetable stack.
+ * If pos is not NULL, prune entries over max_dist of pos.
  */
-struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack_t *this) {
+struct sourcetable *stack_flatten_dist(struct caster_state *caster, sourcetable_stack_t *this, pos_t *pos, float max_dist) {
 	struct sourcetable *s;
 	char *header = mystrdup("");
 	struct hash_iterator hi;
@@ -663,15 +664,17 @@ struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack
 			if (e == NULL) {
 				/*
 				 * Entry not found, meaning it has the highest priority:
-				 * add it.
+				 * add it if within maximum distance.
 				 */
-				mp = sourceline_copy(sp);
-				if (mp == NULL) {
-					P_RWLOCK_UNLOCK(&s->lock);
-					P_RWLOCK_UNLOCK(&this->lock);
-					goto cancel;
+				if (!pos || distance(&sp->pos, pos) < max_dist) {
+					mp = sourceline_copy(sp);
+					if (mp == NULL) {
+						P_RWLOCK_UNLOCK(&s->lock);
+						P_RWLOCK_UNLOCK(&this->lock);
+						goto cancel;
+					}
+					_sourcetable_add_direct(r, mp);
 				}
-				_sourcetable_add_direct(r, mp);
 			}
 		}
 
@@ -685,6 +688,13 @@ cancel:
 	strfree(header);
 	if (r) sourcetable_free(r);
 	return NULL;
+}
+
+/*
+ * Return an aggregated sourcetable as computed from our sourcetable stack
+ */
+struct sourcetable *stack_flatten(struct caster_state *caster, sourcetable_stack_t *this) {
+	return stack_flatten_dist(caster, this, NULL, 0);
 }
 
 /*
