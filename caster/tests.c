@@ -192,6 +192,63 @@ static int test_getbits() {
 	return fail;
 }
 
+static int test_rtcm_typeset_parse() {
+	puts("test_rtcm_typeset_parse");
+	struct rtcm_typeset tmp;
+	int fail = 0;
+
+	struct test {
+		const char *parse, *expect;
+	};
+
+	struct test testlist[] = {
+		{"", NULL},
+		{"0", NULL},
+		{"-1", NULL},
+		{"999", NULL},
+		{"99999", NULL},
+		{"1231", NULL},
+		{"3999", NULL},
+		{"4096", NULL},
+		{",", NULL},
+		{"1000,", NULL},
+		{"999,1000", NULL},
+		{"1000,999", NULL},
+		{"1000", "1000"},
+		{"1020", "1020"},
+		{"4000", "4000"},
+		{"4095", "4095"},
+		{"1020,1010", "1010,1020"},
+		{"1230", "1230"},
+		{NULL, NULL}
+	};
+	for (struct test *tl = testlist; tl->parse; tl++) {
+		int r = rtcm_typeset_parse(&tmp, tl->parse);
+		if (r < 0) {
+			if (tl->expect == NULL)
+				putchar('.');
+			else {
+				printf("\nFAIL: rtcm_typeset_parse(%s) returned %d instead of %s\n", tl->parse, r, tl->expect);
+				fail++;
+			}
+		} else if (r >= 0 && tl->expect == NULL) {
+			printf("\nFAIL: rtcm_typeset_parse(%s) returned %d instead of -1\n", tl->parse, r);
+			fail++;
+		} else {
+			char *rstr = rtcm_typeset_str(&tmp);
+			if (!strcmp(rstr, tl->expect))
+				putchar('.');
+			else {
+				printf("\nFAIL: rtcm_typeset_str(%s) returned %s instead of %s\n", tl->parse, rstr, tl->expect);
+				fail++;
+			}
+			free(rstr);
+		}
+	}
+	putchar('\n');
+	return fail;
+}
+
 static int test_ip_analyze_prefixquota() {
 	puts("prefix_quota_parse");
 	int fail = 0;
@@ -314,5 +371,6 @@ int main() {
 	fail += test_ip_analyze_prefixquota();
 	fail += urldecode_test();
 	fail += test_getbits();
+	fail += test_rtcm_typeset_parse();
 	return fail != 0;
 }

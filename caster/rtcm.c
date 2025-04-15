@@ -12,6 +12,97 @@
  * RTCM handling module.
  */
 
+static inline void rtcm_typeset_init(struct rtcm_typeset *this) {
+	memset(this->set1k, 0, sizeof this->set1k);
+	memset(this->set4k, 0, sizeof this->set4k);
+}
+
+/*
+ * Return a type bit in the type bitfields.
+ */
+static inline int rtcm_typeset_check(struct rtcm_typeset *this, int type) {
+	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
+		return this->set1k[(type-RTCM_1K_MIN)>>3] & (1<<((type-RTCM_1K_MIN)&7));
+	if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
+		return this->set4k[(type-RTCM_4K_MIN)>>3] & (1<<((type-RTCM_4K_MIN)&7));
+	return 0;
+}
+
+/*
+ * Set a type bit in the type bitfields.
+ */
+static inline int rtcm_typeset_set(struct rtcm_typeset *this, int type) {
+	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX) {
+		this->set1k[(type-RTCM_1K_MIN)>>3] |= (1<<(type&7));
+		return 0;
+	} else if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX) {
+		this->set4k[(type-RTCM_4K_MIN)>>3] |= (1<<(type&7));
+		return 0;
+	}
+	return -1;
+}
+
+int rtcm_typeset_parse(struct rtcm_typeset *this, const char *typelist) {
+	char typestr[5];
+	int type;
+	struct rtcm_typeset t;
+
+	rtcm_typeset_init(&t);
+
+	int len = 0;
+	do {
+		if (*typelist == ',' || *typelist == '\0') {
+			typestr[len] = '\0';
+			if (sscanf(typestr, "%d", &type) != 1)
+				return -1;
+			if (rtcm_typeset_set(&t, type) < 0)
+				return -1;
+			len = 0;
+		} else if (len < sizeof(typestr)-1)
+			typestr[len++] = *typelist;
+	} while (*typelist++);
+
+	*this = t;
+	return 0;
+}
+
+/*
+ * Return a string list of marked RTCM types, separated by ',',
+ * ended by '\0'
+ */
+char *rtcm_typeset_str(struct rtcm_typeset *this) {
+	int n = 0;
+	for (int i = RTCM_1K_MIN; i <= RTCM_1K_MAX; i++)
+		if (rtcm_typeset_check(this, i))
+			n++;
+	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
+		if (rtcm_typeset_check(this, i))
+			n++;
+	if (n == 0)
+		return NULL;
+
+	// 4 digits + ',' per entry or '\0' after the last,
+	// + 1 for the extra '\0' stored by snprintf.
+	char *r = (char *)strmalloc(n*5+1);
+	if (r == NULL)
+		return NULL;
+
+	char *rp = r;
+	for (int i = RTCM_1K_MIN; i <= RTCM_1K_MAX; i++)
+		if (rtcm_typeset_check(this, i)) {
+			snprintf(rp, 6, "%d,", i);
+			rp += 5;
+		}
+	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
+		if (rtcm_typeset_check(this, i)) {
+			snprintf(rp, 6, "%d,", i);
+			rp += 5;
+		}
+	// stomp over the last ','
+	rp[-1] = '\0';
+	return r;
+}
+
 static unsigned long crc24q[] = {
     0x00000000, 0x01864CFB, 0x028AD50D, 0x030C99F6,
     0x0493E6E1, 0x0515AA1A, 0x061933EC, 0x079F7F17,
@@ -202,8 +293,7 @@ struct rtcm_info *rtcm_info_new() {
 	struct rtcm_info *this = (struct rtcm_info *)malloc(sizeof(struct rtcm_info));
 	if (this == NULL)
 		return NULL;
-	memset(this->types1k, 0, sizeof this->types1k);
-	memset(this->types4k, 0, sizeof this->types4k);
+	rtcm_typeset_init(&this->typeset);
 	return this;
 }
 
@@ -218,76 +308,18 @@ static void handle_1006(struct ntrip_state *st, struct rtcm_info *rp, unsigned c
 }
 
 /*
- * Return a type bit in the type bitfields.
- */
-static inline int rtcm_info_check_type(struct rtcm_info *this, int type) {
-	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
-		return this->types1k[(type-RTCM_1K_MIN)>>3] & (1<<((type-RTCM_1K_MIN)&7));
-	if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
-		return this->types4k[(type-RTCM_4K_MIN)>>3] & (1<<((type-RTCM_4K_MIN)&7));
-	return 0;
-}
-
-/*
- * Set a type bit in the type bitfields.
- */
-static inline void rtcm_info_set_type(struct rtcm_info *this, int type) {
-	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
-		this->types1k[(type-RTCM_1K_MIN)>>3] |= (1<<(type&7));
-	else if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
-		this->types4k[(type-RTCM_4K_MIN)>>3] |= (1<<(type&7));
-}
-
-/*
- * Return a string list of marked RTCM types, separated by ',',
- * ended by '\0'
- */
-static char *rtcm_info_types(struct rtcm_info *this) {
-	int n = 0;
-	for (int i = RTCM_1K_MIN; i <= RTCM_1K_MAX; i++)
-		if (rtcm_info_check_type(this, i))
-			n++;
-	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
-		if (rtcm_info_check_type(this, i))
-			n++;
-	if (n == 0)
-		return NULL;
-
-	// 4 digits + ',' per entry or '\0' after the last,
-	// + 1 for the extra '\0' stored by snprintf.
-	char *r = (char *)strmalloc(n*5+1);
-	if (r == NULL)
-		return NULL;
-
-	char *rp = r;
-	for (int i = RTCM_1K_MIN; i <= RTCM_1K_MAX; i++)
-		if (rtcm_info_check_type(this, i)) {
-			snprintf(rp, 6, "%d,", i);
-			rp += 5;
-		}
-	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
-		if (rtcm_info_check_type(this, i)) {
-			snprintf(rp, 6, "%d,", i);
-			rp += 5;
-		}
-	// stomp over the last ','
-	rp[-1] = '\0';
-	return r;
-}
-
-/*
  * Return the RTCM cache as a JSON object.
  */
 json_object *rtcm_info_json(struct rtcm_info *this) {
 	json_object *j = json_object_new_object();
-	char *types = rtcm_info_types(this);
+	char *types = rtcm_typeset_str(&this->typeset);
 	if (types) {
 		json_object_object_add_ex(j, "types", json_object_new_string(types), JSON_C_CONSTANT_NEW);
 	} else {
 		json_object_object_add_ex(j, "types", json_object_new_null(), JSON_C_CONSTANT_NEW);
 	}
 	strfree(types);
-	if (rtcm_info_check_type(this, 1005) || rtcm_info_check_type(this, 1006)) {
+	if (rtcm_typeset_check(&this->typeset, 1005) || rtcm_typeset_check(&this->typeset, 1006)) {
 		pos_t pos;
 		double alt;
 		json_object *jpos = json_object_new_object();
@@ -314,7 +346,7 @@ static void rtcm_handler(struct ntrip_state *st, unsigned char *d, int len, stru
 	if (!rp)
 		return;
 
-	rtcm_info_set_type(rp, type);
+	rtcm_typeset_set(&rp->typeset, type);
 
 	if (type == 1005 && len == 25)
 		handle_1005_1006(st, rp, 1005, d, len);
