@@ -433,13 +433,44 @@ struct config *config_parse(const char *filename) {
  * cyaml_free() crashes if we let it do the job, possibly because of structure field order.
  */
 void config_free(struct config *this) {
-	for (int i = 0; i < this->bind_count; i++)
+	for (int i = 0; i < this->bind_count; i++) {
 		free(this->bind[i].ip);
+		free((char *)this->bind[i].hostname);
+		free((char *)this->bind[i].tls_full_certificate_chain);
+		free((char *)this->bind[i].tls_private_key);
+	}
 	free(this->bind);
 
 	for (int i = 0; i < this->proxy_count; i++)
 		free(this->proxy[i].host);
 	free(this->proxy);
+
+	for (int i = 0; i < this->webroots_count; i++) {
+		free((char *)this->webroots[i].path);
+		free((char *)this->webroots[i].uri);
+	}
+	free(this->webroots);
+
+	for (int i = 0; i < this->node_count; i++) {
+		free((char *)this->node[i].host);
+		free((char *)this->node[i].authorization);
+	}
+	free(this->node);
+
+	for (int i = 0; i < this->endpoint_count; i++) {
+		free((char *)this->endpoint[i].ip);
+		free((char *)this->endpoint[i].host);
+	}
+	free(this->endpoint);
+
+	for (int i = 0; i < this->graylog_count; i++) {
+		free((char *)this->graylog[i].host);
+		free((char *)this->graylog[i].uri);
+		free((char *)this->graylog[i].authorization);
+		free((char *)this->graylog[i].drainfilename);
+	}
+	free(this->graylog);
+
 	free(this->threads);
 
 	free((char *)this->host_auth_filename);
