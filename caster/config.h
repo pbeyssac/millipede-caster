@@ -10,7 +10,7 @@
  */
 
 struct config_bind {
-	char *ip;
+	const char *ip;
 	unsigned short port;
 	/*
 	 * Size of listen queue
@@ -18,16 +18,16 @@ struct config_bind {
 	 */
 	int queue_size;
 	int tls;
-	char *tls_full_certificate_chain;
-	char *tls_private_key;
-	char *hostname;
+	const char *tls_full_certificate_chain;
+	const char *tls_private_key;
+	const char *hostname;
 };
 
 struct config_proxy {
 	/*
 	 * Destination host and port to proxy.
 	 */
-	char *host;
+	const char *host;
 	unsigned short port;
 
 	/*
@@ -48,9 +48,9 @@ struct config_node {
 	/*
 	 * Destination host and port
 	 */
-	char *host;
+	const char *host;
 	unsigned short port;
-	char *authorization;
+	const char *authorization;
 	int tls;
 
 	/* Maximum queue size for memory backlog */
@@ -60,8 +60,8 @@ struct config_node {
 };
 
 struct config_endpoint {
-	char *ip;
-	char *host;
+	const char *ip;
+	const char *host;
 	unsigned short port;
 	int tls;
 };
@@ -70,7 +70,7 @@ struct config_graylog {
 	/*
 	 * Configuration for a graylog server
 	 */
-	char *host;
+	const char *host;
 	unsigned short port;
 
 	/* URI on the server */
@@ -80,7 +80,7 @@ struct config_graylog {
 	int log_level;
 
 	/* Token for Authorization: HTTP header */
-	char *authorization;
+	const char *authorization;
 
 	/* How many seconds to wait before restarting a failed connection */
 	int retry_delay;
@@ -92,7 +92,7 @@ struct config_graylog {
 	size_t queue_max_size;
 
 	/* File template (see strftime(3)) for overflow files */
-	char *drainfilename;
+	const char *drainfilename;
 };
 
 struct config_threads {
@@ -262,7 +262,7 @@ struct config {
 	int webroots_count;
 
 	/* Auth key for incoming syncer API connections */
-	char *syncer_auth;
+	const char *syncer_auth;
 };
 
 extern int backlog_delay;

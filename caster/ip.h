@@ -46,7 +46,7 @@ char *ip_str_port(union sock *sa, char *dest, int size_dest);
 unsigned short ip_port(union sock *sa);
 int ip_cmp(union sock *s1, union sock *s2);
 
-int ip_convert(char *ipstr, union sock *sock);
+int ip_convert(const char *ipstr, union sock *sock);
 struct prefix_quota *prefix_quota_parse(char *ip_prefix, const char *quota_str);
 char *prefix_quota_str(struct prefix_quota *ppq);
 int prefix_table_get_quota(struct prefix_table *this, union sock *addr);

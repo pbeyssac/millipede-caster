@@ -434,7 +434,7 @@ struct config *config_parse(const char *filename) {
  */
 void config_free(struct config *this) {
 	for (int i = 0; i < this->bind_count; i++) {
-		free(this->bind[i].ip);
+		free((char *)this->bind[i].ip);
 		free((char *)this->bind[i].hostname);
 		free((char *)this->bind[i].tls_full_certificate_chain);
 		free((char *)this->bind[i].tls_private_key);
@@ -442,7 +442,7 @@ void config_free(struct config *this) {
 	free(this->bind);
 
 	for (int i = 0; i < this->proxy_count; i++)
-		free(this->proxy[i].host);
+		free((char *)this->proxy[i].host);
 	free(this->proxy);
 
 	for (int i = 0; i < this->webroots_count; i++) {

@@ -464,7 +464,7 @@ void caster_free(struct caster_state *this) {
 /*
  * Load TLS certificates from file paths.
  */
-static int listener_load_certs(struct listener *this, char *tls_full_certificate_chain, char *tls_private_key) {
+static int listener_load_certs(struct listener *this, const char *tls_full_certificate_chain, const char *tls_private_key) {
 	if (SSL_CTX_use_certificate_chain_file(this->ssl_server_ctx, tls_full_certificate_chain) <= 0)
 		return -1;
 	if (SSL_CTX_use_PrivateKey_file(this->ssl_server_ctx, tls_private_key, SSL_FILETYPE_PEM) <= 0)

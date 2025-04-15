@@ -89,7 +89,7 @@ int ip_cmp(union sock *s1, union sock *s2) {
 /*
  * Convert a v6 or v4 IP address from a string to a union sock.
  */
-int ip_convert(char *ipstr, union sock *sock) {
+int ip_convert(const char *ipstr, union sock *sock) {
 	int r;
 	memset(sock, 0, sizeof(union sock));
 	r = inet_pton(AF_INET6, ipstr, &sock->v6.sin6_addr);
