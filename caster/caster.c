@@ -322,27 +322,6 @@ static void caster_free_listeners(struct caster_state *this) {
 	this->listeners_count = 0;
 }
 
-static int caster_start_graylog(struct caster_state *this) {
-	if (this->config->graylog_count != 1)
-		return 0;
-	this->graylog = (struct graylog_sender **)malloc(sizeof(struct graylog_sender *)*this->config->graylog_count);
-	this->graylog_count = this->config->graylog_count;
-	for (int i = 0; i < this->config->graylog_count; i++) {
-		this->graylog[i] = graylog_sender_new(this,
-			this->config->graylog[i].host,
-			this->config->graylog[i].port,
-			this->config->graylog[i].uri,
-			this->config->graylog[i].tls,
-			this->config->graylog[i].retry_delay,
-			this->config->graylog[i].bulk_max_size,
-			this->config->graylog[i].queue_max_size,
-			this->config->graylog[i].authorization,
-			this->config->graylog[i].drainfilename);
-		graylog_sender_start(this->graylog[i], 0);
-	}
-	return 0;
-}
-
 static int caster_start_syncers(struct caster_state *this) {
 	if (this->config->node_count == 0) {
 		this->syncers_count = 0;
@@ -383,9 +362,21 @@ static void caster_free_graylog(struct caster_state *this) {
 }
 
 static int caster_reload_graylog(struct caster_state *this) {
-	if (this->graylog_count == 1 && this->config->graylog_count == 1) {
-		int i = 0;
-		return graylog_sender_reload(this->graylog[i],
+	int r = 0;
+	int i;
+
+	/* The log system is currently hardocoded for graylog_count == 0 or 1 */
+
+	struct graylog_sender **new_graylog = NULL;
+
+	if (this->config->graylog_count) {
+		new_graylog = (struct graylog_sender **)malloc(sizeof(struct graylog_sender *)*this->config->graylog_count);
+		if (new_graylog == NULL)
+			return -1;
+	}
+
+	for (i = 0; i < this->config->graylog_count; i++) {
+		new_graylog[i] = graylog_sender_new(this,
 			this->config->graylog[i].host,
 			this->config->graylog[i].port,
 			this->config->graylog[i].uri,
@@ -395,10 +386,22 @@ static int caster_reload_graylog(struct caster_state *this) {
 			this->config->graylog[i].queue_max_size,
 			this->config->graylog[i].authorization,
 			this->config->graylog[i].drainfilename);
+		if (!new_graylog[i]) {
+			r = -1;
+			break;
+		}
+		graylog_sender_start(new_graylog[i], 0);
+	}
+	if (r == -1) {
+		for (int j = 0; i < j; j++)
+			graylog_sender_free(new_graylog[j]);
+		free(new_graylog);
 	} else {
 		caster_free_graylog(this);
-		return caster_start_graylog(this);
+		this->graylog = new_graylog;
+		this->graylog_count = this->config->graylog_count;
 	}
+	return r;
 }
 
 void caster_free(struct caster_state *this) {
@@ -1032,7 +1035,7 @@ int caster_main(char *config_file) {
 	}
 
 	caster_reload_fetchers(caster);
-	caster_start_graylog(caster);
+	caster_reload_graylog(caster);
 	caster_start_syncers(caster);
 
 	event_base_dispatch(caster->base);

@@ -16,9 +16,6 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	int retry_delay, int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename);
 void graylog_sender_free(struct graylog_sender *this);
 void graylog_sender_stop(struct graylog_sender *this);
-int graylog_sender_reload(struct graylog_sender *this,
-	const char *host, unsigned short port, const char *uri, int tls,
-	int retry_delay, int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename);
 void graylog_sender_start(void *arg_cb, int n);
 
 #endif

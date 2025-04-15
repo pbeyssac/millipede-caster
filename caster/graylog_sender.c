@@ -87,22 +87,6 @@ void graylog_sender_free(struct graylog_sender *this) {
 }
 
 /*
- * Reload fetcher, possibly modifying the refresh_delay and priority.
- */
-int graylog_sender_reload(struct graylog_sender *this,
-	const char *host, unsigned short port, const char *uri, int tls,
-	int retry_delay, int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename) {
-
-	ntrip_task_reload(this->task, host, port, uri, tls, retry_delay, bulk_max_size, queue_max_size, drainfilename);
-
-	evhttp_clear_headers(&this->task->headers);
-	evhttp_add_header(&this->task->headers, "Authorization", authkey);
-
-	graylog_sender_start(this, 0);
-	return 0;
-}
-
-/*
  * Start a graylog sender.
  */
 void
