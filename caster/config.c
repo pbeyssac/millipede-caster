@@ -347,7 +347,8 @@ struct config *config_parse(const char *filename) {
 		return NULL;
 	}
 
-#define	DEFAULT_ASSIGN(this, field)	{if (!(this)->field) {(this)->field = default_config.field;}}
+#define	DEFAULT_ASSIGN(this, field)		{if (!(this)->field) {(this)->field = default_config.field;}}
+#define	DEFAULT_ASSIGN_ARRAY(this, i, struct1, struct2, field)	{if (!(this)->struct1[i].field) {(this)->struct1[i].field = struct2.field;}}
 
 	DEFAULT_ASSIGN(this, hysteresis_m);
 	DEFAULT_ASSIGN(this, max_nearest_lookup_distance_m);
@@ -382,44 +383,31 @@ struct config *config_parse(const char *filename) {
 	this->zero_copy = !this->disable_zero_copy;
 
 	for (int i = 0; i < this->proxy_count; i++) {
-		if (this->proxy[i].table_refresh_delay == 0)
-			this->proxy[i].table_refresh_delay = default_config_proxy.table_refresh_delay;
-		if (this->proxy[i].port == 0)
-			this->proxy[i].port = default_config_proxy.port;
-		if (this->proxy[i].priority == 0)
-			this->proxy[i].priority = default_config_proxy.priority;
+		DEFAULT_ASSIGN_ARRAY(this, i, proxy, default_config_proxy, table_refresh_delay);
+		DEFAULT_ASSIGN_ARRAY(this, i, proxy, default_config_proxy, port);
+		DEFAULT_ASSIGN_ARRAY(this, i, proxy, default_config_proxy, priority);
 	}
 
 	for (int i = 0; i < this->node_count; i++) {
-		if (this->node[i].port == 0)
-			this->node[i].port = default_config_node.port;
-		if (this->node[i].queue_max_size == 0)
-			this->node[i].queue_max_size = default_config_node.queue_max_size;
-		if (this->node[i].retry_delay == 0)
-			this->node[i].retry_delay = default_config_node.retry_delay;
+		DEFAULT_ASSIGN_ARRAY(this, i, node, default_config_node, port);
+		DEFAULT_ASSIGN_ARRAY(this, i, node, default_config_node, queue_max_size);
+		DEFAULT_ASSIGN_ARRAY(this, i, node, default_config_node, retry_delay);
 	}
 
 	for (int i = 0; i < this->endpoint_count; i++) {
-		if (this->endpoint[i].port == 0)
-			this->endpoint[i].port = default_config_endpoint.port;
+		DEFAULT_ASSIGN_ARRAY(this, i, endpoint, default_config_endpoint, port);
 	}
 
 	for (int i = 0; i < this->graylog_count; i++) {
-		if (this->graylog[i].retry_delay == 0)
-			this->graylog[i].retry_delay = default_config_graylog.retry_delay;
-		if (this->graylog[i].port == 0)
-			this->graylog[i].port = default_config_graylog.port;
-		if (this->graylog[i].bulk_max_size == 0)
-			this->graylog[i].bulk_max_size = default_config_graylog.bulk_max_size;
-		if (this->graylog[i].queue_max_size == 0)
-			this->graylog[i].queue_max_size = default_config_graylog.queue_max_size;
+		DEFAULT_ASSIGN_ARRAY(this, i, graylog, default_config_graylog, retry_delay);
+		DEFAULT_ASSIGN_ARRAY(this, i, graylog, default_config_graylog, port);
+		DEFAULT_ASSIGN_ARRAY(this, i, graylog, default_config_graylog, bulk_max_size);
+		DEFAULT_ASSIGN_ARRAY(this, i, graylog, default_config_graylog, queue_max_size);
 	}
 
 	for (int i = 0; i < this->bind_count; i++) {
-		if (this->bind[i].port == 0)
-			this->bind[i].port = default_config_bind.port;
-		if (this->bind[i].queue_size == 0)
-			this->bind[i].queue_size = default_config_bind.queue_size;
+		DEFAULT_ASSIGN_ARRAY(this, i, bind, default_config_bind, port);
+		DEFAULT_ASSIGN_ARRAY(this, i, bind, default_config_bind, queue_size);
 	}
 
 	if (this->threads_count == 0) {
