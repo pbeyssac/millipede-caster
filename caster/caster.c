@@ -190,7 +190,7 @@ json_object *caster_endpoints_json(struct caster_state *caster) {
 }
 
 static struct caster_state *
-caster_new(struct config *config, const char *config_file) {
+caster_new(const char *config_file) {
 	int err = 0;
 	struct caster_state *this = (struct caster_state *)calloc(1, sizeof(struct caster_state));
 	if (this == NULL)
@@ -244,8 +244,8 @@ caster_new(struct config *config, const char *config_file) {
 
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
-	this->config = config;
-	this->endpoints_json = caster_endpoints_json(this);
+	this->config = NULL;
+	this->endpoints_json = NULL;
 	this->config_file = config_file;
 
 	char *abs_config_path = realpath(config_file, NULL);
@@ -269,8 +269,9 @@ caster_new(struct config *config, const char *config_file) {
 	if (this->config_dir) chdir(this->config_dir);
 
 	this->joblist = threads ? joblist_new(this) : NULL;
-	int r1 = log_init(&this->flog, this->config->log, &caster_log_cb, this);
-	int r2 = log_init(&this->alog, this->config->access_log, &caster_alog, this);
+
+	int r1 = log_init(&this->flog, NULL, &caster_log_cb, this);
+	int r2 = log_init(&this->alog, NULL, &caster_alog, this);
 
 	this->graylog = NULL;
 	this->graylog_count = 0;
@@ -452,8 +453,10 @@ void caster_free(struct caster_state *this) {
 	log_free(&this->flog);
 	log_free(&this->alog);
 	strfree(this->config_dir);
-	json_object_put(this->endpoints_json);
-	config_free(this->config);
+	if (this->endpoints_json)
+		json_object_put(this->endpoints_json);
+	if (this->config)
+		config_free(this->config);
 	libevent_global_shutdown();
 	free(this);
 }
@@ -752,7 +755,8 @@ static int caster_reload_config(struct caster_state *this) {
 		logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s", this->config_file);
 		return -1;
 	}
-	config_free(this->config);
+	if (this->config)
+		config_free(this->config);
 	this->config = config;
 	json_object_put(this->endpoints_json);
 	this->endpoints_json = caster_endpoints_json(this);
@@ -866,6 +870,8 @@ int caster_reload(struct caster_state *this) {
 	int r = 0;
 	if (caster_reload_config(this) < 0)
 		r = -1;
+	if (caster_chdir_reload(this, 1) < 0)
+		r = -1;
 	if (caster_reload_listeners(this) < 0)
 		r = -1;
 	if (caster_reload_fetchers(this) < 0)
@@ -873,8 +879,6 @@ int caster_reload(struct caster_state *this) {
 	if (caster_reload_graylog(this) < 0)
 		r = -1;
 	if (caster_reload_syncers(this) < 0)
-		r = -1;
-	if (caster_chdir_reload(this, 1) < 0)
 		r = -1;
 	return r;
 }
@@ -1003,22 +1007,13 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	struct config *config = config_parse(config_file);
-
-	if (!config) {
-		fprintf(stderr, "Can't parse configuration from %s\n", config_file);
-		return 1;
-	}
-
-	caster = caster_new(config, config_file);
+	caster = caster_new(config_file);
 	if (!caster) {
 		fprintf(stderr, "Can't allocate caster\n");
 		return 1;
 	}
 
-	caster_chdir_reload(caster, 0);
-
-	if (caster_reload_listeners(caster) < 0) {
+	if (caster_reload(caster) < 0) {
 		caster_free(caster);
 		return 1;
 	}
@@ -1033,10 +1028,6 @@ int caster_main(char *config_file) {
 		caster_free(caster);
 		return 1;
 	}
-
-	caster_reload_fetchers(caster);
-	caster_reload_graylog(caster);
-	caster_start_syncers(caster);
 
 	event_base_dispatch(caster->base);
 

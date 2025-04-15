@@ -10,7 +10,11 @@ int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg)
 	P_RWLOCK_INIT(&this->lock, NULL);
 	this->log_cb = log_cb;
 	this->state = arg;
-	this->logfile = fopen(filename, "a+");
+
+	if (filename)
+		this->logfile = fopen(filename, "a+");
+	else
+		this->logfile = stderr;
 	if (!this->logfile) {
 		fprintf(stderr, "Can't open log file %s: %s\n", filename, strerror(errno));
 		return -1;
