@@ -51,7 +51,6 @@
 
 static void caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
 static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
-static int caster_start_fetchers(struct caster_state *this);
 static int caster_reload_fetchers(struct caster_state *this);
 static void caster_free_fetchers(struct caster_state *this);
 static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *sa, int socklen, void *arg);
@@ -912,38 +911,15 @@ static int caster_set_signals(struct caster_state *this) {
 }
 
 /*
- * Start sourcetable fetchers (proxy)
+ * Start/reload sourcetable fetchers (proxy)
  */
-static int caster_start_fetchers(struct caster_state *this) {
-	if (!this->config->proxy_count)
-		return 0;
-
-	struct sourcetable_fetch_args **fetchers = (struct sourcetable_fetch_args **)malloc(sizeof(struct sourcetable_fetch_args *)*this->config->proxy_count);
-
-	this->sourcetable_fetchers = fetchers;
-	this->sourcetable_fetchers_count = this->config->proxy_count;
-
-	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
-		fetchers[i] = fetcher_sourcetable_new(this,
-			this->config->proxy[i].host,
-			this->config->proxy[i].port,
-			this->config->proxy[i].tls,
-			this->config->proxy[i].table_refresh_delay,
-			this->config->proxy[i].priority);
-		if (fetchers[i])
-			fetcher_sourcetable_start(fetchers[i], 0);
-	}
-
-	return 0;
-}
-
 static int caster_reload_fetchers(struct caster_state *this) {
 	int r = 0;
-	if (!this->config->proxy_count) {
-		caster_free_fetchers(this);
-		return 0;
-	}
-	struct sourcetable_fetch_args **new_fetchers = (struct sourcetable_fetch_args **)malloc(sizeof(struct sourcetable_fetch_args *)*this->config->proxy_count);
+	struct sourcetable_fetch_args **new_fetchers;
+	if (this->config->proxy_count)
+		new_fetchers = (struct sourcetable_fetch_args **)malloc(sizeof(struct sourcetable_fetch_args *)*this->config->proxy_count);
+	else
+		new_fetchers = NULL;
 
 	/*
 	 * For each entry in the new config, recycle a similar entry in the old configuration.
@@ -1055,7 +1031,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	caster_start_fetchers(caster);
+	caster_reload_fetchers(caster);
 	caster_start_graylog(caster);
 	caster_start_syncers(caster);
 
