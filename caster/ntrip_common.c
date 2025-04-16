@@ -108,6 +108,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->query_string = NULL;
 	this->content_type = NULL;
 	this->client = 0;
+	this->rtcm_filter = 0;
 	return this;
 }
 

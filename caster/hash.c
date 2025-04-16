@@ -110,6 +110,16 @@ void hash_table_replace(struct hash_table *this, struct element *e, void *value)
 }
 
 /*
+ * Update a hash table with keys and values from another.
+ */
+void hash_table_update(struct hash_table *this, struct hash_table *updates) {
+	struct hash_iterator hi;
+	struct element *e;
+	HASH_FOREACH(e, updates, hi)
+		hash_table_add(this, e->key, e->value);
+}
+
+/*
  * Insert an element.
  */
 int hash_table_add(struct hash_table *this, const char *key, void *value) {

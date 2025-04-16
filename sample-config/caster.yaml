@@ -102,6 +102,27 @@ log_level:		INFO
 #
 hysteresis_m:		500.0
 
+#
+# Sample RTCM filter configuration
+#
+# Currently limited to 1 filter with 1 conversion.
+#
+# apply		mountpoint to apply to
+# pass		list of RTCM types to pass through
+# convert section
+#	types		list of RTCM types to convert
+#	conversion	type of conversion, msm7_3 or msm7_4
+#		msm7_4 = convert MSM7 packets to MSM4
+#		msm7_3 = convert MSM7 packets to MSM3
+#
+# rtcm_filter:
+#    - apply:		NEAR4
+#      pass:		1005,1006,1008,1019,1020,1032,1033,1042,1046,1074,1084,1094,1124,1230
+#      convert:
+#        - types:	1077,1087,1097,1107,1117,1127
+#          conversion:	msm7_4
+#
+
 # default size set for sending buffers (SO_SNDBUF), 112 KB
 # currently for all client sockets.
 backlog_socket: 114688

@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "log.h"
+#include "rtcm.h"
 
 /*
  * Caster configuration structures.
@@ -103,6 +104,18 @@ struct config_threads {
 struct config_webroots {
 	const char *path;
 	const char *uri;
+};
+
+struct config_rtcm_convert {
+	const char *types;			// ','-separated list of RTCM types to convert
+	enum rtcm_conversion conversion;	// conversion to apply
+};
+
+struct config_rtcm_filter {
+	const char *apply;	// ','-separated list of mountpoints
+	const char *pass;	// ','-separated list of RTCM types
+	struct config_rtcm_convert *convert;
+	int convert_count;
 };
 
 struct config {
@@ -260,6 +273,12 @@ struct config {
 	 */
 	struct config_webroots *webroots;
 	int webroots_count;
+
+	/*
+	 * RTCM filter
+	 */
+	struct config_rtcm_filter *rtcm_filter;
+	int rtcm_filter_count;
 
 	/* Auth key for incoming syncer API connections */
 	const char *syncer_auth;

@@ -112,6 +112,14 @@ static const cyaml_strval_t log_level_strings[] = {
 	{ "EDEBUG", LOG_EDEBUG },
 };
 
+/*
+ * YAML mapping from RTCM conversion name to integer values
+ */
+static const cyaml_strval_t rtcm_conversion_strings[] = {
+	{ "msm7_3", RTCM_CONV_MSM7_3 },
+	{ "msm7_4", RTCM_CONV_MSM7_4 }
+};
+
 static const cyaml_schema_field_t bind_fields_schema[] = {
 	CYAML_FIELD_STRING_PTR(
 		"ip", CYAML_FLAG_POINTER, struct config_bind, ip, 0, CYAML_UNLIMITED),
@@ -243,6 +251,37 @@ static const cyaml_schema_value_t webroots_schema = {
 		struct config_webroots, webroots_fields_schema),
 };
 
+static const cyaml_schema_field_t rtcm_convert_fields_schema[] = {
+	CYAML_FIELD_STRING_PTR(
+		"types", CYAML_FLAG_POINTER, struct config_rtcm_convert, types, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_ENUM(
+			"conversion", CYAML_FLAG_DEFAULT, struct config_rtcm_convert,
+			conversion, rtcm_conversion_strings,
+			CYAML_ARRAY_LEN(rtcm_conversion_strings)),
+	CYAML_FIELD_END
+};
+
+static const cyaml_schema_value_t rtcm_convert_schema = {
+	CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT,
+		struct config_rtcm_convert, rtcm_convert_fields_schema),
+};
+
+static const cyaml_schema_field_t rtcm_filter_fields_schema[] = {
+	CYAML_FIELD_STRING_PTR(
+		"apply", CYAML_FLAG_POINTER, struct config_rtcm_filter, apply, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_STRING_PTR(
+		"pass", CYAML_FLAG_POINTER, struct config_rtcm_filter, pass, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_SEQUENCE(
+		"convert", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
+		struct config_rtcm_filter, convert, &rtcm_convert_schema, 0, 1),
+	CYAML_FIELD_END
+};
+
+static const cyaml_schema_value_t rtcm_filter_schema = {
+	CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT,
+		struct config_rtcm_filter, rtcm_filter_fields_schema),
+};
+
 /* CYAML mapping schema fields array for the top level mapping. */
 static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
@@ -318,6 +357,9 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 		struct config, webroots, &webroots_schema, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(
 		"syncer_auth", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config, syncer_auth, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_SEQUENCE(
+		"rtcm_filter", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
+		struct config, rtcm_filter, &rtcm_filter_schema, 0, 1),
 	CYAML_FIELD_END
 };
 

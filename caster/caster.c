@@ -751,6 +751,56 @@ caster_reload_blocklist(struct caster_state *caster) {
 	return r;
 }
 
+static void
+caster_free_rtcm_filters(struct caster_state *caster) {
+	if (caster->rtcm_filter_dict) {
+		hash_table_free(caster->rtcm_filter_dict);
+		caster->rtcm_filter_dict = NULL;
+	}
+	if (caster->rtcm_filter)
+		rtcm_filter_free(caster->rtcm_filter);
+	caster->rtcm_filter = NULL;
+}
+
+static int
+caster_reload_rtcm_filters(struct caster_state *caster) {
+	//P_RWLOCK_WRLOCK(&caster->configlock);
+	if (caster->config->rtcm_filter_count == 0) {
+		caster_free_rtcm_filters(caster);
+		return 0;
+	}
+	if (caster->config->rtcm_filter_count != 1) {
+		caster_free_rtcm_filters(caster);
+		return -1;
+	}
+
+	caster->rtcm_filter_dict = hash_table_new(5, NULL);
+	if (caster->rtcm_filter_dict == NULL)
+		return -1;
+
+	for (int i = 0; i < caster->config->rtcm_filter_count; i++) {
+		struct rtcm_filter *rtcm_filter;
+		rtcm_filter = rtcm_filter_new(
+			caster->config->rtcm_filter[i].pass,
+			caster->config->rtcm_filter[i].convert_count ? caster->config->rtcm_filter[i].convert[0].types : NULL,
+			caster->config->rtcm_filter[i].convert_count ? caster->config->rtcm_filter[i].convert[0].conversion : 0
+		);
+		if (rtcm_filter == NULL) {
+			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
+			return -1;
+		}
+		struct hash_table *h = rtcm_filter_dict_parse(rtcm_filter, caster->config->rtcm_filter[i].apply);
+		if (h == NULL) {
+			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
+			rtcm_filter_free(rtcm_filter);
+			return -1;
+		}
+		hash_table_update(caster->rtcm_filter_dict, h);
+		caster->rtcm_filter = rtcm_filter;
+	}
+	return 0;
+}
+
 static int caster_reload_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
@@ -779,6 +829,8 @@ static int caster_chdir_reload(struct caster_state *this, int reopen_logs) {
 	if (caster_reload_auth(this) < 0)
 		r = -1;
 	if (caster_reload_blocklist(this) < 0)
+		r = -1;
+	if (caster_reload_rtcm_filters(this) < 0)
 		r = -1;
 	fchdir(current_dir);
 	close(current_dir);
