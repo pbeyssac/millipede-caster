@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bitfield.h"
 #include "conf.h"
 #include "ip.h"
 #include "rtcm.h"

@@ -5,6 +5,7 @@
 #include <event2/buffer.h>
 //#include <json-c/json.h>
 
+#include "bitfield.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
 
@@ -22,9 +23,9 @@ static inline void rtcm_typeset_init(struct rtcm_typeset *this) {
  */
 static inline int rtcm_typeset_check(struct rtcm_typeset *this, int type) {
 	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
-		return this->set1k[(type-RTCM_1K_MIN)>>3] & (1<<((type-RTCM_1K_MIN)&7));
+		return getbit(this->set1k, type-RTCM_1K_MIN);
 	if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
-		return this->set4k[(type-RTCM_4K_MIN)>>3] & (1<<((type-RTCM_4K_MIN)&7));
+		return getbit(this->set4k, type-RTCM_4K_MIN);
 	return 0;
 }
 
@@ -33,10 +34,10 @@ static inline int rtcm_typeset_check(struct rtcm_typeset *this, int type) {
  */
 static inline int rtcm_typeset_set(struct rtcm_typeset *this, int type) {
 	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX) {
-		this->set1k[(type-RTCM_1K_MIN)>>3] |= (1<<(type&7));
+		setbit(this->set1k, type-RTCM_1K_MIN);
 		return 0;
 	} else if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX) {
-		this->set4k[(type-RTCM_4K_MIN)>>3] |= (1<<(type&7));
+		setbit(this->set4k, type-RTCM_4K_MIN);
 		return 0;
 	}
 	return -1;
@@ -232,40 +233,6 @@ static void ecef_to_lat_lon(pos_t *pos, double *palt, long ecef_x, long ecef_y, 
 	return;
 }
 
-/*
- * Extract a bit field in a RTCM packet.
- * beg and len are counted in bits.
- */
-uint64_t getbits(unsigned char *d, int beg, int len) {
-	long r;
-	unsigned char mask;
-
-	// Compute all constants that depend on function arguments
-	// to make the task easier for the inline optimizer.
-	int offset_first = beg >> 3;
-	int offset_last = (beg+len-1) >> 3;
-	int bits_first = beg & 7;
-	int full_bytes = (len - (8 - bits_first)) >> 3;
-	int bits_last = (len - (8 - bits_first)) & 7;
-
-	/* First, possibly incomplete, byte */
-	mask = 0xff>>bits_first;
-	r = d[offset_first] & mask;
-
-	if (offset_first == offset_last)
-		return r >> ((-beg-len) & 7);
-
-	int offset = offset_first+1;
-
-	/* Process full bytes */
-	while (full_bytes--)
-		r = (r<<8) + d[offset++];
-
-	/* Last, possibly incomplete, byte */
-	if (bits_last)
-		r = (r << bits_last) + (d[offset] >> (8-bits_last));
-	return r;
-}
 
 /* Get a int38 as a uint64_t */
 static inline uint64_t get_int38(unsigned char *d, int beg) {
