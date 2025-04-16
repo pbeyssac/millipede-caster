@@ -10,6 +10,7 @@ struct packet *packet_new(size_t len_raw, struct caster_state *caster) {
 	P_MUTEX_INIT(&this->mutex, NULL);
 	this->datalen = len_raw;
 	this->refcnt = 1;
+	this->is_rtcm = 0;
 	this->caster = caster;
 	return this;
 }

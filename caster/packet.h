@@ -13,6 +13,7 @@ struct packet {
 	P_MUTEX_T mutex;
 	int refcnt;		// mostly for zero-copy mode
 	struct caster_state *caster;
+	int is_rtcm;		// Checked to be a valid RTCM packet
 	size_t datalen;
 	unsigned char data[];
 };
