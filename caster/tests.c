@@ -202,7 +202,7 @@ static int test_rtcm_typeset_parse() {
 	};
 
 	struct test testlist[] = {
-		{"", NULL},
+		{"", ""},
 		{"0", NULL},
 		{"-1", NULL},
 		{"999", NULL},
@@ -228,18 +228,18 @@ static int test_rtcm_typeset_parse() {
 			if (tl->expect == NULL)
 				putchar('.');
 			else {
-				printf("\nFAIL: rtcm_typeset_parse(%s) returned %d instead of %s\n", tl->parse, r, tl->expect);
+				printf("\nFAIL: rtcm_typeset_parse(\"%s\") returned %d instead of %s\n", tl->parse, r, tl->expect);
 				fail++;
 			}
 		} else if (r >= 0 && tl->expect == NULL) {
-			printf("\nFAIL: rtcm_typeset_parse(%s) returned %d instead of -1\n", tl->parse, r);
+			printf("\nFAIL: rtcm_typeset_parse(\"%s\") returned %d instead of -1\n", tl->parse, r);
 			fail++;
 		} else {
 			char *rstr = rtcm_typeset_str(&tmp);
 			if (!strcmp(rstr, tl->expect))
 				putchar('.');
 			else {
-				printf("\nFAIL: rtcm_typeset_str(%s) returned %s instead of %s\n", tl->parse, rstr, tl->expect);
+				printf("\nFAIL: rtcm_typeset_str(rtcm_typeset_parse(\"%s\")) returned %s instead of \"%s\"\n", tl->parse, rstr, tl->expect);
 				fail++;
 			}
 			free(rstr);

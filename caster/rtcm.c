@@ -42,12 +42,21 @@ static inline int rtcm_typeset_set(struct rtcm_typeset *this, int type) {
 	return -1;
 }
 
+/*
+ * Load types from a comma-separated list.
+ * Return 0 if ok, -1 if error.
+ */
 int rtcm_typeset_parse(struct rtcm_typeset *this, const char *typelist) {
 	char typestr[5];
 	int type;
 	struct rtcm_typeset t;
 
 	rtcm_typeset_init(&t);
+
+	if (!*typelist) {
+		*this = t;
+		return 0;
+	}
 
 	int len = 0;
 	do {
@@ -78,8 +87,6 @@ char *rtcm_typeset_str(struct rtcm_typeset *this) {
 	for (int i = RTCM_4K_MIN; i <= RTCM_4K_MAX; i++)
 		if (rtcm_typeset_check(this, i))
 			n++;
-	if (n == 0)
-		return NULL;
 
 	// 4 digits + ',' per entry or '\0' after the last,
 	// + 1 for the extra '\0' stored by snprintf.
@@ -98,8 +105,11 @@ char *rtcm_typeset_str(struct rtcm_typeset *this) {
 			snprintf(rp, 6, "%d,", i);
 			rp += 5;
 		}
-	// stomp over the last ','
-	rp[-1] = '\0';
+	// stomp over the last ',', if any.
+	if (n)
+		rp[-1] = '\0';
+	else
+		rp[0] = '\0';
 	return r;
 }
 
