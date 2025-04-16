@@ -268,6 +268,7 @@ static void raw_free_callback(const void *data, size_t datalen, void *extra) {
  */
 int livesource_send_subscribers(struct livesource *this, struct packet *packet, struct caster_state *caster) {
 	struct subscriber *np;
+	struct packet *pconv = NULL;
 	int n = 0;
 	int ns = 0;
 
@@ -306,6 +307,16 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			np->backlogged = 1;
 			nbacklogged++;
 			ns++;
+		} else if (st->rtcm_filter && !rtcm_filter_pass(st->caster->rtcm_filter, packet)) {
+			if (!pconv)
+				pconv = rtcm_filter_convert(st->caster->rtcm_filter, st, packet);
+			if (pconv) {
+				if (evbuffer_add(bufferevent_get_output(st->bev), pconv->data, pconv->datalen) < 0) {
+					ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add failed");
+				} else
+					st->sent_bytes += packet->datalen;
+			}
+			ns++;
 		} else if (packet->caster->config->zero_copy) {
 			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed");
@@ -323,6 +334,8 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	}
 
 	assert(n == this->nsubs);
+	if (pconv)
+		packet_free(pconv);
 
 	/*
 	 * Adjust reference count to account for failed calls
