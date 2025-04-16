@@ -544,7 +544,7 @@ static int caster_start_listener(struct caster_state *this, struct config_bind *
 }
 
 /*
- * Reconfigure listening ports, reusing already existing sockets if possible.
+ * Configure/reconfigure listening ports, reusing already existing sockets if possible.
  */
 static int caster_reload_listeners(struct caster_state *this) {
 	union sock sin;

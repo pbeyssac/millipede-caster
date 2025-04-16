@@ -271,7 +271,7 @@ static inline uint64_t get_uint64(unsigned char *d, int beg) {
 }
 
 /*
- * Handle packet types 1005 and 1006.
+ * Handle packet types 1005 and 1006: base position.
  */
 static void handle_1005_1006(struct ntrip_state *st, struct rtcm_info *rp, int type, unsigned char *d, int len) {
 	unsigned char *data = d+3;
@@ -578,6 +578,10 @@ struct packet *rtcm_filter_convert(struct rtcm_filter *this, struct ntrip_state 
 		return rtcm_convert_msm7(st, packet, 3);
 	return NULL;
 }
+
+/*
+ * rtcm_info routines
+ */
 
 struct rtcm_info *rtcm_info_new() {
 	struct rtcm_info *this = (struct rtcm_info *)malloc(sizeof(struct rtcm_info));
