@@ -775,20 +775,22 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
 		if (events & BEV_EVENT_READING) {
-			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout");
-			int idle_time;
 
 			/*
 			 * Special case for NTRIP clients: in case of a read timeout, check whether we have been
 			 * recently sending data.
 			 */
-			if (st->state != NTRIP_WAIT_CLIENT_INPUT || (idle_time = time(NULL) - st->last_send) <= st->caster->config->idle_max_delay) {
-				/* Reenable read */
-				bufferevent_enable(bev, EV_READ);
-				return;
-			}
-			/* Not data sent or read, close. */
-			ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, dropping", idle_time);
+			if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
+				int idle_time = time(NULL) - st->last_send;
+				if (idle_time <= st->caster->config->idle_max_delay) {
+					/* Reenable read */
+					bufferevent_enable(bev, EV_READ);
+					return;
+				}
+				/* No data sent or read, close. */
+				ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, dropping", idle_time);
+			} else
+				ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout");
 		}
 		if (events & BEV_EVENT_WRITING)
 			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout");
