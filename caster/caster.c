@@ -277,6 +277,8 @@ caster_new(const char *config_file) {
 	this->graylog_count = 0;
 	this->syncers = NULL;
 	this->syncers_count = 0;
+	this->rtcm_filter = NULL;
+	this->rtcm_filter_dict = NULL;
 
 	fchdir(current_dir);
 	close(current_dir);

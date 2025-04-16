@@ -83,6 +83,10 @@ struct caster_state {
 
 	sourcetable_stack_t sourcetablestack;
 
+	/* RTCM filtering */
+	struct rtcm_filter *rtcm_filter;	// filters (max 1 currently)
+	struct hash_table *rtcm_filter_dict;	// mountpoint => filter dictionary
+
 	/* Logs */
 	struct log flog, alog;
 	char hostname[128];

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <math.h>
 #include <string.h>
 
@@ -233,12 +234,40 @@ static void ecef_to_lat_lon(pos_t *pos, double *palt, long ecef_x, long ecef_y, 
 	return;
 }
 
+/* Get a uint10 as a uint16_t */
+static inline uint16_t get_uint10(unsigned char *d, int beg) {
+	return getbits(d, beg, 10);
+}
+
+/* Get a int20 as a int32_t */
+static inline int32_t get_int20(unsigned char *d, int beg) {
+	uint32_t r = getbits(d, beg, 20);
+	if (r & 0x80000) r |= 0xfff00000;
+	return r;
+}
+
+/* Get a int24 as a int32_t */
+static inline int32_t get_int24(unsigned char *d, int beg) {
+	int32_t r = getbits(d, beg, 24);
+	if (r & 0x800000) r |= 0xff000000;
+	return r;
+}
+
+/* Get a uint32_t */
+static inline uint32_t get_uint32(unsigned char *d, int beg) {
+	return getbits(d, beg, 32);
+}
 
 /* Get a int38 as a uint64_t */
 static inline uint64_t get_int38(unsigned char *d, int beg) {
 	uint64_t r = getbits(d, beg, 38);
 	if (r & (1L<<37)) r |= 0xffffffc000000000;
 	return r;
+}
+
+/* Get a uint64 */
+static inline uint64_t get_uint64(unsigned char *d, int beg) {
+	return getbits(d, beg, 64);
 }
 
 /*
@@ -266,6 +295,290 @@ static void handle_1005_1006(struct ntrip_state *st, struct rtcm_info *rp, int t
 	rp->z = ecef_z;
 }
 
+/*
+ * Count set bits in v
+ * Code from Brian Kernighan / https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetNaive
+ */
+static int count_set(uint64_t v) {
+	unsigned int c;
+	for (c = 0; v; c++)
+		v &= v - 1; // clear the least significant bit set
+	return c;
+}
+
+/*
+ * Convert GNSS PhaseRange Lock Time Indicator from DF407 to DF402 format,
+ * using bisection.
+ */
+static unsigned int rtcm_df407_to_df402(unsigned int df407) {
+	if (df407 < 256) {
+		if (df407 < 128) {
+			if (df407 < 64) {
+				if (df407 < 32)
+					return 0;
+				return 1;
+			}
+			if (df407 < 96)
+				return 2;
+			return 3;
+		}
+		if (df407 < 192) {
+			if (df407 < 160)
+				return 4;
+			return 5;
+		}
+		if (df407 < 224)
+			return 6;
+		return 7;
+	}
+	if (df407 < 384) {
+		if (df407 < 320) {
+			if (df407 < 288)
+				return 8;
+			return 9;
+		}
+		if (df407 < 352)
+			return 10;
+		return 11;
+	}
+	if (df407 < 448) {
+		if (df407 < 416)
+			return 12;
+		return 13;
+	}
+	if (df407 < 480)
+		return 14;
+	return 15;
+}
+
+/*
+ * Convert MSM7 message to MSM3 or MSM4.
+ */
+static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p, int msm_version) {
+	unsigned char *data = p->data+3;
+	int len = p->datalen-6;
+	unsigned char *data_rtcm, *data_out;
+	int len_out, len_out_bits;
+
+	int msmv = 4;
+
+	int32_t df400, df401, df405, df406;
+	uint16_t df403, df408;
+	unsigned short df407;
+	uint64_t df394, df396;
+	uint32_t df395;
+	char df393;
+	int n;
+	int nsat, nsig, ncell;
+
+	int type = getbits(data, 0, 12);
+	if ((type < 1077 || type > 1127 || type % 10 != 7) || len < 22)
+		/* Invalid packet type or length, or too short */
+		return NULL;
+
+	int pos_out = 0;
+
+	/* Skip message type, reference station ID and GNSS Epoch Time */
+	int pos = 12 + 12 + 30;
+
+	/* Multiple Message Bit */
+	df393 = getbit(data, pos);
+
+	// Skip IODS, Reserved field, Clock Steering Indicator, External Clock Indicator,
+	// GNSS Divergence-free Smoothing Indicator, GNSS Smoothing Interval.
+	pos += 1 + 3 + 7 + 2 + 2 + 1 + 3;
+
+	/* GNSS Satellite Mask */
+	df394 = get_uint64(data, pos);
+	pos += 64;
+	nsat = count_set(df394);
+
+	/* GNSS Signal Mask */
+	df395 = get_uint32(data, pos);
+	pos += 32;
+	nsig = count_set(df395);
+
+	if (nsat*nsig > 64)
+		return NULL;
+
+	assert(pos == 169);
+
+	int endcell = pos + nsat*nsig;
+
+	if (endcell > len*8) {
+		ntrip_log(st, LOG_EDEBUG, "packet nsat=%d nsig=%d endcell %d len %d not long enough", nsat, nsig, endcell, len*8);
+		return NULL;
+	}
+
+	/* GNSS Cell Mask */
+	df396 = getbits(data, pos, nsat*nsig);
+	pos += nsat*nsig;
+	ncell = count_set(df396);
+
+	int endpos = pos + (8+4+10+14)*nsat + (20+24+10+1+10+15)*ncell;
+	if (endpos > len*8) {
+		ntrip_log(st, LOG_EDEBUG, "packet nsat=%d nsig=%d end %d len %d not long enough", nsat, nsig, endpos, len*8);
+		return NULL;
+	}
+
+	ntrip_log(st, LOG_EDEBUG, "type %d MM=%d nsat=%d nsig=%d ncell=%d sat %016lx sig %08x cell %016lx",
+			type, df393, nsat, nsig, ncell, df394, df395, df396);
+
+	if (msmv == 4)
+		len_out_bits = 169 + (8+10+nsig)*nsat + (15+22+4+1+6)*ncell;
+	else
+		/* MSM3 */
+		len_out_bits = 169 + (10+nsig)*nsat + (15+22+4+1)*ncell;
+
+	len_out = (len_out_bits+7) >> 3;
+
+	if (len_out > 1023)
+		return NULL;
+
+	struct packet *packet = packet_new(len_out+6, st->caster);
+
+	if (packet == NULL)
+		return NULL;
+
+	data_rtcm = packet->data;
+
+	/* Add header */
+	data_rtcm[0] = 0xd3;
+	data_rtcm[1] = len_out >> 8;
+	data_rtcm[2] = len_out & 0xff;
+	data_out = data_rtcm + 3;
+
+	/* Set updated type for MSM4 */
+	setbits(data_out, 0, 12, type-7+msmv);
+
+	/*
+	 * Copy common MSM header + cell mask
+	 * If MSM4:
+	 * Copy DF397 array: Number of integer milliseconds in GNSS Satellite rough ranges
+	 */
+	pos = 12;
+	pos_out = 12;
+	copybits(data_out, &pos_out, data, &pos, 157 + nsat*nsig + (msmv == 4 ? nsat*8 : 0));
+
+	if (msmv != 4)
+		pos += nsat*8;
+
+	/* Skip Extended Satellite Information */
+	pos += 4*nsat;
+
+	/* Copy DF398 array: GNSS Satellite rough ranges modulo 1 millisecond */
+	copybits(data_out, &pos_out, data, &pos, nsat*10);
+
+	/* Skip DF399 array: GNSS Satellite rough PhaseRangeRates */
+	pos += 14*nsat;
+
+	/*
+	 * GNSS signal fine Pseudoranges
+	 * Copy DF405 array as DF400 array: remove 5 trailing bits
+	 */
+	for (n = 0; n < ncell; n++) {
+		df405 = get_int20(data, pos);
+		pos += 20;
+
+		/* Round to nearest and truncate */
+		df400 = (df405 + (1<<4)) >> 5;
+
+		setbits(data_out, pos_out, 15, df400);
+		pos_out += 15;
+	}
+
+	/*
+	 * GNSS signal fine PhaseRange data
+	 * Copy DF406 array as DF401 array: remove 2 trailing bits
+	 */
+	for (n = 0; n < ncell; n++) {
+		df406 = get_int24(data, pos);
+		pos += 24;
+
+		/* Round to nearest and truncate */
+		df401 = (df406 + (1<<1)) >> 2;
+
+		setbits(data_out, pos_out, 22, df401);
+		pos_out += 22;
+	}
+
+	/*
+	 * GNSS PhaseRange Lock Time Indicator
+	 * DF407 -> DF402
+	 */
+	for (n = 0; n < ncell; n++) {
+		df407 = get_uint10(data, pos);
+		pos += 10;
+		setbits(data_out, pos_out, 4, rtcm_df407_to_df402(df407));
+		pos_out += 4;
+	}
+
+	/* Copy half-cycle ambiguity indicators */
+	copybits(data_out, &pos_out, data, &pos, ncell);
+
+	/*
+	 * GNSS signal CNRs
+	 * MSM4: copy DF408 array as DF403 array: remove 4 trailing bits
+	 */
+	if (msmv == 4)
+		for (n = 0; n < ncell; n++) {
+			df408 = get_uint10(data, pos);
+			pos += 10;
+
+			/* Round to nearest and truncate */
+			df403 = (df408 + (1<<3)) >> 4;
+			setbits(data_out, pos_out, 6, df403);
+			pos_out += 6;
+		}
+
+	assert(pos_out == len_out_bits);
+
+	/* Fill the last byte with trailing zeroes */
+	if (pos_out & 7) {
+		setbits(data_out, pos_out, 8 - (pos_out & 7), 0);
+		pos_out += 8 - (pos_out & 7);
+	}
+
+	/* Compute and add CRC at the end */
+	uint32_t crc = rtcm_crc24q_hash(data_rtcm, len_out+3);
+	data_rtcm[len_out+3] = crc >> 16;
+	data_rtcm[len_out+4] = crc >> 8;
+	data_rtcm[len_out+5] = crc;
+	return packet;
+}
+
+/*
+ * Return 1 if the provided packet passes the filter, 0 if not.
+ */
+int rtcm_filter_pass(struct rtcm_filter *this, struct packet *packet) {
+	if (!packet->is_rtcm)
+		return 0;
+
+	unsigned char *d = packet->data;
+	unsigned short type = getbits(d+3, 0, 12);
+	return rtcm_typeset_check(&this->pass, type);
+}
+
+/*
+ * Return a converted packet, if relevant.
+ */
+struct packet *rtcm_filter_convert(struct rtcm_filter *this, struct ntrip_state *st, struct packet *packet) {
+	if (!packet->is_rtcm)
+		return NULL;
+
+	unsigned char *d = packet->data;
+	unsigned short type = getbits(d+3, 0, 12);
+
+	if (!rtcm_typeset_check(&this->convert, type))
+		return NULL;
+
+	if (this->conversion == RTCM_CONV_MSM7_4)
+		return rtcm_convert_msm7(st, packet, 4);
+	else if (this->conversion == RTCM_CONV_MSM7_3)
+		return rtcm_convert_msm7(st, packet, 3);
+	return NULL;
+}
+
 struct rtcm_info *rtcm_info_new() {
 	struct rtcm_info *this = (struct rtcm_info *)malloc(sizeof(struct rtcm_info));
 	if (this == NULL)
@@ -276,6 +589,82 @@ struct rtcm_info *rtcm_info_new() {
 
 void rtcm_info_free(struct rtcm_info *this) {
 	free(this);
+}
+
+/*
+ * Return a comma-separated list of keys in a hash table.
+ * Trim leading and trailing white space in keys.
+ */
+struct hash_table *rtcm_filter_dict_parse(struct rtcm_filter *this, const char *apply) {
+	const char *p = apply;
+	const char *key;
+	char *dupkey;
+	int err = 0;
+
+	struct hash_table *h = hash_table_new(5, NULL);
+	if (h == NULL)
+		return NULL;
+
+	do {
+		while (isspace(*p)) p++;
+		key = p;
+		while (*p && *p != ',') p++;
+		if (p == key) {
+			err = 1;
+			break;
+		}
+		int len = p-key;
+		if (*p) p++;
+		while (len && isspace(key[len-1])) len--;
+		if (!len) {
+			err = 1;
+			break;
+		}
+		dupkey = (char *)strmalloc(len+1);
+		if (dupkey == NULL) {
+			err = 1;
+			break;
+		}
+		memcpy(dupkey, key, len);
+		dupkey[len] = '\0';
+		hash_table_add(h, dupkey, NULL);
+		strfree(dupkey);
+	} while (*p);
+
+	if (err) {
+		hash_table_free(h);
+		return NULL;
+	}
+	return h;
+}
+
+void rtcm_filter_free(struct rtcm_filter *this) {
+	free(this);
+}
+
+struct rtcm_filter *rtcm_filter_new(const char *pass, const char *convert, enum rtcm_conversion conversion) {
+	struct rtcm_filter *this = (struct rtcm_filter *)malloc(sizeof(struct rtcm_filter));
+	if (this == NULL)
+		return NULL;
+
+	int r = rtcm_typeset_parse(&this->pass, pass);
+	if (r >=0 && convert)
+		r = rtcm_typeset_parse(&this->convert, convert);
+	else
+		rtcm_typeset_init(&this->convert);
+	if (r < 0) {
+		rtcm_filter_free(this);
+		return NULL;
+	}
+	this->conversion = conversion;
+	return this;
+}
+
+/*
+ * Return whether a mountpoint has a filter.
+ */
+int rtcm_filter_check_mountpoint(struct caster_state *caster, const char *mountpoint) {
+	return hash_table_get_element(caster->rtcm_filter_dict, mountpoint) != NULL;
 }
 
 static void handle_1006(struct ntrip_state *st, struct rtcm_info *rp, unsigned char *d, int len) {
