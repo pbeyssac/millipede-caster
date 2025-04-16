@@ -26,5 +26,6 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg);
 void ntripsrv_workers_readcb(struct bufferevent *bev, void *arg);
 void ntripsrv_workers_writecb(struct bufferevent *bev, void *arg);
 void ntripsrv_workers_eventcb(struct bufferevent *bev, short events, void *arg);
+void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *sa, int socklen, void *arg);
 
 #endif
