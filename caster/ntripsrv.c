@@ -542,14 +542,16 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 					st->type = "client";
 
+					/* Regular NTRIP stream client: set a read timeout to check for data sent */
+					struct timeval read_timeout = { st->caster->config->ntripsrv_default_read_timeout, 0 };
+					bufferevent_set_timeouts(bev, &read_timeout, NULL);
+
 					if (!st->source_virtual) {
 						if (l) {
 							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d", mountpoint, st->source_on_demand);
 							ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 							st->state = NTRIP_WAIT_CLIENT_INPUT;
 
-							/* Regular NTRIP stream client: disable read and write timeouts */
-							bufferevent_set_timeouts(bev, NULL, NULL);
 						} else {
 							if (st->client_version == 1) {
 								err = ntripsrv_send_sourcetable(st, output);
@@ -561,9 +563,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					} else {
 						ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 						st->state = NTRIP_WAIT_CLIENT_INPUT;
-
-						/* Regular NTRIP stream client: disable read and write timeouts */
-						bufferevent_set_timeouts(bev, NULL, NULL);
 					}
 
 					/* If we have a position (Ntrip-gga header), use it */
@@ -773,8 +772,22 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			ntrip_log(st, LOG_NOTICE, "Got an error on connection: %s", strerror_r(initial_errno, err, sizeof err));
 		}
 	} else if (events & BEV_EVENT_TIMEOUT) {
-		if (events & BEV_EVENT_READING)
+		if (events & BEV_EVENT_READING) {
 			ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout");
+			int idle_time;
+
+			/*
+			 * Special case for NTRIP clients: in case of a read timeout, check whether we have been
+			 * recently sending data.
+			 */
+			if (st->state != NTRIP_WAIT_CLIENT_INPUT || (idle_time = time(NULL) - st->last_send) <= st->caster->config->idle_max_delay) {
+				/* Reenable read */
+				bufferevent_enable(bev, EV_READ);
+				return;
+			}
+			/* Not data sent or read, close. */
+			ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, dropping", idle_time);
+		}
 		if (events & BEV_EVENT_WRITING)
 			ntrip_log(st, LOG_NOTICE, "ntripsrv write timeout");
 	}
