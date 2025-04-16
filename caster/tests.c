@@ -117,8 +117,46 @@ static int gga_test() {
 	return fail;
 }
 
+static int test_setbits() {
+	puts("test_setbits");
+	int fail = 0;
+
+	uint64_t patterns[] = {0xffffffffffffffff, 0xf0f0f0f0f0f0f0f0, 0x5555555555555555, 0xaaaaaaaaaaaaaaaa, 0x5a5a5a5a5a5a5a5a,
+		0x0123456789abcdef, 0xfedcba9876543210, 0x55aa55aa55aa55aa};
+	unsigned char datapattern[16];
+
+	memset(datapattern, 0, sizeof datapattern);
+
+	for (int i = 0; i < sizeof patterns / sizeof(patterns[0]); i++) {
+		uint64_t p = patterns[i];
+		for (int len = 1; len <= 64; len++) {
+			for (int beg = 0; beg <= 64; beg++) {
+				uint64_t r, expect;
+				expect = p >> (64-len);
+				setbits(datapattern, beg, len, expect);
+				r = getbits(datapattern, beg, len);
+				if (r == expect)
+					putchar('.');
+				else {
+					printf("\nFAIL: getbits(data, %d, %d) returned 0x%016lx vs 0x%016lx\n", beg, len, r, expect);
+					fail++;
+				}
+				setbits(datapattern, beg, len, 0x0);
+				r = getbits(datapattern, beg, len);
+				if (r == 0)
+					putchar('.');
+				else {
+					printf("\nFAIL: getbits(data, %d, %d) returned 0x%016lx vs 0\n", beg, len, r);
+					fail++;
+				}
+			}
+		}
+	}
+	return fail;
+}
+
 static int test_getbits() {
-	puts("getbits");
+	puts("test_getbits");
 	int fail = 0;
 
 	unsigned char data[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -372,6 +410,7 @@ int main() {
 	fail += test_ip_analyze_prefixquota();
 	fail += urldecode_test();
 	fail += test_getbits();
+	fail += test_setbits();
 	fail += test_rtcm_typeset_parse();
 	return fail != 0;
 }

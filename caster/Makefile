@@ -9,11 +9,11 @@ OPT	= -D_XOPEN_SOURCE -D_GNU_SOURCE
 CFLAGS	=	-g $(OPT) -I/usr/local/include -Wall
 LDFLAGS	=	-L/usr/local/lib -levent_core -levent_extra -levent_pthreads -levent_openssl -lcyaml -lssl -lcrypto -ljson-c -lpthread -lm
 
-SRCS	=	adm.c api.c caster.c conf.c config.c endpoints.c fetcher_sourcetable.c file.c gelf.c graylog_sender.c hash.c http.c ip.c jobs.c livesource.c log.c main.c ntrip_common.c ntrip_task.c ntripcli.c ntripsrv.c packet.c request.c rtcm.c redistribute.c sourceline.c sourcetable.c syncer.c util.c
-OBJS	=	adm.o api.o caster.o conf.o config.o endpoints.o fetcher_sourcetable.o file.o gelf.o graylog_sender.o hash.o http.o ip.o jobs.o livesource.o log.o main.o ntrip_common.o ntrip_task.o ntripcli.o ntripsrv.o packet.o request.o rtcm.o redistribute.o sourceline.o sourcetable.o syncer.o util.o
+SRCS	=	adm.c api.c bitfield.c caster.c conf.c config.c endpoints.c fetcher_sourcetable.c file.c gelf.c graylog_sender.c hash.c http.c ip.c jobs.c livesource.c log.c main.c ntrip_common.c ntrip_task.c ntripcli.c ntripsrv.c packet.c request.c rtcm.c redistribute.c sourceline.c sourcetable.c syncer.c util.c
+OBJS	=	adm.o api.o bitfield.o caster.o conf.o config.o endpoints.o fetcher_sourcetable.o file.o gelf.o graylog_sender.o hash.o http.o ip.o jobs.o livesource.o log.o main.o ntrip_common.o ntrip_task.o ntripcli.o ntripsrv.o packet.o request.o rtcm.o redistribute.o sourceline.o sourcetable.o syncer.o util.o
 BINS	=	tests caster
 
-TESTOBJS	=	adm.o api.o caster.o conf.o config.o endpoints.o fetcher_sourcetable.o file.o gelf.o graylog_sender.o hash.o http.o ip.o jobs.o livesource.o log.o ntrip_common.o ntrip_task.o ntripcli.o ntripsrv.o packet.o rtcm.o redistribute.o request.o sourceline.o sourcetable.o syncer.o util.o tests.o
+TESTOBJS	=	adm.o api.o bitfield.o caster.o conf.o config.o endpoints.o fetcher_sourcetable.o file.o gelf.o graylog_sender.o hash.o http.o ip.o jobs.o livesource.o log.o ntrip_common.o ntrip_task.o ntripcli.o ntripsrv.o packet.o rtcm.o redistribute.o request.o sourceline.o sourcetable.o syncer.o util.o tests.o
 
 all:	$(BINS)
 
