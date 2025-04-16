@@ -339,8 +339,11 @@ json_object *rtcm_info_json(struct rtcm_info *this) {
 	return j;
 }
 
-static void rtcm_handler(struct ntrip_state *st, unsigned char *d, int len, struct rtcm_info *rp) {
+static void rtcm_handler(struct ntrip_state *st, struct packet *p, struct rtcm_info *rp) {
+	unsigned char *d = p->data;
+	int len = p->datalen;
 	unsigned short type = getbits(d+3, 0, 12);
+
 	ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len, type);
 
 	if (!rp)
@@ -412,7 +415,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		evbuffer_remove(input, &rtcmp->data[0], len_rtcm);
 		unsigned long crc = rtcm_crc24q_hash(&rtcmp->data[0], len_rtcm-3);
 		if (crc == (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]) {
-			rtcm_handler(st, rtcmp->data, len_rtcm, st->rtcm_info);
+			rtcm_handler(st, rtcmp, st->rtcm_info);
 		} else {
 			ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
 		}
