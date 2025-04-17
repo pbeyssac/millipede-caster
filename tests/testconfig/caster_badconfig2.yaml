@@ -1,0 +1,4 @@
+# Bad configuration
+ listen:
+  - port:	2103
+    ip:		::1

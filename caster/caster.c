@@ -802,7 +802,10 @@ caster_reload_rtcm_filters(struct caster_state *caster) {
 static int caster_reload_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
-		logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s", this->config_file);
+		if (this->config)
+			logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s", this->config_file);
+		else
+			fprintf(stderr, "Can't parse configuration from %s", this->config_file);
 		return -1;
 	}
 	if (this->config)
@@ -847,8 +850,13 @@ signal_cb(evutil_socket_t sig, short events, void *user_data) {
 
 int caster_reload(struct caster_state *this) {
 	int r = 0;
-	if (caster_reload_config(this) < 0)
+	if (caster_reload_config(this) < 0) {
 		r = -1;
+		if (this->config == NULL)
+			// Incorrect new config and no former config:
+			// abort all because we can't log more errors anyway.
+			return -1;
+	}
 	if (caster_chdir_reload(this, 1) < 0)
 		r = -1;
 	if (caster_reload_listeners(this) < 0)

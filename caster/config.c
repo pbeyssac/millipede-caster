@@ -388,6 +388,10 @@ struct config *config_parse(const char *filename) {
 		fprintf(stderr, "ERROR: %s\n", cyaml_strerror(err));
 		return NULL;
 	}
+	if (this == NULL) {
+		fprintf(stderr, "ERROR: empty config\n");
+		return NULL;
+	}
 
 #define	DEFAULT_ASSIGN(this, field)		{if (!(this)->field) {(this)->field = default_config.field;}}
 #define	DEFAULT_ASSIGN_ARRAY(this, i, struct1, struct2, field)	{if (!(this)->struct1[i].field) {(this)->struct1[i].field = struct2.field;}}
