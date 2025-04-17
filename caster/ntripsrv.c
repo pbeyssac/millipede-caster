@@ -460,6 +460,13 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			} else {
 				ntrip_log(st, LOG_EDEBUG, "[End headers]");
 
+				if (st->content_length) {
+					st->content = (char *)strmalloc(st->content_length+1);
+					if (st->content == NULL) {
+						err = 503;
+						break;
+					}
+				}
 				if (st->client_version == 1)
 					st->connection_keepalive = 0;
 				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
@@ -590,9 +597,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (!strcmp(st->http_args[0], "POST")) {
 						if (strlen(st->http_args[1]) >= 5 && !memcmp(st->http_args[1], "/adm/", 5)) {
 							st->type = "adm";
-							st->content = (char *)strmalloc(st->content_length+1);
-							if (st->content == NULL && st->content_length) {
-								err = 503;
+							if (!st->content_length) {
+								err = 400;
 								break;
 							}
 							st->state = NTRIP_WAIT_CLIENT_CONTENT;

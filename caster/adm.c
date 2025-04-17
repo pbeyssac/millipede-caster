@@ -42,7 +42,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 
 		if (!st->content) {
 			request_free(req);
-			*err = 503;
+			*err = 400;
 			return -1;
 		}
 		if (!strcmp(st->content_type, "application/x-www-form-urlencoded")) {
@@ -120,7 +120,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, calls[i].content_cb, req);
 		return 0;
 	} else if (json_post) {
-		req->json = json_tokener_parse(st->content);
+		req->json = st->content ? json_tokener_parse(st->content) : NULL;
 		if (req->json == NULL) {
 			*err = 400;
 		} else if (!strcmp(uri, "/api/v1/sync") && !strcmp(method, "POST")) {
