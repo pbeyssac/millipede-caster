@@ -58,7 +58,8 @@ int ip_prefix_parse(const char *ipstr, union sock *sock, int *prefixlen);
 struct prefix_quota *prefix_quota_parse(const char *ip_prefix, const char *quota_str);
 char *prefix_quota_str(struct prefix_quota *ppq);
 int prefix_table_get_quota(struct prefix_table *this, union sock *addr);
-struct prefix_table *prefix_table_new(const char *filename, struct log *log);
+struct prefix_table *prefix_table_new();
+int prefix_table_read(struct prefix_table * this, const char *filename, struct log *log);
 void prefix_table_free(struct prefix_table *this);
 
 #endif

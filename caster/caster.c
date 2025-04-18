@@ -740,10 +740,15 @@ caster_reload_blocklist(struct caster_state *caster) {
 
 	if (caster->config->blocklist_filename) {
 		logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->blocklist_filename);
-		p = prefix_table_new(caster->config->blocklist_filename, &caster->flog);
-		caster->blocklist = p;
+		p = prefix_table_new();
 		if (p == NULL)
 			r = -1;
+		else if (prefix_table_read(p, caster->config->blocklist_filename, &caster->flog) < 0) {
+			prefix_table_free(p);
+			p = NULL;
+			r = -1;
+		}
+		caster->blocklist = p;
 	}
 	P_RWLOCK_UNLOCK(&caster->configlock);
 	return r;

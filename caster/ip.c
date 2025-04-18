@@ -334,20 +334,11 @@ int prefix_table_get_quota(struct prefix_table *this, union sock *addr) {
 /*
  * Return a new prefix table, filled from the provided file name.
  */
-struct prefix_table *prefix_table_new(const char *filename, struct log *log) {
-	struct parsed_file *p;
+struct prefix_table *prefix_table_new() {
 	struct prefix_table *this = (struct prefix_table *)malloc(sizeof(struct prefix_table));
 
 	if (this == NULL)
 		return NULL;
-
-	p = file_parse(filename, 2, "\t ", 1, log);
-
-	if (p == NULL) {
-		logfmt(log, LOG_ERR, "Can't read or parse %s", filename);
-		free(this);
-		return NULL;
-	}
 
 	this->v4_table.maxentries = 0;
 	this->v4_table.nentries = 0;
@@ -355,6 +346,17 @@ struct prefix_table *prefix_table_new(const char *filename, struct log *log) {
 	this->v6_table.maxentries = 0;
 	this->v6_table.nentries = 0;
 	this->v6_table.entries = NULL;
+
+	return this;
+}
+
+int prefix_table_read(struct prefix_table *this, const char *filename, struct log *log) {
+	struct parsed_file *p;
+	p = file_parse(filename, 2, "\t ", 1, log);
+	if (p == NULL) {
+		logfmt(log, LOG_ERR, "Can't read or parse %s", filename);
+		return -1;
+	}
 
 	for (int n = 0; n < p->nlines; n++) {
 		struct prefix_quota *pq;
@@ -366,7 +368,7 @@ struct prefix_table *prefix_table_new(const char *filename, struct log *log) {
 	}
 	file_free(p);
 	_prefix_table_sort(this);
-	return this;
+	return 0;
 }
 
 /*
