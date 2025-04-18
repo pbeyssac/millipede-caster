@@ -111,7 +111,7 @@ for i, (send, expect) in enumerate(tests):
   if re.match(expect, data):
     print(".", end='')
   else:
-    print("FAIL\nExpected: %s\nGot: %s" % (expect, data))
+    print("FAIL\nExpected: %s\nGot: %s line %d" % (expect, data, i+1))
     err = 1
 
 print()

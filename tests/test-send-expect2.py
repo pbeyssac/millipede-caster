@@ -30,7 +30,7 @@ err = 0
 s0 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 s0.connect((HOST, PORT))
 
-for send, expect, send0, expect0 in tests:
+for i, (send, expect, send0, expect0) in enumerate(tests):
   s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
   s.connect((HOST, PORT))
   s.sendall(send)
@@ -48,7 +48,7 @@ for send, expect, send0, expect0 in tests:
     if re.match(expect0, data0):
       print(".", end='')
     else:
-      print("FAIL ON s0\nExpected: %s\nGot: %s" % (expect0, data0))
+      print("FAIL ON s0\nExpected: %s\nGot: %s line %d" % (expect0, data0, i+1))
       err = 1
 
   s.close()
