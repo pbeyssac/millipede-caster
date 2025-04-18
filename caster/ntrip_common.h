@@ -81,7 +81,7 @@ struct ntrip_state {
 	unsigned long long received_bytes, sent_bytes;
 
 	// reference count used in threaded mode for deferred calls
-	_Atomic int ref;
+	_Atomic int refcnt;
 
 	/* linked-list pointers for main job queue */
 	STAILQ_ENTRY(ntrip_state) next;

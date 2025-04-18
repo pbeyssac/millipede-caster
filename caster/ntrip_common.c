@@ -75,7 +75,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 		STAILQ_INIT(&this->jobq);
 	this->njobs = 0;
 	this->newjobs = 0;
-	this->ref = 1;
+	this->refcnt = 1;
 	this->bev_freed = 0;
 	this->bev_close_on_free = 0;
 	this->bev = bev;
@@ -368,7 +368,7 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
  * No lock needed.
  */
 void ntrip_incref(struct ntrip_state *this, char *orig) {
-	atomic_fetch_add(&this->ref, 1);
+	atomic_fetch_add(&this->refcnt, 1);
 }
 
 /*
@@ -376,7 +376,7 @@ void ntrip_incref(struct ntrip_state *this, char *orig) {
  * Required lock: ntrip_state
  */
 void ntrip_decref(struct ntrip_state *this, char *orig) {
-	if (atomic_fetch_sub(&this->ref, 1) == 1) {
+	if (atomic_fetch_sub(&this->refcnt, 1) == 1) {
 		assert(this->state == NTRIP_END);
 		ntrip_deferred_free(this, orig);
 	}
