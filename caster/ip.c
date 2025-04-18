@@ -193,14 +193,14 @@ struct prefix_quota *prefix_quota_parse(char *ip_prefix, const char *quota_str) 
 	if (!r)
 		return NULL;
 
-	if (_prefix_parse(ip_prefix, &r->addr, &prefixlen) <= 0) {
+	if (_prefix_parse(ip_prefix, &r->prefix.addr, &prefixlen) <= 0) {
 		free(r);
 		return NULL;
 	}
 	r->quota = quota;
-	r->len = prefixlen;
+	r->prefix.len = prefixlen;
 
-	if (_prefix_check_ip(&r->addr, prefixlen) < 0) {
+	if (_prefix_check_ip(&r->prefix.addr, prefixlen) < 0) {
 		free(r);
 		return NULL;
 	}
@@ -213,9 +213,9 @@ struct prefix_quota *prefix_quota_parse(char *ip_prefix, const char *quota_str) 
 char *prefix_quota_str(struct prefix_quota *ppq) {
 	char ip[50];
 	int maxlen = sizeof(ip)+15;
-	ip_str(&ppq->addr, ip, sizeof ip);
+	ip_str(&ppq->prefix.addr, ip, sizeof ip);
 	char *r = (char *)malloc(maxlen);
-	snprintf(r, maxlen, "%s/%d %d", ip, ppq->len, ppq->quota);
+	snprintf(r, maxlen, "%s/%d %d", ip, ppq->prefix.len, ppq->quota);
 	return r;
 }
 
@@ -226,9 +226,9 @@ static int _cmp_prefix(const void *p1, const void *p2) {
 	struct prefix_quota *qp1 = *(struct prefix_quota **)p1;
 	struct prefix_quota *qp2 = *(struct prefix_quota **)p2;
 
-	if (qp1->len < qp2->len)
+	if (qp1->prefix.len < qp2->prefix.len)
 		return -1;
-	if (qp1->len > qp2->len)
+	if (qp1->prefix.len > qp2->prefix.len)
 		return 1;
 	return 0;
 }
@@ -261,7 +261,7 @@ static int _monofamily_prefix_table_add(struct _monofamily_prefix_table *this, s
  * Add an element to an aggregate prefix table, choosing the right protocol.
  */
 static int _prefix_table_add(struct prefix_table *this, struct prefix_quota *new_entry) {
-	if (new_entry->addr.generic.sa_family == AF_INET6)
+	if (new_entry->prefix.addr.generic.sa_family == AF_INET6)
 		return _monofamily_prefix_table_add(&this->v6_table, new_entry);
 	else
 		return _monofamily_prefix_table_add(&this->v4_table, new_entry);
@@ -270,7 +270,7 @@ static int _prefix_table_add(struct prefix_table *this, struct prefix_quota *new
 /*
  * Check whether addr is inside the prefix.
  */
-static int _in_prefix(struct prefix_quota *prefix, union sock *addr) {
+static int _in_prefix(struct prefix *prefix, union sock *addr) {
 	unsigned char *a, *ap;
 	int lenfull, remain;
 
@@ -303,7 +303,7 @@ static int _in_prefix(struct prefix_quota *prefix, union sock *addr) {
  */
 static int _monofamily_prefix_table_get_quota(struct _monofamily_prefix_table *this, union sock *addr) {
 	for (int i = this->nentries-1; i >= 0; i--)
-		if (_in_prefix(this->entries[i], addr))
+		if (_in_prefix(&this->entries[i]->prefix, addr))
 			return this->entries[i]->quota;
 	return -1;
 }

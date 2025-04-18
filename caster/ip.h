@@ -17,11 +17,18 @@ union sock {
 };
 
 /*
+ * Descriptor for an IP prefix
+ */
+struct prefix {
+	union sock addr;	// address (AF_INET6 or AF_INET)
+	int len;		// prefix length
+};
+
+/*
  * Descriptor for an IP prefix quota
  */
 struct prefix_quota {
-	union sock addr;	// address (AF_INET6 or AF_INET)
-	int len;		// prefix length
+	struct prefix prefix;
 	int quota;		// number of allowed connections per IP
 				// -1 = unlimited
 };
