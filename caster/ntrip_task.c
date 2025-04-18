@@ -280,6 +280,7 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 		/*
 		 * Need to unlock then reacquire locks in the correct order
 		 */
+		ntrip_incref(st, "ntrip_task_queue");
 		P_RWLOCK_UNLOCK(&this->st_lock);
 
 		bufferevent_lock(bev);
@@ -294,10 +295,13 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 			bufferevent_decref(bev);
 			this->bev_decref_pending = 0;
 		}
+		ntrip_decref(st, "ntrip_task_queue");
 		bufferevent_unlock(bev);
-	} else
+		P_RWLOCK_UNLOCK(&this->st_lock);
+	} else {
 		assert(bev == NULL);
-	P_RWLOCK_UNLOCK(&this->st_lock);
+		P_RWLOCK_UNLOCK(&this->st_lock);
+	}
 }
 
 /*
@@ -352,7 +356,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 				P_RWLOCK_UNLOCK(&task->mimeq_lock);
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
 				ntrip_task_clear_st(task);
-				ntrip_deferred_free(st, "ntrip_task_send_next_request");
+				ntrip_decref_end(st, "ntrip_task_send_next_request");
 				return;
 			}
 			st->task->pending++;
@@ -366,7 +370,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 			if (evbuffer_add_reference(output, m->s, m->len, NULL, NULL) < 0) {
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
 				ntrip_task_clear_st(task);
-				ntrip_deferred_free(st, "ntrip_task_send_next_request");
+				ntrip_decref_end(st, "ntrip_task_send_next_request");
 				return;
 			}
 			task->pending = 1;

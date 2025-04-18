@@ -169,7 +169,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 		if (kill_backlogged == 0 || np->backlogged) {
 			struct ntrip_state *st = np->ntrip_state;
 			_livesource_del_subscriber_unlocked(st);
-			ntrip_deferred_free(st, "livesource_kill_subscribers_unlocked");
+			ntrip_decref_end(st, "livesource_kill_subscribers_unlocked");
 		}
 		bufferevent_unlock(bev);
 	}

@@ -742,7 +742,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	}
 	evhttp_clear_headers(&opt_headers);
 	if (st->state == NTRIP_FORCE_CLOSE)
-		ntrip_deferred_free(st, "ntripsrv_readcb");
+		ntrip_decref_end(st, "ntripsrv_readcb");
 }
 
 /*
@@ -760,7 +760,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 		output = bufferevent_get_output(bev);
 		len = evbuffer_get_length(output);
 		if (len == 0)
-			ntrip_deferred_free(st, "ntripsrv_writecb");
+			ntrip_decref_end(st, "ntripsrv_writecb");
 		else
 			ntrip_log(st, LOG_EDEBUG, "ntripsrv_writecb remaining len %d", len);
 	}
@@ -807,7 +807,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	}
 
 	ntrip_log(st, LOG_EDEBUG, "ntrip_free srv_eventcb bev %p", bev);
-	ntrip_deferred_free(st, "ntripsrv_eventcb");
+	ntrip_decref_end(st, "ntripsrv_eventcb");
 }
 
 /*
@@ -883,7 +883,7 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	st->state = NTRIP_WAIT_HTTP_METHOD;
 
 	if (ntrip_register_check(st) < 0) {
-		ntrip_deferred_free(st, "ntripsrv_listener_cb");
+		ntrip_decref_end(st, "ntripsrv_listener_cb");
 		return;
 	}
 

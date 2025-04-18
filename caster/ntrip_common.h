@@ -81,7 +81,7 @@ struct ntrip_state {
 	unsigned long long received_bytes, sent_bytes;
 
 	// reference count used in threaded mode for deferred calls
-	int ref;
+	_Atomic int ref;
 
 	/* linked-list pointers for main job queue */
 	STAILQ_ENTRY(ntrip_state) next;
@@ -234,7 +234,9 @@ void ntrip_set_peeraddr(struct ntrip_state *this, struct sockaddr *sa, size_t so
 void ntrip_set_localaddr(struct ntrip_state *this);
 void ntrip_clear_request(struct ntrip_state *this);
 void ntrip_free(struct ntrip_state *this, char *orig);
-void ntrip_deferred_free(struct ntrip_state *this, char *orig);
+void ntrip_incref(struct ntrip_state *this, char *orig);
+void ntrip_decref_end(struct ntrip_state *this, char *orig);
+void ntrip_decref(struct ntrip_state *this, char *orig);
 void ntrip_deferred_run(struct caster_state *this);
 int ntrip_drop_by_id(struct caster_state *caster, long long id);
 void ntrip_unregister_livesource(struct ntrip_state *this);

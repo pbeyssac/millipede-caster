@@ -357,7 +357,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	if (end || st->state == NTRIP_FORCE_CLOSE) {
 		ntrip_notify_close(st);
 		ntripcli_log_close(st);
-		ntrip_deferred_free(st, "ntripcli_readcb");
+		ntrip_decref_end(st, "ntripcli_readcb");
 	}
 }
 
@@ -385,7 +385,7 @@ void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m, int s
 	 || (m && send_mime && evbuffer_add_reference(output, m->s, m->len, mime_free_callback, m) < 0)) {
 		ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
 		ntripcli_log_close(st);
-		ntrip_deferred_free(st, "ntripcli_send_request");
+		ntrip_decref_end(st, "ntripcli_send_request");
 		return;
 	}
 	st->state = NTRIP_WAIT_HTTP_STATUS;
@@ -422,7 +422,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 
 	ntrip_notify_close(st);
 	ntripcli_log_close(st);
-	ntrip_deferred_free(st, "ntripcli_eventcb");
+	ntrip_decref_end(st, "ntripcli_eventcb");
 }
 
 struct ntrip_state *

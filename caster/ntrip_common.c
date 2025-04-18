@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <stdatomic.h>
 #include <sys/time.h>
 
 #include <openssl/ssl.h>
@@ -16,6 +17,8 @@
 #include "livesource.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
+
+static void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 
 /*
  * Create a NTRIP session state for a client or a server connection.
@@ -361,18 +364,34 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
 }
 
 /*
- * Required locks: bufferevent, ntrip_state
+ * Increment reference counter.
+ * No lock needed.
  */
-void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
-	this->ref--;
-	if (this->ref)
-		return;
+void ntrip_incref(struct ntrip_state *this, char *orig) {
+	atomic_fetch_add(&this->ref, 1);
+}
 
+/*
+ * Decrement reference counter.
+ * Required lock: ntrip_state
+ */
+void ntrip_decref(struct ntrip_state *this, char *orig) {
+	if (atomic_fetch_sub(&this->ref, 1) == 1) {
+		assert(this->state == NTRIP_END);
+		ntrip_deferred_free(this, orig);
+	}
+}
+
+/*
+ * Set ntrip_state in the NTRIP_END state (end of connection).
+ * Decrement reference counter.
+ * Required lock: ntrip_state
+ */
+void ntrip_decref_end(struct ntrip_state *this, char *orig) {
 	if (this->state == NTRIP_END) {
 		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free from %s", orig);
 		return;
 	}
-
 	this->state = NTRIP_END;
 
 	/*
@@ -395,6 +414,14 @@ void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
 		ntrip_log(this, LOG_DEBUG, "Warning: potentiel evbuffer leak, %ld bytes remaining", remain);
 		evbuffer_drain(bufferevent_get_output(bev), remain);
 	}
+	ntrip_decref(this, orig);
+}
+
+/*
+ * Required lock: ntrip_state
+ */
+static void ntrip_deferred_free(struct ntrip_state *this, char *orig) {
+	struct bufferevent *bev = this->bev;
 
 	bufferevent_disable(bev, EV_READ|EV_WRITE);
 	bufferevent_set_timeouts(bev, NULL, NULL);
@@ -495,7 +522,7 @@ int ntrip_drop_by_id(struct caster_state *caster, long long id) {
 		}
 		if (st->id == id) {
 			ntrip_notify_close(st);
-			ntrip_deferred_free(st, "ntrip_drop_by_id");
+			ntrip_decref_end(st, "ntrip_drop_by_id");
 			bufferevent_unlock(bev);
 			r = 1;
 			break;
@@ -619,7 +646,7 @@ int ntrip_filter_run_input(struct ntrip_state *st) {
 			return -1;
 
 		if (r != BEV_OK) {
-			ntrip_deferred_free(st, "after chunk_decoder");
+			ntrip_decref_end(st, "after chunk_decoder");
 			return -1;
 		}
 	}

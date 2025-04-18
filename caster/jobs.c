@@ -44,17 +44,6 @@ struct joblist *joblist_new(struct caster_state *caster) {
 }
 
 /*
- * Remove all references to a ntrip_state so it can be freed.
- */
-static void _ntrip_decref(struct ntrip_state *st) {
-	struct bufferevent *bev = st->bev;
-	bufferevent_lock(bev);
-	ntrip_deferred_free(st, "joblist_run");
-	bufferevent_unlock(bev);
-	bufferevent_decref(bev);
-}
-
-/*
  * Required lock: ntrip_state
  */
 static int _joblist_drain(struct jobq *jobq) {
@@ -63,7 +52,7 @@ static int _joblist_drain(struct jobq *jobq) {
 	while ((j = STAILQ_FIRST(jobq))) {
 		STAILQ_REMOVE_HEAD(jobq, next);
 		if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
-			_ntrip_decref(j->ntrip_unlocked_content.st);
+			ntrip_decref(j->ntrip_unlocked_content.st, "_joblist_drain");
 		n++;
 		free(j);
 	}
@@ -143,7 +132,10 @@ void joblist_run(struct joblist *this) {
 				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
 			else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT) {
 				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb, j->ntrip_unlocked_content.req);
-				_ntrip_decref(j->ntrip_unlocked_content.st);
+				struct bufferevent *bev = j->ntrip_unlocked_content.st->bev;
+				bufferevent_lock(bev);
+				ntrip_decref(j->ntrip_unlocked_content.st, "joblist_run");
+				bufferevent_unlock(bev);
 			} else if (j->type == JOB_STOP_THREAD) {
 				logfmt(&this->caster->flog, LOG_INFO, "Exiting thread %d", (long)pthread_getspecific(this->caster->thread_id));
 				pthread_exit(NULL);
@@ -455,7 +447,7 @@ void joblist_append_ntrip_unlocked_content(
 		tmpj.ntrip_unlocked_content.st = st;
 		tmpj.ntrip_unlocked_content.content_cb = content_cb;
 		tmpj.ntrip_unlocked_content.req = req;
-		st->ref++;
+		ntrip_incref(st, "joblist_append_ntrip_unlocked_content");
 		_joblist_append_generic(this, NULL, &tmpj);
 	} else
 		cb(st, content_cb, req);
