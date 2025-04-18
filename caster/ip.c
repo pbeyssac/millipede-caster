@@ -114,17 +114,24 @@ int ip_convert(const char *ipstr, union sock *sock) {
  * Parse a string containing IP[/prefixlen].
  * If prefixlen is not provided, use /128 for IPv6, /32 for IPv4.
  */
-static int _prefix_parse(char *ipstr, union sock *sock, int *prefixlen) {
+int ip_prefix_parse(const char *ipstr, union sock *sock, int *prefixlen) {
 	int pmax;
+	const int MAX_IP_LEN = 40;
+	char ip[MAX_IP_LEN];
 
+	int len = 0;
 	char *p = strchr(ipstr, '/');
-	if (p != NULL) {
-		*p++ = '\0';
-		if (sscanf(p, "%d", prefixlen) != 1)
-			return 0;
-	}
 
-	if (ip_convert(ipstr, sock) <= 0)
+	len = p ? (p - ipstr) : strlen(ipstr);
+	if (len > MAX_IP_LEN)
+		return 0;
+	memcpy(ip, ipstr, len);
+	ip[len] = '\0';
+
+	if (p && sscanf(p+1, "%d", prefixlen) != 1)
+		return 0;
+
+	if (ip_convert(ip, sock) <= 0)
 		return 0;
 	switch(sock->generic.sa_family) {
 	case AF_INET6:
@@ -183,7 +190,7 @@ static int _prefix_check_ip(union sock *sock, int prefixlen) {
  * Parse a prefix + quota pair.
  * Return a filled struct prefix_quota.
  */
-struct prefix_quota *prefix_quota_parse(char *ip_prefix, const char *quota_str) {
+struct prefix_quota *prefix_quota_parse(const char *ip_prefix, const char *quota_str) {
 	int quota, prefixlen;
 
 	if (sscanf(quota_str, "%u", &quota) != 1 || quota < -1)
@@ -193,7 +200,7 @@ struct prefix_quota *prefix_quota_parse(char *ip_prefix, const char *quota_str) 
 	if (!r)
 		return NULL;
 
-	if (_prefix_parse(ip_prefix, &r->prefix.addr, &prefixlen) <= 0) {
+	if (ip_prefix_parse(ip_prefix, &r->prefix.addr, &prefixlen) <= 0) {
 		free(r);
 		return NULL;
 	}
