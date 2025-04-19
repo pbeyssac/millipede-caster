@@ -322,11 +322,9 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			}
 			ns++;
 		} else if (packet->caster->config->zero_copy) {
-			packet_incref(packet);
 			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed");
 				ns++;
-				packet_decref(packet);
 			} else {
 				st->last_send = t;
 				st->sent_bytes += packet->datalen;
