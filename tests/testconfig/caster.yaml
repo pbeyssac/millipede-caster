@@ -13,6 +13,11 @@ sourcetable_file:	sourcetable.dat
 access_log:		../test-access.log
 log:			../test-caster.log
 
+ntripcli_default_write_timeout:	10
+ntripcli_default_read_timeout:	10
+ntripsrv_default_write_timeout:	10
+ntripsrv_default_read_timeout:	10
+idle_max_delay:			10
 http_content_length_max:	100
 http_header_max_size:		100
 
