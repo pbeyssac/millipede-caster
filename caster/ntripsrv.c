@@ -160,16 +160,19 @@ void ntripsrv_deferred_output(
 
 	struct mime_content *m = content_cb(st->caster, req);
 	bufferevent_lock(st->bev);
-	struct evbuffer *output = bufferevent_get_output(st->bev);
 
-	send_server_reply(st, output, req->status, NULL, NULL, m);
+	/* Check for NTRIP_END, as we should never get back from this state */
+	if (st->state != NTRIP_END) {
+		struct evbuffer *output = bufferevent_get_output(st->bev);
+		send_server_reply(st, output, req->status, NULL, NULL, m);
 
-	if (st->connection_keepalive && st->received_keepalive) {
-		ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_HTTP_METHOD", st->connection_keepalive, st->received_keepalive);
-		st->state = NTRIP_WAIT_HTTP_METHOD;
-	} else {
-		ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_CLOSE", st->connection_keepalive, st->received_keepalive);
-		st->state = NTRIP_WAIT_CLOSE;
+		if (st->connection_keepalive && st->received_keepalive) {
+			ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_HTTP_METHOD", st->connection_keepalive, st->received_keepalive);
+			st->state = NTRIP_WAIT_HTTP_METHOD;
+		} else {
+			ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_CLOSE", st->connection_keepalive, st->received_keepalive);
+			st->state = NTRIP_WAIT_CLOSE;
+		}
 	}
 	bufferevent_unlock(st->bev);
 	if (req)
