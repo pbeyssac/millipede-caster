@@ -9,7 +9,6 @@
 #include <openssl/ssl.h>
 
 #include "conf.h"
-#include "auth.h"
 #include "config.h"
 #include "hash.h"
 #include "ip.h"
@@ -68,8 +67,6 @@ struct caster_state {
 	int listeners_count;
 
 	P_RWLOCK_T configlock;
-	struct auth_entry *host_auth;
-	struct auth_entry *source_auth;
 
 	struct prefix_table *blocklist;
 

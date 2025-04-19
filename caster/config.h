@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 
+#include "auth.h"
 #include "log.h"
 #include "rtcm.h"
 
@@ -282,6 +283,10 @@ struct config {
 
 	/* Auth key for incoming syncer API connections */
 	const char *syncer_auth;
+
+	/* Auth file entries */
+	struct auth_entry *host_auth;
+	struct auth_entry *source_auth;
 };
 
 extern int backlog_delay;

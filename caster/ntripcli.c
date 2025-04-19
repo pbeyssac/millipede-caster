@@ -66,8 +66,8 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 
 	P_RWLOCK_RDLOCK(&st->caster->configlock);
 
-	if (st->caster->host_auth) {
-		for (struct auth_entry *a = &st->caster->host_auth[0]; a->user != NULL; a++) {
+	if (st->caster->config->host_auth) {
+		for (struct auth_entry *a = &st->caster->config->host_auth[0]; a->user != NULL; a++) {
 			if (!strcasecmp(a->key, host)) {
 				if (http_headers_add_auth(&headers, a->user, a->password) < 0) {
 					evhttp_clear_headers(&headers);

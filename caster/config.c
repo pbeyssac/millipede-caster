@@ -469,6 +469,8 @@ struct config *config_parse(const char *filename) {
 		if (this->threads[i].stacksize == 0)
 			this->threads[i].stacksize = default_config_threads.stacksize;
 	}
+	this->host_auth = NULL;
+	this->source_auth = NULL;
 	return this;
 }
 
@@ -525,5 +527,9 @@ void config_free(struct config *this) {
 	free((char *)this->sourcetable_filename);
 	free((char *)this->log);
 	free((char *)this->access_log);
+	if (this->host_auth)
+		auth_free(this->host_auth);
+	if (this->source_auth)
+		auth_free(this->source_auth);
 	free(this);
 }

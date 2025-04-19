@@ -389,8 +389,6 @@ void caster_free(struct caster_state *this) {
 	hash_table_free(this->ntrips.ipcount);
 	hash_table_free(this->rtcm_cache);
 
-	auth_free(this->host_auth);
-	auth_free(this->source_auth);
 	if (this->blocklist)
 		prefix_table_free(this->blocklist);
 
@@ -651,16 +649,14 @@ caster_reload_auth(struct caster_state *caster) {
 	if (caster->config->host_auth_filename) {
 		struct auth_entry *tmp = auth_parse(caster, caster->config->host_auth_filename);
 		if (tmp != NULL) {
-			auth_free(caster->host_auth);
-			caster->host_auth = tmp;
+			caster->config->host_auth = tmp;
 		} else
 			r = -1;
 	}
 	if (caster->config->source_auth_filename) {
 		struct auth_entry *tmp = auth_parse(caster, caster->config->source_auth_filename);
 		if (tmp != NULL) {
-			auth_free(caster->source_auth);
-			caster->source_auth = tmp;
+			caster->config->source_auth = tmp;
 		} else
 			r = -1;
 	}
