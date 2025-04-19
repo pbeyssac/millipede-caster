@@ -9,6 +9,7 @@
 #include <openssl/ssl.h>
 
 #include "conf.h"
+#include "auth.h"
 #include "config.h"
 #include "hash.h"
 #include "ip.h"

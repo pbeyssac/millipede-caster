@@ -27,6 +27,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include "auth.h"
 #include "caster.h"
 #include "config.h"
 #include "gelf.h"
@@ -52,45 +53,6 @@ static void caster_log_cb(void *arg, struct gelf_entry *g, int level, const char
 static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
 static int caster_reload_fetchers(struct caster_state *this);
 static void caster_free_fetchers(struct caster_state *this);
-
-/*
- * Read user authentication file for the NTRIP server.
- */
-static struct auth_entry *auth_parse(struct caster_state *caster, const char *filename) {
-	struct parsed_file *p;
-	p = file_parse(filename, 3, ":", 0, &caster->flog);
-
-	if (p == NULL) {
-		logfmt(&caster->flog, LOG_ERR, "Can't read or parse %s", filename);
-		return NULL;
-	}
-	struct auth_entry *auth = (struct auth_entry *)malloc(sizeof(struct auth_entry)*(p->nlines+1));
-
-	int n;
-	for (n = 0; n < p->nlines; n++) {
-		auth[n].key = mystrdup(p->pls[n][0]);
-		auth[n].user = mystrdup(p->pls[n][1]);
-		auth[n].password = mystrdup(p->pls[n][2]);
-	}
-	auth[n].key = NULL;
-	auth[n].user = NULL;
-	auth[n].password = NULL;
-	file_free(p);
-	return auth;
-}
-
-static void auth_free(struct auth_entry *this) {
-	struct auth_entry *p = this;
-	if (this == NULL)
-		return;
-	while (p->key || p->user || p->password) {
-		strfree((char *)p->key);
-		strfree((char *)p->user);
-		strfree((char *)p->password);
-		p++;
-	}
-	free(this);
-}
 
 void caster_log_error(struct caster_state *this, char *orig) {
 	char s[256];
