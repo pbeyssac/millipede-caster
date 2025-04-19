@@ -192,11 +192,8 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 	int explicit_mountpoint = 0;
 	struct auth_entry *wildcard_entry = NULL;
 
-	P_RWLOCK_RDLOCK(&this->caster->configlock);
-
-	struct auth_entry *auth = this->caster->config->source_auth;
+	struct auth_entry *auth = this->config->source_auth;
 	if (auth == NULL) {
-		P_RWLOCK_UNLOCK(&this->caster->configlock);
 		return CHECKPW_MOUNTPOINT_INVALID;
 	}
 
@@ -228,9 +225,6 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 			r = CHECKPW_MOUNTPOINT_WILDCARD;
 		}
 	}
-
-	P_RWLOCK_UNLOCK(&this->caster->configlock);
-
 	return r;
 }
 
@@ -246,13 +240,13 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 	timersub(&t0, &st->last_recompute_date, &t1);
 
 	/* Ignore if too soon since last recompute */
-	if (t1.tv_sec < st->caster->config->min_nearest_recompute_interval)
+	if (t1.tv_sec < st->config->min_nearest_recompute_interval)
 		return;
 
 	/* Ignore if too close to last recompute, and max interval not reached */
 	if (st->last_recompute_date.tv_sec
-		&& t1.tv_sec < st->caster->config->max_nearest_recompute_interval
-		&& distance(&st->last_pos, &st->last_recompute_pos) < st->caster->config->min_nearest_recompute_pos_delta)
+		&& t1.tv_sec < st->config->max_nearest_recompute_interval
+		&& distance(&st->last_pos, &st->last_recompute_pos) < st->config->min_nearest_recompute_pos_delta)
 		return;
 
 	struct sourcetable *pos_sourcetable = stack_flatten_dist(st->caster, &st->caster->sourcetablestack, &st->last_pos, st->lookup_dist);
@@ -271,13 +265,13 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 
 	float last_lookup_dist = st->lookup_dist;
 
-	if (st->caster->config->nearest_base_count_target > 0) {
-		if (s->size_dist_array < st->caster->config->nearest_base_count_target) {
+	if (st->config->nearest_base_count_target > 0) {
+		if (s->size_dist_array < st->config->nearest_base_count_target) {
 			st->lookup_dist *= 2;
-			if (st->lookup_dist > st->caster->config->max_nearest_lookup_distance_m)
-				st->lookup_dist = st->caster->config->max_nearest_lookup_distance_m;
+			if (st->lookup_dist > st->config->max_nearest_lookup_distance_m)
+				st->lookup_dist = st->config->max_nearest_lookup_distance_m;
 		} else
-			st->lookup_dist = s->dist_array[st->caster->config->nearest_base_count_target-1].dist + 1000;
+			st->lookup_dist = s->dist_array[st->config->nearest_base_count_target-1].dist + 1000;
 	}
 
 	if (s->size_dist_array == 0) {
@@ -313,10 +307,10 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 		 * between very close stations.
 		 */
 
-		float current_dist = st->virtual_mountpoint ? (distance(&st->mountpoint_pos, &st->last_pos)-st->caster->config->hysteresis_m) : 1e10;
+		float current_dist = st->virtual_mountpoint ? (distance(&st->mountpoint_pos, &st->last_pos)-st->config->hysteresis_m) : 1e10;
 
 		if (current_dist < s->dist_array[0].dist) {
-			ntrip_log(st, LOG_INFO, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis", st->virtual_mountpoint, m, st->caster->config->hysteresis_m);
+			ntrip_log(st, LOG_DEBUG, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis", st->virtual_mountpoint, m, st->config->hysteresis_m);
 		} else {
 			enum livesource_state source_state;
 			struct livesource *l = livesource_find_on_demand(st->caster, st, m, &s->dist_array[0].pos, 1, s->dist_array[0].on_demand, &source_state);
@@ -342,12 +336,15 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	int err = 0;
 	struct evbuffer *output = bufferevent_get_output(bev);
 	struct evkeyvalq opt_headers;
+	struct config *config = st->config;
 
 	int method_post_source = 0;
 
 	TAILQ_INIT(&opt_headers);
 
 	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
+
+	ntrip_refresh_config(st);
 
 	if (ntrip_filter_run_input(st) < 0)
 		return;
@@ -364,7 +361,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
-			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+			if ((line?len:waiting_len) > config->http_header_max_size) {
 				err = 400;
 				break;
 			}
@@ -392,7 +389,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			st->received_keepalive = 0;
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
-			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+			if ((line?len:waiting_len) > config->http_header_max_size) {
 				err = 431;
 				break;
 			}
@@ -419,10 +416,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					unsigned long content_length;
 					int length_err;
 					if (sscanf(value, "%lu", &content_length) == 1) {
-						length_err = (content_length > st->caster->config->http_content_length_max);
+						length_err = (content_length > config->http_content_length_max);
 						if (length_err) {
 							ntrip_log(st, LOG_NOTICE, "Content-Length %d: exceeds max configured value %d",
-								content_length, st->caster->config->http_content_length_max);
+								content_length, config->http_content_length_max);
 							err = 413;
 							break;
 						}
@@ -444,7 +441,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_EDEBUG, "Header %s: *****", key);
 					if (http_decode_auth(value, &st->scheme_basic, &st->user, &st->password) < 0) {
-						if (st->caster->config->log_level >= LOG_DEBUG) {
+						if (config->log_level >= LOG_DEBUG) {
 							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"", value);
 						} else {
 							ntrip_log(st, LOG_NOTICE, "Can't decode Authorization");
@@ -499,7 +496,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 
-					if (st->caster->config->webroots_count) {
+					if (config->webroots_count) {
 						if (filesrv(st, st->http_args[1], &err, &opt_headers) >= 0 || err)
 							break;
 					}
@@ -559,7 +556,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->type = "client";
 
 					/* Regular NTRIP stream client: set a read timeout to check for data sent */
-					struct timeval read_timeout = { st->caster->config->idle_max_delay+1, 0 };
+					struct timeval read_timeout = { config->idle_max_delay+1, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 
 					if (!st->source_virtual) {
@@ -589,7 +586,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					/*
 					 * We only limit the send buffer on NTRIP clients, except for the sourcetable.
 					 */
-					int sndbuf = st->caster->config->backlog_socket;
+					int sndbuf = config->backlog_socket;
 					if (setsockopt(st->fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof sndbuf) < 0)
 						ntrip_log(st, LOG_NOTICE, "setsockopt SO_SNDBUF %d failed", sndbuf);
 				} else if (!strcmp(st->http_args[0], "POST") || !strcmp(st->http_args[0], "SOURCE")) {
@@ -675,7 +672,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						evbuffer_add_reference(output, "ICY 200 OK\r\n\r\n", 14, NULL, NULL);
 					else
 						ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
-					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
+					struct timeval read_timeout = { config->source_read_timeout, 0 };
 					st->state = NTRIP_WAIT_STREAM_SOURCE;
 					ntrip_set_rtcm_cache(st);
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
@@ -795,13 +792,13 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			 */
 			if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
 				int idle_time = time(NULL) - st->last_send;
-				if (idle_time <= st->caster->config->idle_max_delay) {
+				if (idle_time <= st->config->idle_max_delay) {
 					/* Reenable read */
 					bufferevent_enable(bev, EV_READ);
 					return;
 				}
 				/* No data sent or read, close. */
-				ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, max %d, dropping", idle_time, st->caster->config->idle_max_delay);
+				ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, max %d, dropping", idle_time, st->config->idle_max_delay);
 			} else
 				ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout");
 		}
@@ -841,11 +838,9 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct bufferevent *bev;
 	SSL *ssl = NULL;
 
-	//P_RWLOCK_RDLOCK(&listener_conf->caster->configlock);
 	if (listener_conf->tls) {
 		ssl = SSL_new(listener_conf->ssl_server_ctx);
 		if (ssl == NULL) {
-			P_RWLOCK_UNLOCK(&listener_conf->caster->configlock);
 			ERR_print_errors_cb(caster_tls_log_cb, caster);
 			close(fd);
 			return;
@@ -861,7 +856,6 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		else
 			bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
 	}
-	//P_RWLOCK_UNLOCK(&listener_conf->caster->configlock);
 
 	if (bev == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent!");
@@ -899,7 +893,7 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	else
 		bufferevent_setcb(bev, ntripsrv_readcb, ntripsrv_writecb, ntripsrv_eventcb, st);
 	bufferevent_enable(bev, EV_READ|EV_WRITE);
-	struct timeval read_timeout = { st->caster->config->ntripsrv_default_read_timeout, 0 };
-	struct timeval write_timeout = { st->caster->config->ntripsrv_default_write_timeout, 0 };
+	struct timeval read_timeout = { st->config->ntripsrv_default_read_timeout, 0 };
+	struct timeval write_timeout = { st->config->ntripsrv_default_write_timeout, 0 };
 	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 }

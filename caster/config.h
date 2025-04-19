@@ -1,6 +1,7 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
+#include <stdatomic.h>
 #include <stdio.h>
 
 #include "auth.h"
@@ -284,6 +285,8 @@ struct config {
 	/* Auth key for incoming syncer API connections */
 	const char *syncer_auth;
 
+	_Atomic int refcnt;
+
 	/* Auth file entries */
 	struct auth_entry *host_auth;
 	struct auth_entry *source_auth;
@@ -298,5 +301,14 @@ extern size_t backlog_evbuffer;
 
 struct config *config_parse(const char *filename);
 void config_free(struct config *this);
+
+static inline void config_incref(struct config *this) {
+	atomic_fetch_add_explicit(&this->refcnt, 1, memory_order_relaxed);
+}
+
+static inline void config_decref(struct config *this) {
+	if (atomic_fetch_sub_explicit(&this->refcnt, 1, memory_order_relaxed) == 1)
+		config_free(this);
+}
 
 #endif

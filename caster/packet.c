@@ -1,5 +1,6 @@
-#include <event2/buffer.h>
+#include <stdatomic.h>
 
+#include <event2/buffer.h>
 #include "conf.h"
 #include "caster.h"
 #include "packet.h"
@@ -7,11 +8,10 @@
 
 struct packet *packet_new(size_t len_raw, struct caster_state *caster) {
 	struct packet *this = (struct packet *)malloc(sizeof(struct packet) + len_raw);
-	P_MUTEX_INIT(&this->mutex, NULL);
 	this->datalen = len_raw;
-	this->refcnt = 1;
+	atomic_init(&this->refcnt, 1);
 	this->is_rtcm = 0;
-	this->caster = caster;
+	this->zero_copy = caster->config->zero_copy;
 	return this;
 }
 
@@ -20,26 +20,22 @@ struct packet *packet_new(size_t len_raw, struct caster_state *caster) {
  * for zero copy mode.
  */
 void packet_free(struct packet *packet) {
-	/*
-	 * When not in zero-copy mode, don't lock the packet as
-	 * we are the only thread handling it.
-	 */
-	if (!packet->caster->config->zero_copy) {
-		P_MUTEX_UNLOCK(&packet->mutex);
-		P_MUTEX_DESTROY(&packet->mutex);
+	if (!packet->zero_copy) {
 		free((void *)packet);
 		return;
 	}
 
-	P_MUTEX_LOCK(&packet->mutex);
-	packet->refcnt--;
-	if (packet->refcnt == 0) {
-		P_MUTEX_UNLOCK(&packet->mutex);
-		P_MUTEX_DESTROY(&packet->mutex);
+	if (atomic_fetch_add_explicit(&packet->refcnt, -1, memory_order_relaxed) == 1)
 		free((void *)packet);
-	} else {
-		P_MUTEX_UNLOCK(&packet->mutex);
-	}
+}
+
+void packet_incref(struct packet *packet) {
+	atomic_fetch_add(&packet->refcnt, 1);
+}
+
+void packet_decref(struct packet *packet) {
+	if (atomic_fetch_add_explicit(&packet->refcnt, -1, memory_order_relaxed) == 1)
+		free((void *)packet);
 }
 
 int packet_handle_raw(struct ntrip_state *st) {
@@ -48,10 +44,10 @@ int packet_handle_raw(struct ntrip_state *st) {
 	while (1) {
 		unsigned long len_raw = evbuffer_get_length(input);
 		ntrip_log(st, LOG_EDEBUG, "ntrip_handle_raw ready to get %d bytes", len_raw);
-		if (len_raw < st->caster->config->min_raw_packet)
+		if (len_raw < st->config->min_raw_packet)
 			return 0;
-		if (len_raw > st->caster->config->max_raw_packet)
-			len_raw = st->caster->config->max_raw_packet;
+		if (len_raw > st->config->max_raw_packet)
+			len_raw = st->config->max_raw_packet;
 		struct packet *rawp = packet_new(len_raw, st->caster);
 		st->received_bytes += len_raw;
 		if (rawp == NULL) {

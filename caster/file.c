@@ -38,9 +38,9 @@ int filesrv(struct ntrip_state *st, const char *uri, int *err, struct evkeyvalq 
 	struct config_webroots *wr = NULL;
 	int len_uri = strlen(uri);
 
-	for (int i = 0; i < st->caster->config->webroots_count; i++) {
+	for (int i = 0; i < st->config->webroots_count; i++) {
 		struct config_webroots *wrt;
-		wrt = st->caster->config->webroots + i;
+		wrt = st->config->webroots + i;
 		int lw = strlen(wrt->uri);
 		if (lw && len_uri >= lw && !memcmp(wrt->uri, uri, lw)) {
 			wr = wrt;

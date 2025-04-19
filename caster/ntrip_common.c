@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -61,7 +62,6 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->last_pos_valid = 0;
 	memset(&this->last_recompute_date, 0, sizeof(this->last_recompute_date));
 	this->max_min_dist = 0;
-	this->lookup_dist = caster->config->max_nearest_lookup_distance_m;
 	this->user = NULL;
 	this->password = NULL;
 	this->scheme_basic = 0;
@@ -75,7 +75,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 		STAILQ_INIT(&this->jobq);
 	this->njobs = 0;
 	this->newjobs = 0;
-	this->refcnt = 1;
+	atomic_init(&this->refcnt, 1);
 	this->bev_freed = 0;
 	this->bev_close_on_free = 0;
 	this->bev = bev;
@@ -112,7 +112,24 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->content_type = NULL;
 	this->client = 0;
 	this->rtcm_filter = 0;
+
+	this->config = caster_config_getref(this->caster);
+	this->lookup_dist = this->config->max_nearest_lookup_distance_m;
 	return this;
+}
+
+/*
+ * Update our config reference if necessary.
+ *
+ * Required locks: ntrip_state
+ */
+void ntrip_refresh_config(struct ntrip_state *this) {
+	struct config *new_config = atomic_load(&this->caster->config);
+	if (new_config != this->config) {
+		new_config = caster_config_getref(this->caster);
+		config_decref(this->config);
+		this->config = new_config;
+	}
 }
 
 /*
@@ -160,10 +177,8 @@ static int _ntrip_register(struct ntrip_state *this, int quota_check) {
 		this->task->st_id = this->id;
 
 	if (quota_check) {
-		P_RWLOCK_RDLOCK(&this->caster->configlock);
-		if (this->caster->config->blocklist)
-			quota = prefix_table_get_quota(this->caster->config->blocklist, &this->peeraddr);
-		P_RWLOCK_UNLOCK(&this->caster->configlock);
+		if (this->config->blocklist)
+			quota = prefix_table_get_quota(this->config->blocklist, &this->peeraddr);
 	}
 
 	if (quota >= 0 && ipcount > quota) {
@@ -310,6 +325,7 @@ void ntrip_clear_request(struct ntrip_state *this) {
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_EDEBUG, "FREE %s", orig);
 
+	config_decref(this->config);
 	strfree(this->mountpoint);
 	strfree(this->uri);
 	strfree(this->virtual_mountpoint);
@@ -629,7 +645,7 @@ void ntrip_alog(void *arg, const char *fmt, ...) {
 
 void ntrip_log(void *arg, int level, const char *fmt, ...) {
 	struct ntrip_state *this = (struct ntrip_state *)arg;
-	if (level > this->caster->config->log_level && (!this->caster->config->graylog || level > this->caster->config->graylog[0].log_level))
+	if (level > this->config->log_level && (!this->config->graylog || level > this->config->graylog[0].log_level))
 		return;
 	va_list ap;
 	va_start(ap, fmt);

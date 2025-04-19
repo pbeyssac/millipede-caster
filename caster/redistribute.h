@@ -19,12 +19,13 @@ struct redistribute_cb_args {
 	char persistent;			// restart after failure?
 	struct livesource *livesource;
 	struct ntrip_task *task;
+	int on_demand_source_timeout;
 };
 
 int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource);
 struct redistribute_cb_args *redistribute_args_new(struct caster_state *caster, struct livesource *livesource,
 	struct endpoint *e,
-	char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent);
+	char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent, int on_demand_source_timeout);
 void redistribute_args_free(struct redistribute_cb_args *this);
 int redistribute_schedule(struct caster_state *caster, struct ntrip_state *st, struct redistribute_cb_args *redis_args);
 void redistribute_cb(evutil_socket_t fd, short what, void *cbarg);

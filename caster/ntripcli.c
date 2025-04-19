@@ -64,23 +64,18 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 		return NULL;
 	}
 
-	P_RWLOCK_RDLOCK(&st->caster->configlock);
-
-	if (st->caster->config->host_auth) {
-		for (struct auth_entry *a = &st->caster->config->host_auth[0]; a->user != NULL; a++) {
+	if (st->config->host_auth) {
+		for (struct auth_entry *a = &st->config->host_auth[0]; a->user != NULL; a++) {
 			if (!strcasecmp(a->key, host)) {
 				if (http_headers_add_auth(&headers, a->user, a->password) < 0) {
 					evhttp_clear_headers(&headers);
 					strfree(host_port);
-					P_RWLOCK_UNLOCK(&st->caster->configlock);
 					return NULL;
 				} else
 					break;
 			}
 		}
 	}
-
-	P_RWLOCK_UNLOCK(&st->caster->configlock);
 
 	int hlen = 0;
 	TAILQ_FOREACH(np, &headers, next) {
@@ -148,6 +143,8 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
 
+	ntrip_refresh_config(st);
+
 	if (ntrip_filter_run_input(st) < 0)
 		return;
 
@@ -158,7 +155,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
-			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+			if ((line?len:waiting_len) > st->config->http_header_max_size) {
 				end = 1;
 				break;
 			}
@@ -199,7 +196,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			if (!strcmp(st->http_args[0], "ICY") && !strcmp(st->mountpoint, "") && status_code == 200) {
 				// NTRIP1 connection, don't look for headers
 				st->state = NTRIP_REGISTER_SOURCE;
-				struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
+				struct timeval read_timeout = { st->config->source_read_timeout, 0 };
 				bufferevent_set_timeouts(bev, &read_timeout, NULL);
 			}
 
@@ -215,7 +212,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
-			if ((line?len:waiting_len) > st->caster->config->http_header_max_size) {
+			if ((line?len:waiting_len) > st->config->http_header_max_size) {
 				end = 1;
 				break;
 			}
@@ -228,7 +225,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					end = 1;
 				} else if (strlen(st->mountpoint)) {
 					st->state = NTRIP_REGISTER_SOURCE;
-					struct timeval read_timeout = { st->caster->config->source_read_timeout, 0 };
+					struct timeval read_timeout = { st->config->source_read_timeout, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				} else if (st->task && st->task->line_cb)
 					st->state = NTRIP_WAIT_CALLBACK_LINE;
@@ -265,10 +262,10 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					unsigned long content_length;
 					int length_err;
 					if (sscanf(value, "%lu", &content_length) == 1) {
-						length_err = (content_length > st->caster->config->http_content_length_max);
+						length_err = (content_length > st->config->http_content_length_max);
 						if (length_err) {
 							ntrip_log(st, LOG_NOTICE, "Content-Length %d: exceeds max configured value %d",
-									content_length, st->caster->config->http_content_length_max);
+									content_length, st->config->http_content_length_max);
 							end = 1;
 							break;
 						}
@@ -348,7 +345,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			if (st->persistent || r == 0)
 				break;
 			int idle_time = time(NULL) - st->last_useful;
-			if (idle_time > st->caster->config->idle_max_delay) {
+			if (idle_time > st->config->idle_max_delay) {
 				ntrip_log(st, LOG_NOTICE, "last_useful %s: %d seconds ago, dropping", st->mountpoint, idle_time);
 				end = 1;
 			}
@@ -508,9 +505,9 @@ ntripcli_start(struct ntrip_state *st) {
 	bufferevent_enable(bev, EV_READ|EV_WRITE);
 
 	struct timeval read_timeout = {
-		st->task && st->task->read_timeout ? st->task->read_timeout : st->caster->config->ntripcli_default_read_timeout, 0 };
+		st->task && st->task->read_timeout ? st->task->read_timeout : st->config->ntripcli_default_read_timeout, 0 };
 	struct timeval write_timeout = {
-		st->task && st->task->write_timeout ? st->task->write_timeout : st->caster->config->ntripcli_default_write_timeout, 0 };
+		st->task && st->task->write_timeout ? st->task->write_timeout : st->config->ntripcli_default_write_timeout, 0 };
 	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 
 	bufferevent_socket_connect_hostname(bev, st->caster->dns_base, AF_UNSPEC, st->host, st->port);

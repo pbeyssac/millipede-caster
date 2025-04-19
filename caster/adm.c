@@ -74,7 +74,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		user = hash_table_get(req->hash, "user");
 		password = hash_table_get(req->hash, "password");
 
-		if (!user || !password || !check_password(st, st->caster->config->admin_user, user, password)) {
+		if (!user || !password || !check_password(st, st->config->admin_user, user, password)) {
 			request_free(req);
 			*err = 401;
 			return -1;
@@ -124,8 +124,8 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		if (req->json == NULL) {
 			*err = 400;
 		} else if (!strcmp(uri, "/api/v1/sync") && !strcmp(method, "POST")) {
-			if (st->caster->config->syncer_auth == NULL
-					|| st->password == NULL || st->scheme_basic || strcmp(st->caster->config->syncer_auth, st->password)) {
+			if (st->config->syncer_auth == NULL
+					|| st->password == NULL || st->scheme_basic || strcmp(st->config->syncer_auth, st->password)) {
 				*err = 401;
 			} else {
 				ntripsrv_deferred_output(st, api_sync_json, req);
@@ -139,7 +139,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 
 	/* Legacy access */
 
-	if (!st->user || !check_password(st, st->caster->config->admin_user, st->user, st->password)) {
+	if (!st->user || !check_password(st, st->config->admin_user, st->user, st->password)) {
 		request_free(req);
 		int www_auth_value_len = strlen(root_uri) + 15;
 		char *www_auth_value = (char *)strmalloc(www_auth_value_len);

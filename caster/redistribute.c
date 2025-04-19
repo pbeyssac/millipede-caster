@@ -43,7 +43,8 @@ int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, p
 struct redistribute_cb_args *
 redistribute_args_new(struct caster_state *caster, struct livesource *livesource,
 	struct endpoint *e,
-	char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent) {
+	char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent,
+	int on_demand_source_timeout) {
 	struct redistribute_cb_args *this;
 	this = (struct redistribute_cb_args *)malloc(sizeof(struct redistribute_cb_args));
 	char *uri = (char *)strmalloc(strlen(mountpoint)+2);
@@ -82,6 +83,7 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 	endpoint_copy(&this->endpoint, e);
 	this->persistent = persistent;
 	this->livesource = livesource;
+	this->on_demand_source_timeout = on_demand_source_timeout;
 	return this;
 }
 
@@ -140,8 +142,8 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
 
 	this->task->port = port;
 	this->task->tls = tls;
-	this->task->read_timeout = this->caster->config->on_demand_source_timeout;
-	this->task->write_timeout = this->caster->config->on_demand_source_timeout;
+	this->task->read_timeout = this->on_demand_source_timeout;
+	this->task->write_timeout = this->on_demand_source_timeout;
 
 	if (ntrip_task_start(this->task, NULL, this->livesource, this->persistent) < 0)
 		logfmt(&this->caster->flog, LOG_CRIT, "ntrip_task_start failed, cannot redistribute %s", this->mountpoint);

@@ -283,11 +283,8 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	this->npackets++;
 
 	/* Increase reference count in one go to reduce overhead */
-	if (packet->caster->config->zero_copy) {
-		P_MUTEX_LOCK(&packet->mutex);
-		packet->refcnt += this->nsubs;
-		P_MUTEX_UNLOCK(&packet->mutex);
-	}
+	if (packet->zero_copy)
+		atomic_fetch_add_explicit(&packet->refcnt, this->nsubs, memory_order_relaxed);
 
 	int nbacklogged = 0;
 
@@ -321,10 +318,12 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 				}
 			}
 			ns++;
-		} else if (packet->caster->config->zero_copy) {
+		} else if (packet->zero_copy) {
+			packet_incref(packet);
 			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed");
 				ns++;
+				packet_decref(packet);
 			} else {
 				st->last_send = t;
 				st->sent_bytes += packet->datalen;
@@ -348,11 +347,9 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	/*
 	 * Adjust reference count to account for failed calls
 	 */
-	if (packet->caster->config->zero_copy && ns) {
+	if (packet->zero_copy && ns) {
 		/* Don't need to free the packet as it will be done by the caller, the refcnt should never be 0 here */
-		P_MUTEX_LOCK(&packet->mutex);
-		packet->refcnt -= ns;
-		P_MUTEX_UNLOCK(&packet->mutex);
+		atomic_fetch_sub_explicit(&packet->refcnt, ns, memory_order_relaxed);
 	}
 	assert(packet->refcnt > 0);
 
@@ -494,7 +491,7 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 		this->livesources->serial++;
 		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s", mountpoint);
 		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np,
-			&e, mountpoint, mountpoint_pos, this->config->reconnect_delay, 0);
+			&e, mountpoint, mountpoint_pos, st->config->reconnect_delay, 0, st->config->on_demand_source_timeout);
 		endpoint_free(&e);
 		joblist_append_redistribute(this->joblist, redistribute_source_stream, redis_args);
 		result = np;
