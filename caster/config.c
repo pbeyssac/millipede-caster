@@ -5,6 +5,7 @@
 
 #include "ntrip_common.h"
 #include "config.h"
+#include "ip.h"
 #include "util.h"
 
 /*
@@ -471,6 +472,7 @@ struct config *config_parse(const char *filename) {
 	}
 	this->host_auth = NULL;
 	this->source_auth = NULL;
+	this->blocklist = NULL;
 	return this;
 }
 
@@ -531,5 +533,7 @@ void config_free(struct config *this) {
 		auth_free(this->host_auth);
 	if (this->source_auth)
 		auth_free(this->source_auth);
+	if (this->blocklist)
+		prefix_table_free(this->blocklist);
 	free(this);
 }

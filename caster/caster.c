@@ -176,7 +176,6 @@ caster_new(const char *config_file) {
 	this->listeners_count = 0;
 	this->sourcetable_fetchers = NULL;
 	this->sourcetable_fetchers_count = 0;
-	this->blocklist = NULL;
 
 	this->ssl_client_ctx = SSL_CTX_new(TLS_client_method());
 	if (this->ssl_client_ctx == NULL) {
@@ -388,9 +387,6 @@ void caster_free(struct caster_state *this) {
 
 	hash_table_free(this->ntrips.ipcount);
 	hash_table_free(this->rtcm_cache);
-
-	if (this->blocklist)
-		prefix_table_free(this->blocklist);
 
 	evdns_base_free(this->dns_base, 1);
 	event_base_free(this->base);
@@ -670,10 +666,6 @@ caster_reload_blocklist(struct caster_state *caster) {
 	int r = 0;
 	P_RWLOCK_WRLOCK(&caster->configlock);
 	struct prefix_table *p;
-	if (caster->blocklist) {
-		prefix_table_free(caster->blocklist);
-		caster->blocklist = NULL;
-	}
 
 	if (caster->config->blocklist_filename) {
 		logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->blocklist_filename);
@@ -685,7 +677,7 @@ caster_reload_blocklist(struct caster_state *caster) {
 			p = NULL;
 			r = -1;
 		}
-		caster->blocklist = p;
+		caster->config->blocklist = p;
 	}
 	P_RWLOCK_UNLOCK(&caster->configlock);
 	return r;

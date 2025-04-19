@@ -68,8 +68,6 @@ struct caster_state {
 
 	P_RWLOCK_T configlock;
 
-	struct prefix_table *blocklist;
-
 	SSL_CTX *ssl_client_ctx;	// TLS context for fetchers
 
 	struct timeval start_date;

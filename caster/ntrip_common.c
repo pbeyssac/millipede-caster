@@ -161,8 +161,8 @@ static int _ntrip_register(struct ntrip_state *this, int quota_check) {
 
 	if (quota_check) {
 		P_RWLOCK_RDLOCK(&this->caster->configlock);
-		if (this->caster->blocklist)
-			quota = prefix_table_get_quota(this->caster->blocklist, &this->peeraddr);
+		if (this->caster->config->blocklist)
+			quota = prefix_table_get_quota(this->caster->config->blocklist, &this->peeraddr);
 		P_RWLOCK_UNLOCK(&this->caster->configlock);
 	}
 
