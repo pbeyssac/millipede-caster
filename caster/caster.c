@@ -659,34 +659,13 @@ static int caster_reload_listeners(struct caster_state *this) {
 
 static int
 caster_reload_sourcetables(struct caster_state *caster) {
-	struct sourcetable *s;
-	struct sourcetable *stmp;
-
 	struct sourcetable *local_table
 		= sourcetable_read(caster, caster->config->sourcetable_filename, caster->config->sourcetable_priority);
 
 	if (local_table == NULL)
 		return -1;
 
-	P_RWLOCK_WRLOCK(&caster->sourcetablestack.lock);
-
-	TAILQ_FOREACH_SAFE(s, &caster->sourcetablestack.list, next, stmp) {
-		P_RWLOCK_WRLOCK(&s->lock);
-		if (s->local && s->filename) {
-			logfmt(&caster->flog, LOG_INFO, "Removing %s", s->filename);
-			TAILQ_REMOVE(&caster->sourcetablestack.list, s, next);
-			sourcetable_free_unlocked(s);
-			/* Skip the unlock below! */
-			continue;
-		}
-		P_RWLOCK_UNLOCK(&s->lock);
-	}
-
-	logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->sourcetable_filename);
-	TAILQ_INSERT_TAIL(&caster->sourcetablestack.list, local_table, next);
-
-	P_RWLOCK_UNLOCK(&caster->sourcetablestack.lock);
-
+	stack_replace_local(caster, &caster->sourcetablestack, local_table);
 	return 0;
 }
 

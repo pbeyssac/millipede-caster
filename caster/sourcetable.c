@@ -554,7 +554,7 @@ struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpo
  * Remove a sourcetable identified by host+port in the sourcetable stack.
  * Insert a new one instead, if new_sourcetable is not NULL.
  */
-static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack, const char *host, unsigned port, struct sourcetable *new_sourcetable, int compare_tv) {
+static void _stack_replace(struct caster_state *caster, sourcetable_stack_t *stack, const char *host, unsigned port, struct sourcetable *new_sourcetable, int compare_tv, int local) {
 	struct sourcetable *s;
 	struct sourcetable *r = NULL;
 
@@ -562,7 +562,9 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 
 	TAILQ_FOREACH(s, &stack->list, next) {
 		P_RWLOCK_WRLOCK(&s->lock);
-		if (!strcmp(s->caster, host) && s->port == port) {
+		if ((local && s->local && s->filename)
+			||
+		    (host && !strcmp(s->caster, host) && s->port == port)) {
 			r = s;
 			break;
 		}
@@ -571,6 +573,8 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 
 	if (r) {
 		if (new_sourcetable == NULL || !compare_tv || timercmp(&r->fetch_time, &new_sourcetable->fetch_time, <)) {
+			if (local)
+				logfmt(&caster->flog, LOG_INFO, "Removing %s", s->filename);
 			TAILQ_REMOVE(&stack->list, r, next);
 			if (new_sourcetable != NULL) {
 				P_RWLOCK_UNLOCK(&r->lock);
@@ -590,6 +594,8 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 		/*
 		 * Insert at the right place to keep the stack sorted by decreasing priority.
 		 */
+		if (local)
+			logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->sourcetable_filename);
 		TAILQ_FOREACH(s, &stack->list, next) {
 			if (new_sourcetable->priority >= s->priority) {
 				TAILQ_INSERT_BEFORE(s, new_sourcetable, next);
@@ -605,7 +611,11 @@ static void _stack_replace_host(struct caster_state *caster, sourcetable_stack_t
 }
 
 void stack_replace_host(struct caster_state *caster, sourcetable_stack_t *stack, const char *host, unsigned port, struct sourcetable *new_sourcetable) {
-	_stack_replace_host(caster, stack, host, port, new_sourcetable, 0);
+	_stack_replace(caster, stack, host, port, new_sourcetable, 0, 0);
+}
+
+void stack_replace_local(struct caster_state *caster, sourcetable_stack_t *stack, struct sourcetable *new_sourcetable) {
+	_stack_replace(caster, stack, NULL, 0, new_sourcetable, 0, 1);
 }
 
 /*
@@ -731,7 +741,7 @@ int sourcetable_update_execute(struct caster_state *caster, json_object *j) {
 
 	if (s != NULL) {
 		logfmt(&caster->flog, LOG_DEBUG, "received sourcetable for %s", s->caster);
-		_stack_replace_host(caster, &caster->sourcetablestack, s->caster, s->port, s, 1);
+		_stack_replace(caster, &caster->sourcetablestack, s->caster, s->port, s, 1, 0);
 	}
 	return 200;
 }
