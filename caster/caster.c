@@ -53,6 +53,7 @@ static void caster_log_cb(void *arg, struct gelf_entry *g, int level, const char
 static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
 static int caster_reload_fetchers(struct caster_state *this);
 static void caster_free_fetchers(struct caster_state *this);
+static void caster_free_rtcm_filters(struct caster_state *caster);
 
 void caster_log_error(struct caster_state *this, char *orig) {
 	char s[256];
@@ -415,6 +416,7 @@ void caster_free(struct caster_state *this) {
 		json_object_put(this->endpoints_json);
 	if (this->config)
 		config_decref(this->config);
+	caster_free_rtcm_filters(this);
 	libevent_global_shutdown();
 	free(this);
 }
@@ -723,6 +725,7 @@ caster_reload_rtcm_filters(struct caster_state *caster) {
 			return -1;
 		}
 		hash_table_update(caster->rtcm_filter_dict, h);
+		hash_table_free(h);
 		caster->rtcm_filter = rtcm_filter;
 	}
 	return 0;
