@@ -347,9 +347,9 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			int r = rtcm_packet_handle(st);
 			if (st->persistent || r == 0)
 				break;
-			int idle_time = time(NULL) - st->last_send;
+			int idle_time = time(NULL) - st->last_useful;
 			if (idle_time > st->caster->config->idle_max_delay) {
-				ntrip_log(st, LOG_NOTICE, "last_send %s: %d seconds ago, dropping", st->mountpoint, idle_time);
+				ntrip_log(st, LOG_NOTICE, "last_useful %s: %d seconds ago, dropping", st->mountpoint, idle_time);
 				end = 1;
 			}
 		}

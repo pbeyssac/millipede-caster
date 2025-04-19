@@ -164,7 +164,7 @@ struct ntrip_state {
 	struct livesource *own_livesource;
 
 	/* packet feed (RTCM or other) redistribution */
-	time_t last_send;			// last time a packet was resent to someone
+	time_t last_useful;			// last time a packet was resent to someone
 	char persistent;			// Flag: don't unregister & close the livesource even after idle_max_delay
 
 	/*
@@ -177,6 +177,7 @@ struct ntrip_state {
 	struct ntrip_task *task;		// descriptor and callbacks for the current task
 	struct subscriber *subscription;	// current source subscription
 	char *uri;				// URI for requests
+	time_t last_send;			// last time a packet was sent to this client
 
 	/*
 	 * NTRIP server state

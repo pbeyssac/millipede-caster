@@ -63,7 +63,7 @@ int packet_handle_raw(struct ntrip_state *st) {
 
 		//ntrip_log(st, LOG_DEBUG, "Raw: packet source %s size %d", st->mountpoint, len_raw);
 		if (livesource_send_subscribers(st->own_livesource, rawp, st->caster))
-			st->last_send = time(NULL);
+			st->last_useful = time(NULL);
 		packet_free(rawp);
 		return 1;
 	}

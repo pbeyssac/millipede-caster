@@ -556,7 +556,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->type = "client";
 
 					/* Regular NTRIP stream client: set a read timeout to check for data sent */
-					struct timeval read_timeout = { st->caster->config->ntripsrv_default_read_timeout, 0 };
+					struct timeval read_timeout = { st->caster->config->idle_max_delay+1, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 
 					if (!st->source_virtual) {
@@ -798,7 +798,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 					return;
 				}
 				/* No data sent or read, close. */
-				ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, dropping", idle_time);
+				ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, max %d, dropping", idle_time, st->caster->config->idle_max_delay);
 			} else
 				ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout");
 		}

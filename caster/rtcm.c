@@ -752,7 +752,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			st->received_bytes += len;
 			ntrip_log(st, LOG_INFO, "resending %zd bytes", len);
 			if (livesource_send_subscribers(st->own_livesource, not_rtcmp, st->caster))
-				st->last_send = time(NULL);
+				st->last_useful = time(NULL);
 			r = 1;
 			packet_free(not_rtcmp);
 			max_len -= len;
@@ -792,7 +792,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		}
 
 		if (livesource_send_subscribers(st->own_livesource, rtcmp, st->caster))
-			st->last_send = time(NULL);
+			st->last_useful = time(NULL);
 		packet_free(rtcmp);
 		r = 1;
 	}
