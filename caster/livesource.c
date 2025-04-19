@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <string.h>
+#include <time.h>
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -269,6 +270,7 @@ static void raw_free_callback(const void *data, size_t datalen, void *extra) {
 int livesource_send_subscribers(struct livesource *this, struct packet *packet, struct caster_state *caster) {
 	struct subscriber *np;
 	struct packet *pconv = NULL;
+	time_t t = time(NULL);
 	int n = 0;
 	int ns = 0;
 
@@ -313,21 +315,29 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			if (pconv) {
 				if (evbuffer_add(bufferevent_get_output(st->bev), pconv->data, pconv->datalen) < 0) {
 					ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add failed");
-				} else
+				} else {
+					st->last_send = t;
 					st->sent_bytes += packet->datalen;
+				}
 			}
 			ns++;
 		} else if (packet->caster->config->zero_copy) {
+			packet_incref(packet);
 			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed");
 				ns++;
-			} else
+				packet_decref(packet);
+			} else {
+				st->last_send = t;
 				st->sent_bytes += packet->datalen;
+			}
 		} else {
 			if (evbuffer_add(bufferevent_get_output(st->bev), packet->data, packet->datalen) < 0) {
 				ns++;
-			} else
+			} else {
+				st->last_send = t;
 				st->sent_bytes += packet->datalen;
+			}
 		}
 		bufferevent_unlock(bev);
 		n++;
