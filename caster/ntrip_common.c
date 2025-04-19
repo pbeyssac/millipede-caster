@@ -51,7 +51,9 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
 	this->port = port;
-	this->last_send = time(NULL);
+	time_t t = time(NULL);
+	this->last_useful = t;
+	this->last_send = t;
 	this->subscription = NULL;
 	this->server_version = 2;
 	this->client_version = 0;
