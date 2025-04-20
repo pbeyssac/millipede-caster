@@ -275,7 +275,7 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 
 	struct ntrip_state *st = this->st;
 	struct bufferevent *bev = this->bev;
-	if (st != NULL) {
+	if (st != NULL && bev != NULL) {
 		int my_sending = (this->bev_sending == 0);
 		this->bev_sending++;
 
