@@ -141,7 +141,6 @@ int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct lives
  * Kill any associated TCP session.
  */
 void ntrip_task_stop(struct ntrip_task *this) {
-	logfmt(&this->caster->flog, LOG_INFO, "Stopping %s from %s:%d", this->type, this->host, this->port);
 
 	P_RWLOCK_RDLOCK(&this->st_lock);
 	this->state = TASK_STOPPED;
@@ -158,8 +157,11 @@ void ntrip_task_stop(struct ntrip_task *this) {
 
 	ntrip_task_clear_st(this);
 
-	if (id)
+	if (id) {
+		logfmt(&this->caster->flog, LOG_INFO, "Stopping %s (%p) from %s:%d", this->type, this, this->host, this->port);
 		ntrip_drop_by_id(this->caster, id);
+	} else
+		logfmt(&this->caster->flog, LOG_INFO, "Stopping %s (%p) from %s:%d: not running", this->type, this, this->host, this->port);
 }
 
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {

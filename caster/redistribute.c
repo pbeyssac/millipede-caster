@@ -89,7 +89,6 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 
 void
 redistribute_args_free(struct redistribute_cb_args *this) {
-	ntrip_task_stop(this->task);
 	if (this->task)
 		ntrip_task_free(this->task);
 	endpoint_free(&this->endpoint);
