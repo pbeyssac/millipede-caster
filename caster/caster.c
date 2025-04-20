@@ -375,12 +375,12 @@ void caster_free(struct caster_state *this) {
 
 	caster_free_listeners(this);
 
-	if (this->signalpipe_event)
-		event_free(this->signalpipe_event);
 	if (this->signalhup_event)
 		event_free(this->signalhup_event);
 	if (this->signalint_event)
 		event_free(this->signalint_event);
+	if (this->signalterm_event)
+		event_free(this->signalterm_event);
 
 	caster_free_fetchers(this);
 	caster_free_syncers(this);
@@ -772,12 +772,12 @@ static int caster_chdir_reload(struct caster_state *this, int reopen_logs) {
 
 static void
 signal_cb(evutil_socket_t sig, short events, void *user_data) {
-	struct event_base *base = user_data;
+	struct caster_signal_cb_info *info = user_data;
 	struct timeval delay = { 0, 0 };
 
-	printf("Caught an interrupt signal; exiting.\n");
-
-	event_base_loopexit(base, &delay);
+	printf("Caught %s signal; exiting.\n", info->signame);
+	logfmt(&info->caster->flog, LOG_INFO, "Caught %s signal; exiting.", info->signame);
+	event_base_loopexit(info->caster->base, &delay);
 }
 
 int caster_reload(struct caster_state *this) {
@@ -827,9 +827,19 @@ void event_log_redirect(int severity, const char *msg) {
 }
 
 static int caster_set_signals(struct caster_state *this) {
-	this->signalint_event = evsignal_new(this->base, SIGINT, signal_cb, (void *)this->base);
+	this->sigint_info.caster = this;
+	this->sigint_info.signame = "SIGINT";
+	this->sigterm_info.signame = "SIGTERM";
+	this->sigterm_info.caster = this;
+	this->signalint_event = evsignal_new(this->base, SIGINT, signal_cb, (void *)&this->sigint_info);
 	if (!this->signalint_event || event_add(this->signalint_event, NULL) < 0) {
-		fprintf(stderr, "Could not create/add a signal event!\n");
+		fprintf(stderr, "Could not create/add SIGINT signal event!\n");
+		return -1;
+	}
+
+	this->signalterm_event = evsignal_new(this->base, SIGTERM, signal_cb, (void *)&this->sigterm_info);
+	if (!this->signalterm_event || event_add(this->signalterm_event, NULL) < 0) {
+		fprintf(stderr, "Could not create/add SIGTERM signal event!\n");
 		return -1;
 	}
 
@@ -837,7 +847,7 @@ static int caster_set_signals(struct caster_state *this) {
 
 	this->signalhup_event = evsignal_new(this->base, SIGHUP, signalhup_cb, (void *)this);
 	if (!this->signalhup_event || event_add(this->signalhup_event, 0) < 0) {
-		fprintf(stderr, "Could not create/add a signal event!\n");
+		fprintf(stderr, "Could not create/add SIGHUP signal event!\n");
 		return -1;
 	}
 	return 0;
@@ -958,6 +968,7 @@ int caster_main(char *config_file) {
 
 	event_base_dispatch(caster->base);
 
+	logfmt(&caster->flog, LOG_NOTICE, "Stopping caster");
 	caster_free(caster);
 	return 0;
 }

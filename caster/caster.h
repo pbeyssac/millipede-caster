@@ -35,6 +35,12 @@ struct listener {
 	char *hostname;			// hostname for TLS/SNI
 };
 
+/* Structure passed to signal callback for caster termination */
+struct caster_signal_cb_info {
+	const char *signame;
+	struct caster_state *caster;
+};
+
 /*
  * State for a caster
  */
@@ -102,8 +108,9 @@ struct caster_state {
 
 	/* Signal handling */
 	struct event *signalint_event;
-	struct event *signalpipe_event;
+	struct event *signalterm_event;
 	struct event *signalhup_event;
+	struct caster_signal_cb_info sigint_info, sigterm_info;
 
 	/*
 	 * Sourcetable fetcher configuration.
