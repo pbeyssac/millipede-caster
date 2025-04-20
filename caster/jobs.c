@@ -272,13 +272,13 @@ static int job_equal(struct job *j1, struct job *j2) {
 static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st, struct job *tmpj) {
 	struct job *j = NULL;
 	if (st == NULL) {
-		P_MUTEX_LOCK(&this->append_mutex);
 		j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
-			//ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
+			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
 			return;
 		}
 		memcpy(j, tmpj, sizeof(*j));
+		P_MUTEX_LOCK(&this->append_mutex);
 		assert(this->append_njobs >= 0);
 		STAILQ_INSERT_TAIL(&this->append_jobq, j, next);
 		this->append_njobs++;
@@ -325,8 +325,8 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	if (lastj == NULL || !job_equal(lastj, tmpj)) {
 		j = (struct job *)malloc(sizeof(struct job));
 		if (j == NULL) {
-			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
 			P_MUTEX_UNLOCK(&this->append_mutex);
+			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
 			return;
 		}
 
@@ -345,24 +345,32 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	}
 
 	assert(jobq_was_empty ? (st->newjobs == 1 || st->newjobs == -1) : 1);
+
+	int inserted, njobs = st->njobs, newjobs = st->newjobs;
 	if (st->newjobs == 1) {
 		/*
 		 * Insertion needed in the main job queue.
 		 */
 		assert(st->newjobs != -1);
-		ntrip_log(st, LOG_EDEBUG, "job appended, inserting in joblist ntrip_queue njobs %d newjobs %d", st->njobs, st->newjobs);
+		inserted = 1;
 		STAILQ_INSERT_TAIL(&this->append_queue, st, next);
 		this->append_ntrip_njobs++;
 		st->newjobs = -1;
 	} else {
 		assert(st->newjobs == -1);
-		ntrip_log(st, LOG_EDEBUG, "job appended, ntrip already in job list, njobs %d newjobs %d", st->njobs, st->newjobs);
+		inserted = 0;
 	}
+
+	P_MUTEX_UNLOCK(&this->append_mutex);
+
+	/* Log message out of locks to avoid deadlocks */
+	ntrip_log(st, LOG_EDEBUG, "job appended, ntrip %d in joblist ntrip_queue njobs %d newjobs %d",
+		inserted?"inserted":"already in",
+		njobs, newjobs);
 
 	/*
 	 * Signal waiting workers there is a new job.
 	 */
-	P_MUTEX_UNLOCK(&this->append_mutex);
 	P_MUTEX_LOCK(&this->condlock);
 	if (pthread_cond_signal(&this->condjob) != 0)
 		caster_log_error(this->caster, "pthread_cond_signal");
