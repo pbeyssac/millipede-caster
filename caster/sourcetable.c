@@ -144,14 +144,13 @@ struct sourcetable *sourcetable_new(const char *host, unsigned short port, int t
 	return this;
 }
 
-void sourcetable_free_unlocked(struct sourcetable *this) {
+static void sourcetable_free_unlocked(struct sourcetable *this) {
 	strfree(this->header);
 	strfree(this->caster);
 	strfree((char *)this->filename);
 
 	hash_table_free(this->key_val);
 
-	P_RWLOCK_UNLOCK(&this->lock);
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
 }

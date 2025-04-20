@@ -63,7 +63,6 @@ struct dist_table {
 
 struct sourcetable *sourcetable_read(struct caster_state *caster, const char *filename, int priority);
 struct sourcetable *sourcetable_new(const char *host, unsigned short port, int tls);
-void sourcetable_free_unlocked(struct sourcetable *this);
 void sourcetable_free(struct sourcetable *this);
 struct mime_content *sourcetable_get(struct sourcetable *this);
 json_object *sourcetable_json(struct sourcetable *this);
