@@ -41,6 +41,7 @@ struct hash_iterator {
 };
 
 struct hash_table *hash_table_new(int n_buckets, void free_callback(void *));
+void hash_table_free_null(void *value);
 void hash_table_free(struct hash_table *this);
 
 void hash_table_replace(struct hash_table *this, struct element *e, void *value);

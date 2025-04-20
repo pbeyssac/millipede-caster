@@ -195,7 +195,7 @@ caster_new(const char *config_file) {
 	P_RWLOCK_INIT(&this->rtcm_lock, NULL);
 	this->ntrips.next_id = 1;
 
-	this->ntrips.ipcount = hash_table_new(509, NULL);
+	this->ntrips.ipcount = hash_table_new(509, hash_table_free_null);
 
 	// Used for access to source_auth, host_auth, blocklist and listener config
 	pthread_mutexattr_t attr;

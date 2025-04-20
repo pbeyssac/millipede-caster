@@ -52,6 +52,9 @@ static void _hash_table_free_element(struct hash_table *this, struct element *e)
 	free(e);
 }
 
+void hash_table_free_null(void *value) {
+}
+
 /*
  * Free a complete hash table.
  */
