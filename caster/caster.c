@@ -202,6 +202,7 @@ caster_new(const char *config_file) {
 	pthread_mutexattr_init(&attr);
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 	P_MUTEX_INIT(&this->configmtx, &attr);
+	pthread_mutexattr_destroy(&attr);
 
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
