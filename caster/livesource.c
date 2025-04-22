@@ -224,6 +224,8 @@ struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntr
 
 /*
  * Remove a subscriber from a live source.
+ *
+ * Required lock: ntrip_state
  */
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st) {
 	if (st->subscription) {
@@ -255,24 +257,15 @@ void livesource_del_subscriber(struct ntrip_state *st) {
 }
 
 /*
- * Packet freeing callback
- */
-static void raw_free_callback(const void *data, size_t datalen, void *extra) {
-	struct packet *packet = (struct packet *)extra;
-	packet_free(packet);
-}
-
-/*
  * Send a packet to all source subscribers
  *
  * Required locks: ntrip_state, packet
  */
 int livesource_send_subscribers(struct livesource *this, struct packet *packet, struct caster_state *caster) {
 	struct subscriber *np;
-	struct packet *pconv = NULL;
+	struct packet *pconv = NULL, *p;
 	time_t t = time(NULL);
 	int n = 0;
-	int ns = 0;
 
 	if (this == NULL)
 		/* Dead livesource */
@@ -281,10 +274,6 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	P_RWLOCK_WRLOCK(&this->lock);
 
 	this->npackets++;
-
-	/* Increase reference count in one go to reduce overhead */
-	if (packet->zero_copy)
-		atomic_fetch_add_explicit(&packet->refcnt, this->nsubs, memory_order_relaxed);
 
 	int nbacklogged = 0;
 
@@ -296,7 +285,6 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			/* Subscriber currently closing, skip */
 			ntrip_log(st, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d", st->state);
 			bufferevent_unlock(bev);
-			ns++;
 			n++;
 			continue;
 		}
@@ -305,37 +293,18 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
-			ns++;
-		} else if (st->rtcm_filter && !rtcm_filter_pass(st->caster->rtcm_filter, packet)) {
+			bufferevent_unlock(bev);
+			n++;
+			continue;
+		}
+		p = packet;
+		if (st->rtcm_filter && !rtcm_filter_pass(st->caster->rtcm_filter, packet)) {
 			if (!pconv)
 				pconv = rtcm_filter_convert(st->caster->rtcm_filter, st, packet);
-			if (pconv) {
-				if (evbuffer_add(bufferevent_get_output(st->bev), pconv->data, pconv->datalen) < 0) {
-					ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add failed");
-				} else {
-					st->last_send = t;
-					st->sent_bytes += packet->datalen;
-				}
-			}
-			ns++;
-		} else if (packet->zero_copy) {
-			packet_incref(packet);
-			if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
-				ntrip_log(st, LOG_CRIT, "RTCM: evbuffer_add_reference failed");
-				ns++;
-				packet_decref(packet);
-			} else {
-				st->last_send = t;
-				st->sent_bytes += packet->datalen;
-			}
-		} else {
-			if (evbuffer_add(bufferevent_get_output(st->bev), packet->data, packet->datalen) < 0) {
-				ns++;
-			} else {
-				st->last_send = t;
-				st->sent_bytes += packet->datalen;
-			}
+			p = pconv;
 		}
+		if (p)
+			packet_send(p, st, t);
 		bufferevent_unlock(bev);
 		n++;
 	}
@@ -344,13 +313,6 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	if (pconv)
 		packet_free(pconv);
 
-	/*
-	 * Adjust reference count to account for failed calls
-	 */
-	if (packet->zero_copy && ns) {
-		/* Don't need to free the packet as it will be done by the caller, the refcnt should never be 0 here */
-		atomic_fetch_sub_explicit(&packet->refcnt, ns, memory_order_relaxed);
-	}
 	assert(packet->refcnt > 0);
 
 	/*

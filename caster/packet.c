@@ -38,6 +38,35 @@ void packet_decref(struct packet *packet) {
 		free((void *)packet);
 }
 
+/*
+ * Packet freeing callback
+ */
+static void raw_free_callback(const void *data, size_t datalen, void *extra) {
+	struct packet *packet = (struct packet *)extra;
+	packet_free(packet);
+}
+
+/*
+ * Send a packet
+ * Required lock: ntrip_state
+ */
+void packet_send(struct packet *packet, struct ntrip_state *st, time_t t) {
+	if (packet->zero_copy) {
+		if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
+			ntrip_log(st, LOG_CRIT, "evbuffer_add_reference failed");
+			return;
+		}
+		packet_incref(packet);
+	} else {
+		if (evbuffer_add(bufferevent_get_output(st->bev), packet->data, packet->datalen) < 0) {
+			ntrip_log(st, LOG_CRIT, "evbuffer_add failed");
+			return;
+		}
+	}
+	st->last_send = t;
+	st->sent_bytes += packet->datalen;
+}
+
 int packet_handle_raw(struct ntrip_state *st) {
 	struct evbuffer *input = st->input;
 
