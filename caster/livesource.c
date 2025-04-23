@@ -370,7 +370,7 @@ int livesource_del(struct livesource *this, struct ntrip_state *st, struct caste
  *	-1: other error
  */
 int livesource_connected(struct ntrip_state *st, char *mountpoint) {
-	json_object *j;
+	json_object *j = NULL;
 	struct livesource *existing_livesource;
 
 	assert(st->own_livesource == NULL && st->subscription == NULL);
@@ -380,7 +380,7 @@ int livesource_connected(struct ntrip_state *st, char *mountpoint) {
 	 * since we are not a source subscriber.
 	 */
 	P_RWLOCK_WRLOCK(&st->caster->livesources->lock);
-	existing_livesource = livesource_find_unlocked(st->caster, st, mountpoint, NULL, 0, 0, NULL, &j);
+	existing_livesource = livesource_find_unlocked(st->caster, st, mountpoint, NULL, 0, 0, NULL, NULL);
 	if (existing_livesource) {
 		/* Here, we should perphaps destroy & replace any existing source fetcher. */
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
@@ -438,7 +438,8 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 	struct livesource *np;
 	struct livesource *result = NULL;
 
-	*jp = NULL;
+	if (jp)
+		*jp = NULL;
 
 	np = (struct livesource *)hash_table_get(this->livesources->hash, mountpoint);
 
@@ -459,7 +460,8 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 			return NULL;
 		}
 		hash_table_add(this->livesources->hash, mountpoint, np);
-		*jp = livesource_update_json(np, this, LIVESOURCE_UPDATE_ADD);
+		if (*jp)
+			*jp = livesource_update_json(np, this, LIVESOURCE_UPDATE_ADD);
 		this->livesources->serial++;
 		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s", mountpoint);
 		struct redistribute_cb_args *redis_args = redistribute_args_new(this, np,
