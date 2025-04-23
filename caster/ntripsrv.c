@@ -173,7 +173,8 @@ void ntripsrv_deferred_output(
 			ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_CLOSE", st->connection_keepalive, st->received_keepalive);
 			st->state = NTRIP_WAIT_CLOSE;
 		}
-	}
+	} else
+		mime_free(m);
 	bufferevent_unlock(st->bev);
 	if (req)
 		request_free(req);

@@ -704,6 +704,8 @@ caster_reload_rtcm_filters(struct caster_state *caster) {
 		return -1;
 	}
 
+	if (caster->rtcm_filter_dict)
+		hash_table_free(caster->rtcm_filter_dict);
 	caster->rtcm_filter_dict = hash_table_new(5, NULL);
 	if (caster->rtcm_filter_dict == NULL)
 		return -1;
@@ -727,6 +729,8 @@ caster_reload_rtcm_filters(struct caster_state *caster) {
 		}
 		hash_table_update(caster->rtcm_filter_dict, h);
 		hash_table_free(h);
+		if (caster->rtcm_filter)
+			rtcm_filter_free(caster->rtcm_filter);
 		caster->rtcm_filter = rtcm_filter;
 	}
 	return 0;

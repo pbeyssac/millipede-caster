@@ -524,8 +524,18 @@ void config_free(struct config *this) {
 	}
 	free(this->graylog);
 
+	for (int i = 0; i < this->rtcm_filter_count; i++) {
+		for (int j = 0; j < this->rtcm_filter[i].convert_count; j++)
+			free((char *)this->rtcm_filter[i].convert[j].types);
+		free(this->rtcm_filter[i].convert);
+		free((char *)this->rtcm_filter[i].apply);
+		free((char *)this->rtcm_filter[i].pass);
+	}
+	free(this->rtcm_filter);
+
 	free(this->threads);
 
+	free((char *)this->syncer_auth);
 	free((char *)this->host_auth_filename);
 	free((char *)this->source_auth_filename);
 	free((char *)this->blocklist_filename);
