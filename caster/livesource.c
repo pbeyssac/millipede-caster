@@ -477,8 +477,8 @@ struct livesource *livesource_find_on_demand(struct caster_state *this, struct n
 	return result;
 }
 
-struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos) {
-	return livesource_find_on_demand(this, st, mountpoint, mountpoint_pos, 0, 0, NULL);
+int livesource_exists(struct caster_state *this, char *mountpoint, pos_t *mountpoint_pos) {
+	return livesource_find_on_demand(this, NULL, mountpoint, mountpoint_pos, 0, 0, NULL) != NULL;
 }
 
 struct livesource *livesource_find_and_subscribe(struct caster_state *caster, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand) {

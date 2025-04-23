@@ -502,7 +502,7 @@ static struct sourceline *_stack_find_mountpoint(struct caster_state *caster, so
 		 * If the mountpoint is from our local table, and other non-local tables are to
 		 * be looked-up (local == 0), skip if not live.
 		 */
-		if (local || strcmp(s->caster, "LOCAL") || np->virtual || livesource_find(caster, NULL, np->key, &np->pos)) {
+		if (local || strcmp(s->caster, "LOCAL") || np->virtual || livesource_exists(caster, np->key, &np->pos)) {
 			r = np;
 			break;
 		}
@@ -664,7 +664,7 @@ struct sourcetable *stack_flatten_dist(struct caster_state *caster, sourcetable_
 			/*
 			 * If the mountpoint is from our local table, skip if not live.
 			 */
-			if (local_table && (!sp->virtual && !livesource_find(caster, NULL, sp->key, &sp->pos)))
+			if (local_table && (!sp->virtual && !livesource_exists(caster, sp->key, &sp->pos)))
 				continue;
 
 			struct element *e = hash_table_get_element(r->key_val, sp->key);
