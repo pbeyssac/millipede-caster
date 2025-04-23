@@ -143,7 +143,7 @@ int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct lives
 void ntrip_task_stop(struct ntrip_task *this) {
 
 	P_RWLOCK_RDLOCK(&this->st_lock);
-	this->state = TASK_STOPPED;
+	this->state = TASK_END;
 	long long id = this->st_id;
 	P_RWLOCK_UNLOCK(&this->st_lock);
 
@@ -165,6 +165,8 @@ void ntrip_task_stop(struct ntrip_task *this) {
 }
 
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
+	if (this->state == TASK_END)
+		return;
 	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	this->pending = 0;
 	if (this->refresh_delay) {

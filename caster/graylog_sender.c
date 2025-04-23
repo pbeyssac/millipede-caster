@@ -25,8 +25,7 @@ static void
 end_cb(int ok, void *arg, int n) {
 	struct graylog_sender *a = (struct graylog_sender *)arg;
 	ntrip_task_clear_st(a->task);
-	if (a->task->state != TASK_STOPPED)
-		ntrip_task_reschedule(a->task, a);
+	ntrip_task_reschedule(a->task, a);
 }
 
 /*

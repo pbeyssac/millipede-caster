@@ -11,7 +11,7 @@
 enum task_state {
 	TASK_INIT,
 	TASK_RUNNING,
-	TASK_STOPPED
+	TASK_END
 };
 
 /*
