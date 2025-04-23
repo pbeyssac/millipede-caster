@@ -144,7 +144,7 @@ struct sourcetable *sourcetable_new(const char *host, unsigned short port, int t
 	return this;
 }
 
-static void sourcetable_free_unlocked(struct sourcetable *this) {
+void sourcetable_free(struct sourcetable *this) {
 	strfree(this->header);
 	strfree(this->caster);
 	strfree((char *)this->filename);
@@ -153,11 +153,6 @@ static void sourcetable_free_unlocked(struct sourcetable *this) {
 
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
-}
-
-void sourcetable_free(struct sourcetable *this) {
-	P_RWLOCK_WRLOCK(&this->lock);
-	sourcetable_free_unlocked(this);
 }
 
 /*
@@ -575,16 +570,14 @@ static void _stack_replace(struct caster_state *caster, sourcetable_stack_t *sta
 			if (local)
 				logfmt(&caster->flog, LOG_INFO, "Removing %s", s->filename);
 			TAILQ_REMOVE(&stack->list, r, next);
-			if (new_sourcetable != NULL) {
-				P_RWLOCK_UNLOCK(&r->lock);
+			P_RWLOCK_UNLOCK(&r->lock);
+			if (new_sourcetable != NULL)
 				sourcetable_diff(caster, r, new_sourcetable);
-				P_RWLOCK_WRLOCK(&r->lock);
-			}
-			sourcetable_free_unlocked(r);
+			sourcetable_free(r);
 		} else {
 			P_RWLOCK_UNLOCK(&r->lock);
 			if (new_sourcetable != NULL) {
-				sourcetable_free_unlocked(new_sourcetable);
+				sourcetable_free(new_sourcetable);
 				new_sourcetable = NULL;
 			}
 		}
