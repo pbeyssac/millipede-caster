@@ -166,13 +166,10 @@ void ntripsrv_deferred_output(
 		struct evbuffer *output = bufferevent_get_output(st->bev);
 		send_server_reply(st, output, req->status, NULL, NULL, m);
 
-		if (st->connection_keepalive && st->received_keepalive) {
-			ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_HTTP_METHOD", st->connection_keepalive, st->received_keepalive);
+		if (st->connection_keepalive && st->received_keepalive)
 			st->state = NTRIP_WAIT_HTTP_METHOD;
-		} else {
-			ntrip_log(st, LOG_DEBUG, "ntripsrv_deferred_output %d %d WAIT_CLOSE", st->connection_keepalive, st->received_keepalive);
+		else
 			st->state = NTRIP_WAIT_CLOSE;
-		}
 	} else
 		mime_free(m);
 	bufferevent_unlock(st->bev);
