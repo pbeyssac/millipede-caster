@@ -109,7 +109,7 @@ struct livesource *livesource_find_and_subscribe(struct caster_state *caster, st
 int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backlogged);
 void livesource_free(struct livesource *this);
 void livesource_set_state(struct livesource *this, struct caster_state *caster, enum livesource_state state);
-struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntrip_state *st);
+void livesource_add_subscriber(struct ntrip_state *st, struct livesource *this, void *arg1);
 void livesource_del_subscriber(struct ntrip_state *st);
 int livesource_send_subscribers(struct livesource *this, struct packet *packet, struct caster_state *caster);
 struct livesource *livesource_find(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos);

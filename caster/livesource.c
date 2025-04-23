@@ -200,26 +200,34 @@ void livesource_set_state(struct livesource *this, struct caster_state *caster, 
 
 /*
  * Add a subscriber to a live source.
- *
- * Required lock: ntrip_state
  */
-struct subscriber *livesource_add_subscriber(struct livesource *this, struct ntrip_state *st) {
+void livesource_add_subscriber(struct ntrip_state *st, struct livesource *this, void *arg1) {
 	struct subscriber *sub = (struct subscriber *)malloc(sizeof(struct subscriber));
 	if (sub != NULL) {
 		sub->livesource = this;
-		sub->ntrip_state = st;
 		sub->backlogged = 0;
 		sub->virtual = 0;
+
+		bufferevent_lock(st->bev);
+		int cancel = (st->state == NTRIP_END);
+		if (!cancel) {
+			assert(st->subscription == NULL);
+			st->subscription = sub;
+			sub->ntrip_state = st;
+		}
+		bufferevent_unlock(st->bev);
+		if (cancel) {
+			free(sub);
+			return;
+		}
 
 		P_RWLOCK_WRLOCK(&this->lock);
 		TAILQ_INSERT_TAIL(&this->subscribers, sub, next);
 		this->nsubs++;
-		st->subscription = sub;
 		P_RWLOCK_UNLOCK(&this->lock);
 
 		ntrip_log(st, LOG_INFO, "subscription done to %s", this->mountpoint);
 	}
-	return sub;
 }
 
 /*
@@ -487,7 +495,7 @@ struct livesource *livesource_find_and_subscribe(struct caster_state *caster, st
 	P_MUTEX_LOCK(&st->caster->livesources->delete_lock);
 	struct livesource *l = livesource_find_on_demand(caster, st, mountpoint, mountpoint_pos, on_demand, sourceline_on_demand, NULL);
 	if (l)
-		livesource_add_subscriber(l, st);
+		livesource_add_subscriber(st, l, NULL);
 	P_MUTEX_UNLOCK(&st->caster->livesources->delete_lock);
 	return l;
 }
