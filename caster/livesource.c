@@ -356,8 +356,12 @@ int livesource_del(struct livesource *this, struct ntrip_state *st, struct caste
  * Required lock: ntrip_state
  * Acquires lock: livesources
  *
+ * Returns:
+ *	1: new source, connected ok
+ *	0: existing source under that name
+ *	-1: other error
  */
-struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint, struct livesource **existing) {
+int livesource_connected(struct ntrip_state *st, char *mountpoint) {
 	json_object *j;
 	struct livesource *existing_livesource;
 
@@ -369,25 +373,23 @@ struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint
 	 */
 	P_RWLOCK_WRLOCK(&st->caster->livesources->lock);
 	existing_livesource = livesource_find_unlocked(st->caster, st, mountpoint, NULL, 0, 0, NULL, &j);
-	if (existing)
-		*existing = existing_livesource;
 	if (existing_livesource) {
 		/* Here, we should perphaps destroy & replace any existing source fetcher. */
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
-		return NULL;
+		return 0;
 	}
 	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_TYPE_DIRECT, LIVESOURCE_RUNNING);
 	if (np == NULL) {
 		st->own_livesource = NULL;
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
-		return NULL;
+		return -1;
 	}
 	int e = hash_table_add(st->caster->livesources->hash, mountpoint, np);
 	if (e != 0) {
 		livesource_free(np);
 		ntrip_log(st, LOG_ERR, "Can't register livesource %s: already found", st->mountpoint);
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
-		return NULL;
+		return -1;
 	}
 	j = livesource_update_json(np, st->caster, LIVESOURCE_UPDATE_ADD);
 	st->caster->livesources->serial++;
@@ -395,7 +397,7 @@ struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint
 	P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
 	ntrip_log(st, LOG_INFO, "livesource %s created RUNNING", mountpoint);
 	syncer_queue_json(st->caster, j);
-	return np;
+	return 1;
 }
 
 static int livesource_find_remote_endpoint(struct caster_state *this, struct ntrip_state *st, const char *mountpoint, struct endpoint *endpoint) {

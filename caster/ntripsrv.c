@@ -659,13 +659,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 503;
 						break;
 					}
-					struct livesource *old_livesource, *new_livesource;
-					new_livesource = livesource_connected(st, st->mountpoint, &old_livesource);
-					if (old_livesource != NULL) {
+					int connected = livesource_connected(st, st->mountpoint);
+					if (!connected) {
 						err = 409;
 						break;
 					}
-					if (new_livesource == NULL) {
+					if (connected < 0) {
 						err = 503;
 						break;
 					}

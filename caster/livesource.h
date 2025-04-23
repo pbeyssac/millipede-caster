@@ -102,7 +102,7 @@ struct livesources *livesource_table_new(const char *hostname, struct timeval *s
 void livesource_table_free(struct livesources *this);
 struct livesource *livesource_new(char *mountpoint, enum livesource_type type, enum livesource_state state);
 int livesource_del(struct livesource *this, struct ntrip_state *st, struct caster_state *caster);
-struct livesource *livesource_connected(struct ntrip_state *st, char *mountpoint, struct livesource **existing);
+int livesource_connected(struct ntrip_state *st, char *mountpoint);
 int livesource_exists(struct caster_state *this, char *mountpoint, pos_t *mountpoint_pos);
 struct livesource *livesource_find_on_demand(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand, enum livesource_state *new_state);
 struct livesource *livesource_find_and_subscribe(struct caster_state *caster, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand);
