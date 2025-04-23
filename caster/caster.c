@@ -742,7 +742,7 @@ static int caster_reload_config(struct caster_state *this) {
 		if (this->config)
 			logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s", this->config_file);
 		else
-			fprintf(stderr, "Can't parse configuration from %s", this->config_file);
+			fprintf(stderr, "Can't parse configuration from %s\n", this->config_file);
 		return -1;
 	}
 	if (atomic_load(&this->config))
