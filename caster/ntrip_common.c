@@ -363,8 +363,10 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
 	struct caster_state *caster = this->caster;
 	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2");
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
-	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
+	// lock order: bev before free_lock, same as
+	// ntrip_deferred_run to fix harmless valgrind warning.
 	bufferevent_lock(this->bev);
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
 
 	ntrip_quota_decr(this);
 	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
