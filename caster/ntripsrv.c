@@ -337,15 +337,15 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	int err = 0;
 	struct evbuffer *output = bufferevent_get_output(bev);
 	struct evkeyvalq opt_headers;
-	struct config *config = st->config;
+	struct config *config;
 
 	int method_post_source = 0;
 
 	TAILQ_INIT(&opt_headers);
 
-	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
+	config = ntrip_refresh_config(st);
 
-	ntrip_refresh_config(st);
+	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
 
 	if (ntrip_filter_run_input(st) < 0)
 		return;

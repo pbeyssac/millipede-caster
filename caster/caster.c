@@ -206,7 +206,7 @@ caster_new(const char *config_file) {
 
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
-	this->config = NULL;
+	atomic_init(&this->config, NULL);
 	this->endpoints_json = NULL;
 	this->config_file = config_file;
 
@@ -745,9 +745,9 @@ static int caster_reload_config(struct caster_state *this) {
 			fprintf(stderr, "Can't parse configuration from %s", this->config_file);
 		return -1;
 	}
-	if (this->config)
-		config_decref(this->config);
-	this->config = config;
+	if (atomic_load(&this->config))
+		config_decref(atomic_load(&this->config));
+	atomic_store(&this->config, config);
 	json_object_put(this->endpoints_json);
 	this->endpoints_json = caster_endpoints_json(this);
 	return 0;

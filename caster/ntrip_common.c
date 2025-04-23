@@ -125,13 +125,15 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
  *
  * Required locks: ntrip_state
  */
-void ntrip_refresh_config(struct ntrip_state *this) {
+struct config *ntrip_refresh_config(struct ntrip_state *this) {
 	struct config *new_config = atomic_load(&this->caster->config);
-	if (new_config != this->config) {
+	struct config *old_config = this->config;
+	if (new_config != old_config) {
 		new_config = caster_config_getref(this->caster);
-		config_decref(this->config);
 		this->config = new_config;
+		config_decref(old_config);
 	}
+	return new_config;
 }
 
 /*
@@ -325,7 +327,6 @@ void ntrip_clear_request(struct ntrip_state *this) {
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_EDEBUG, "FREE %s", orig);
 
-	config_decref(this->config);
 	strfree(this->mountpoint);
 	strfree(this->uri);
 	strfree(this->virtual_mountpoint);
@@ -352,6 +353,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	 */
 	ntrip_log(this, LOG_EDEBUG, "freeing bev %p", this->bev);
 	my_bufferevent_free(this, this->bev);
+	config_decref(this->config);
 	free(this);
 }
 

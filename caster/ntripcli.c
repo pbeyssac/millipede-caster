@@ -140,10 +140,11 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	char *line;
 	size_t len;
 	size_t waiting_len;
+	struct config *config;
 
 	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
 
-	ntrip_refresh_config(st);
+	config = ntrip_refresh_config(st);
 
 	if (ntrip_filter_run_input(st) < 0)
 		return;
@@ -155,7 +156,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
-			if ((line?len:waiting_len) > st->config->http_header_max_size) {
+			if ((line?len:waiting_len) > config->http_header_max_size) {
 				end = 1;
 				break;
 			}
@@ -196,7 +197,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			if (!strcmp(st->http_args[0], "ICY") && !strcmp(st->mountpoint, "") && status_code == 200) {
 				// NTRIP1 connection, don't look for headers
 				st->state = NTRIP_REGISTER_SOURCE;
-				struct timeval read_timeout = { st->config->source_read_timeout, 0 };
+				struct timeval read_timeout = { config->source_read_timeout, 0 };
 				bufferevent_set_timeouts(bev, &read_timeout, NULL);
 			}
 
@@ -212,7 +213,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
-			if ((line?len:waiting_len) > st->config->http_header_max_size) {
+			if ((line?len:waiting_len) > config->http_header_max_size) {
 				end = 1;
 				break;
 			}
@@ -225,7 +226,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					end = 1;
 				} else if (strlen(st->mountpoint)) {
 					st->state = NTRIP_REGISTER_SOURCE;
-					struct timeval read_timeout = { st->config->source_read_timeout, 0 };
+					struct timeval read_timeout = { config->source_read_timeout, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				} else if (st->task && st->task->line_cb)
 					st->state = NTRIP_WAIT_CALLBACK_LINE;
@@ -262,10 +263,10 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					unsigned long content_length;
 					int length_err;
 					if (sscanf(value, "%lu", &content_length) == 1) {
-						length_err = (content_length > st->config->http_content_length_max);
+						length_err = (content_length > config->http_content_length_max);
 						if (length_err) {
 							ntrip_log(st, LOG_NOTICE, "Content-Length %d: exceeds max configured value %d",
-									content_length, st->config->http_content_length_max);
+									content_length, config->http_content_length_max);
 							end = 1;
 							break;
 						}
@@ -345,7 +346,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			if (st->persistent || r == 0)
 				break;
 			int idle_time = time(NULL) - st->last_useful;
-			if (idle_time > st->config->idle_max_delay) {
+			if (idle_time > config->idle_max_delay) {
 				ntrip_log(st, LOG_NOTICE, "last_useful %s: %d seconds ago, dropping", st->mountpoint, idle_time);
 				end = 1;
 			}
