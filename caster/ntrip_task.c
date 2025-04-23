@@ -1,5 +1,6 @@
 #include <assert.h>
 
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <event2/http.h>
@@ -61,7 +62,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	P_RWLOCK_INIT(&this->mimeq_lock, NULL);
 	P_RWLOCK_INIT(&this->st_lock, NULL);
 	this->bev = NULL;
-	this->state = TASK_INIT;
+	atomic_init(&this->state, TASK_INIT);
 	this->bev_sending = 0;
 	this->st_id = -1;
 	this->bev_decref_pending = 0;
@@ -116,7 +117,7 @@ void ntrip_task_set_bev(struct ntrip_task *this) {
 int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent) {
 	int r = -1;
 	assert(this->st == NULL && this->st_id <= 0);
-	this->state = TASK_RUNNING;
+	atomic_store_explicit(&this->state, TASK_RUNNING, memory_order_relaxed);
 	struct ntrip_state *st =
 		ntripcli_new(this->caster, this->host, this->port, this->tls, this->uri, this->type, this,
 		livesource, persistent);
@@ -141,9 +142,10 @@ int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct lives
  * Kill any associated TCP session.
  */
 void ntrip_task_stop(struct ntrip_task *this) {
-
+	if (atomic_load_explicit(&this->state, memory_order_relaxed) == TASK_END)
+		return;
 	P_RWLOCK_RDLOCK(&this->st_lock);
-	this->state = TASK_END;
+	atomic_store_explicit(&this->state, TASK_END, memory_order_relaxed);
 	long long id = this->st_id;
 	P_RWLOCK_UNLOCK(&this->st_lock);
 
@@ -165,7 +167,7 @@ void ntrip_task_stop(struct ntrip_task *this) {
 }
 
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
-	if (this->state == TASK_END)
+	if (atomic_load_explicit(&this->state, memory_order_relaxed) == TASK_END)
 		return;
 	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	this->pending = 0;
@@ -245,6 +247,8 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
  * Insert a new item in the queue, checking accepted size.
  */
 void ntrip_task_queue(struct ntrip_task *this, char *json) {
+	if (atomic_load_explicit(&this->state, memory_order_relaxed) == TASK_END)
+		return;
 	char *s = mystrdup(json);
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	if (m == NULL) {
@@ -389,6 +393,8 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
  * Required lock: ntrip_state
  */
 void ntrip_task_ack_pending(struct ntrip_task *this) {
+	if (atomic_load_explicit(&this->state, memory_order_relaxed) == TASK_END)
+		return;
 	struct mime_content *m;
 	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	while (this->pending && (m = STAILQ_FIRST(&this->mimeq))) {

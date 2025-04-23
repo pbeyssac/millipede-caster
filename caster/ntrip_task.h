@@ -68,7 +68,7 @@ struct ntrip_task {
 	int bev_decref_pending;
 	/* Lock to protect st, bev, bev_sending, st_id, bev_decref_pending access */
 	P_RWLOCK_T st_lock;
-	enum task_state state;
+	_Atomic enum task_state state;
 
 	/* event structure for libevent */
 	struct event *ev;
