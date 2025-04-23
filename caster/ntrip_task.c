@@ -376,6 +376,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 		if (m) {
 			ntripcli_send_request(st, m, 0);
 			if (evbuffer_add_reference(output, m->s, m->len, NULL, NULL) < 0) {
+				P_RWLOCK_UNLOCK(&task->mimeq_lock);
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
 				ntrip_task_clear_st(task);
 				ntrip_decref_end(st, "ntrip_task_send_next_request");
