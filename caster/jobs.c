@@ -53,6 +53,10 @@ static int _joblist_drain(struct jobq *jobq) {
 		STAILQ_REMOVE_HEAD(jobq, next);
 		if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
 			ntrip_decref(j->ntrip_unlocked_content.st, "_joblist_drain");
+		else if (j->type == JOB_NTRIP_PACKET) {
+			ntrip_decref(j->ntrip_packet.st, "_joblist_drain");
+			packet_decref(j->ntrip_packet.packet);
+		}
 		n++;
 		free(j);
 	}
@@ -130,7 +134,14 @@ void joblist_run(struct joblist *this) {
 				j->redistribute.cb(j->redistribute.arg);
 			else if (j->type == JOB_NTRIP_UNLOCKED)
 				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
-			else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT) {
+			else if (j->type == JOB_NTRIP_PACKET) {
+				j->ntrip_packet.cb(j->ntrip_packet.st, j->ntrip_packet.packet, j->ntrip_packet.arg1);
+				struct bufferevent *bev = j->ntrip_packet.st->bev;
+				bufferevent_lock(bev);
+				ntrip_decref(j->ntrip_packet.st, "joblist_run");
+				packet_decref(j->ntrip_packet.packet);
+				bufferevent_unlock(bev);
+			} else if (j->type == JOB_NTRIP_UNLOCKED_CONTENT) {
 				j->ntrip_unlocked_content.cb(j->ntrip_unlocked_content.st, j->ntrip_unlocked_content.content_cb, j->ntrip_unlocked_content.req);
 				struct bufferevent *bev = j->ntrip_unlocked_content.st->bev;
 				bufferevent_lock(bev);
@@ -435,6 +446,26 @@ void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip
 		_joblist_append_generic(this, NULL, &tmpj);
 	} else
 		cb(st);
+}
+
+/*
+ * Queue a new ntrip+packet job, or directly execute in unthreaded mode.
+ * Handle ntrip & packet reference counts.
+ */
+void joblist_append_ntrip_packet(struct joblist *this, void (*cb)(struct ntrip_state *st, struct packet *packet, void *arg1),
+	struct ntrip_state *st, struct packet *packet, void *arg1) {
+	if (threads) {
+		struct job tmpj;
+		tmpj.type = JOB_NTRIP_PACKET;
+		tmpj.ntrip_packet.cb = cb;
+		tmpj.ntrip_packet.st = st;
+		tmpj.ntrip_packet.packet = packet;
+		tmpj.ntrip_packet.arg1 = arg1;
+		ntrip_incref(st, "joblist_append_ntrip_packet");
+		packet_incref(packet);
+		_joblist_append_generic(this, NULL, &tmpj);
+	} else
+		cb(st, packet, arg1);
 }
 
 /*

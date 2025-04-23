@@ -273,7 +273,7 @@ static inline uint64_t get_uint64(unsigned char *d, int beg) {
 /*
  * Handle packet types 1005 and 1006: base position.
  */
-static void handle_1005_1006(struct ntrip_state *st, struct rtcm_info *rp, int type, unsigned char *d, int len) {
+static void handle_1005_1006(struct rtcm_info *rp, int type, unsigned char *d, int len) {
 	unsigned char *data = d+3;
 	uint64_t ecef_x, ecef_y, ecef_z;
 
@@ -671,8 +671,8 @@ int rtcm_filter_check_mountpoint(struct caster_state *caster, const char *mountp
 	return hash_table_get_element(caster->rtcm_filter_dict, mountpoint) != NULL;
 }
 
-static void handle_1006(struct ntrip_state *st, struct rtcm_info *rp, unsigned char *d, int len) {
-	handle_1005_1006(st, rp, 1006, d, len);
+static void handle_1006(struct rtcm_info *rp, unsigned char *d, int len) {
+	handle_1005_1006(rp, 1006, d, len);
 	// d += 3;
 	// unsigned short antenna_height = getbits(d, 152, 16);
 }
@@ -709,22 +709,23 @@ json_object *rtcm_info_json(struct rtcm_info *this) {
 	return j;
 }
 
-static void rtcm_handler(struct ntrip_state *st, struct packet *p, struct rtcm_info *rp) {
+static void rtcm_handler(struct ntrip_state *st, struct packet *p, void *arg1) {
+	struct rtcm_info *rp = (struct rtcm_info *)arg1;
+	if (!rp)
+		return;
+
 	unsigned char *d = p->data;
 	int len = p->datalen;
 	unsigned short type = getbits(d+3, 0, 12);
 
-	ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len, type);
-
-	if (!rp)
-		return;
-
+	P_RWLOCK_WRLOCK(&st->caster->rtcm_lock);
 	rtcm_typeset_set(&rp->typeset, type);
 
 	if (type == 1005 && len == 25)
-		handle_1005_1006(st, rp, 1005, d, len);
+		handle_1005_1006(rp, 1005, d, len);
 	else if (type == 1006 && len == 27)
-		handle_1006(st, rp, d, len);
+		handle_1006(rp, d, len);
+	P_RWLOCK_UNLOCK(&st->caster->rtcm_lock);
 }
 
 /*
@@ -786,7 +787,9 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		unsigned long crc = rtcm_crc24q_hash(&rtcmp->data[0], len_rtcm-3);
 		if (crc == (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]) {
 			rtcmp->is_rtcm = 1;
-			rtcm_handler(st, rtcmp, st->rtcm_info);
+			unsigned short type = getbits(rtcmp->data+3, 0, 12);
+			ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len_rtcm, type);
+			joblist_append_ntrip_packet(st->caster->joblist, rtcm_handler, st, rtcmp, st->rtcm_info);
 		} else {
 			ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
 		}
