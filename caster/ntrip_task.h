@@ -62,11 +62,11 @@ struct ntrip_task {
 	/* Current ntrip_state, if any */
 	struct ntrip_state *st;
 	struct timeval start;
-	struct bufferevent *bev;
-	int bev_sending;
-	long long st_id;
-	int bev_decref_pending;
-	/* Lock to protect st, bev, bev_sending, st_id, bev_decref_pending access */
+
+	/* Exclusion counter when restarting sending */
+	_Atomic int restart_sending;
+
+	/* Lock to protect st access */
 	P_RWLOCK_T st_lock;
 	_Atomic enum task_state state;
 
@@ -116,8 +116,8 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename);
 void ntrip_task_ack_pending(struct ntrip_task *this);
 void ntrip_task_free(struct ntrip_task *this);
-struct ntrip_state *ntrip_task_clear_st(struct ntrip_task *this);
-void ntrip_task_set_bev(struct ntrip_task *this);
+struct ntrip_state *ntrip_task_clear_get_st(struct ntrip_task *this, int getref);
+void ntrip_task_clear_st(struct ntrip_task *this);
 int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);

@@ -168,7 +168,7 @@ redistribute_start(void *arg_cb, int n) {
 static void
 redistribute_end_cb(int ok, void *arg, int n) {
 	struct redistribute_cb_args *this = (struct redistribute_cb_args *)arg;
-	struct ntrip_state *st = ntrip_task_clear_st(this->task);
+	struct ntrip_state *st = ntrip_task_clear_get_st(this->task, 1);
 	if (!ok && st && st->own_livesource) {
 		if (this->persistent) {
 			livesource_set_state(this->livesource, this->caster, LIVESOURCE_FETCH_PENDING);
@@ -178,4 +178,6 @@ redistribute_end_cb(int ok, void *arg, int n) {
 			redistribute_args_free(this);
 		}
 	}
+	if (st)
+		ntrip_decref(st, "redistribute_end_cb");
 }

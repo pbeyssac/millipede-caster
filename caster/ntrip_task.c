@@ -61,11 +61,8 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	STAILQ_INIT(&this->mimeq);
 	P_RWLOCK_INIT(&this->mimeq_lock, NULL);
 	P_RWLOCK_INIT(&this->st_lock, NULL);
-	this->bev = NULL;
 	atomic_init(&this->state, TASK_INIT);
-	this->bev_sending = 0;
-	this->st_id = -1;
-	this->bev_decref_pending = 0;
+	atomic_init(&this->restart_sending, 0);
 	this->bulk_max_size = bulk_max_size;
 	this->queue_max_size = queue_max_size;
 	this->queue_size = 0;
@@ -75,48 +72,34 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 }
 
 /*
- * Protected access to clear the st pointer and return its previous value.
+ * Protected access to clear the st pointer and
+ * return a counted reference to its previous value, if not NULL.
  */
-struct ntrip_state *ntrip_task_clear_st(struct ntrip_task *this) {
+struct ntrip_state *ntrip_task_clear_get_st(struct ntrip_task *this, int getref) {
 	struct ntrip_state *rst;
-	struct bufferevent *rbev = NULL;
-	int bev_sending;
 	P_RWLOCK_WRLOCK(&this->st_lock);
-	assert(this->st == NULL || this->st->id == this->st_id);
-
-	rst = this->st;
+	rst = getref ? this->st : NULL;
+	if (this->st != NULL && !rst)
+		ntrip_decref(this->st ,"ntrip_task_clear_st");
 	this->st = NULL;
-	this->st_id = 0;
-	rbev = this->bev;
-	this->bev = NULL;
-	bev_sending = this->bev_sending;
-	if (rbev != NULL) {
-		if (bev_sending) {
-			this->bev_decref_pending = 1;
-			P_RWLOCK_UNLOCK(&this->st_lock);
-		} else {
-			P_RWLOCK_UNLOCK(&this->st_lock);
-			bufferevent_decref(rbev);
-		}
-	} else
-		P_RWLOCK_UNLOCK(&this->st_lock);
+	P_RWLOCK_UNLOCK(&this->st_lock);
 	return rst;
 }
 
-void ntrip_task_set_bev(struct ntrip_task *this) {
+void ntrip_task_clear_st(struct ntrip_task *this) {
+	ntrip_task_clear_get_st(this, 0);
+}
+
+static inline void ntrip_task_set_st(struct ntrip_task *this, struct ntrip_state *st) {
 	P_RWLOCK_WRLOCK(&this->st_lock);
-	if (this->st != NULL) {
-		if (this->bev != NULL)
-			bufferevent_decref(this->bev);
-		this->bev = this->st->bev;
-		bufferevent_incref(this->bev);
-	}
+	ntrip_incref(st, "ntrip_task_set_st");
+	this->st = st;
 	P_RWLOCK_UNLOCK(&this->st_lock);
 }
 
 int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent) {
 	int r = -1;
-	assert(this->st == NULL && this->st_id <= 0);
+	assert(this->st == NULL);
 	atomic_store_explicit(&this->state, TASK_RUNNING, memory_order_relaxed);
 	struct ntrip_state *st =
 		ntripcli_new(this->caster, this->host, this->port, this->tls, this->uri, this->type, this,
@@ -125,7 +108,7 @@ int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct lives
 	if (st == NULL) {
 		r = -1;
 	} else {
-		ntrip_task_set_bev(this);
+		ntrip_task_set_st(this, st);
 		r = ntripcli_start(st);
 	}
 
@@ -144,10 +127,7 @@ int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct lives
 void ntrip_task_stop(struct ntrip_task *this) {
 	if (atomic_load_explicit(&this->state, memory_order_relaxed) == TASK_END)
 		return;
-	P_RWLOCK_RDLOCK(&this->st_lock);
 	atomic_store_explicit(&this->state, TASK_END, memory_order_relaxed);
-	long long id = this->st_id;
-	P_RWLOCK_UNLOCK(&this->st_lock);
 
 	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	this->pending = 0;
@@ -157,11 +137,13 @@ void ntrip_task_stop(struct ntrip_task *this) {
 	}
 	P_RWLOCK_UNLOCK(&this->mimeq_lock);
 
-	ntrip_task_clear_st(this);
+	struct ntrip_state *st = ntrip_task_clear_get_st(this, 1);
 
-	if (id) {
+	if (st) {
 		logfmt(&this->caster->flog, LOG_INFO, "Stopping %s (%p) from %s:%d", this->type, this, this->host, this->port);
-		ntrip_drop_by_id(this->caster, id);
+		bufferevent_lock(st->bev);
+		ntrip_decref_end(st, "ntrip_task_stop");
+		bufferevent_unlock(st->bev);
 	} else
 		logfmt(&this->caster->flog, LOG_INFO, "Stopping %s (%p) from %s:%d: not running", this->type, this, this->host, this->port);
 }
@@ -276,40 +258,25 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 		P_RWLOCK_UNLOCK(&this->mimeq_lock);
 	}
 
-	P_RWLOCK_WRLOCK(&this->st_lock);
-	assert(this->st == NULL || this->st->id == this->st_id);
-
-	struct ntrip_state *st = this->st;
-	struct bufferevent *bev = this->bev;
-	if (st != NULL && bev != NULL) {
-		int my_sending = (this->bev_sending == 0);
-		this->bev_sending++;
-
-		/*
-		 * Need to unlock then reacquire locks in the correct order
-		 */
-		ntrip_incref(st, "ntrip_task_queue");
-		P_RWLOCK_UNLOCK(&this->st_lock);
-
-		bufferevent_lock(bev);
-		P_RWLOCK_WRLOCK(&this->st_lock);
-		if (my_sending && this->st && this->st->state == NTRIP_IDLE_CLIENT) {
+	int first_sending = atomic_fetch_add_explicit(&this->restart_sending, 1, memory_order_relaxed) == 0;
+	if (first_sending) {
+		P_RWLOCK_RDLOCK(&this->st_lock);
+		struct ntrip_state *st = this->st;
+		if (st != NULL) {
+			struct bufferevent *bev = st->bev;
+			assert(bev != NULL);
+			ntrip_incref(st, "ntrip_task_queue");
 			P_RWLOCK_UNLOCK(&this->st_lock);
-			ntrip_task_send_next_request(this->st);
-			P_RWLOCK_WRLOCK(&this->st_lock);
-		}
-		this->bev_sending--;
-		if (this->bev_sending == 0 && this->bev_decref_pending) {
-			bufferevent_decref(bev);
-			this->bev_decref_pending = 0;
-		}
-		ntrip_decref(st, "ntrip_task_queue");
-		bufferevent_unlock(bev);
-		P_RWLOCK_UNLOCK(&this->st_lock);
-	} else {
-		assert(bev == NULL);
-		P_RWLOCK_UNLOCK(&this->st_lock);
+
+			bufferevent_lock(bev);
+			if (st->state == NTRIP_IDLE_CLIENT)
+				ntrip_task_send_next_request(st);
+			ntrip_decref(st, "ntrip_task_queue");
+			bufferevent_unlock(bev);
+		} else
+			P_RWLOCK_UNLOCK(&this->st_lock);
 	}
+	atomic_fetch_sub_explicit(&this->restart_sending, -1, memory_order_relaxed);
 }
 
 /*

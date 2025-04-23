@@ -478,10 +478,8 @@ ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int t
 	st->client = 1;
 	st->own_livesource = livesource;
 	st->persistent = persistent;
-	if (task) {
-		task->st = st;
+	if (task)
 		task->start = st->start;
-	}
 	return st;
 }
 
