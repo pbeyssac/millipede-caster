@@ -421,6 +421,7 @@ void ntrip_task_free(struct ntrip_task *this) {
 	strfree((char *)this->drainfilename);
 	if (this->ev)
 		event_free(this->ev);
+	P_RWLOCK_UNLOCK(&this->mimeq_lock);
 	P_RWLOCK_DESTROY(&this->mimeq_lock);
 	P_RWLOCK_DESTROY(&this->st_lock);
 	free(this);
