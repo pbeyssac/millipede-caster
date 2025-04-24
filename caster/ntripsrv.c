@@ -315,7 +315,7 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 			if (l) {
 				if (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING)) {
 					st->tmp_pos = s->dist_array[0].pos;
-					redistribute_switch_source(st, l, NULL);
+					joblist_append_ntrip_livesource(st->caster->joblist, redistribute_switch_source, st, l, NULL);
 				}
 				livesource_decref(l);
 			}
