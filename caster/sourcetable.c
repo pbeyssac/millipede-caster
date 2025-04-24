@@ -13,6 +13,8 @@
 #include "ntrip_common.h"
 #include "sourcetable.h"
 
+static int _sourcetable_add_unlocked(struct sourcetable *this, const char *sourcetable_entry, int on_demand, struct caster_state *caster);
+
 /*
  * Read a sourcetable file
  */
@@ -50,7 +52,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 		if (*p == '#')
 			/* Skip comment line */
 			continue;
-		if (sourcetable_add(tmp_sourcetable, line, 0, caster) < 0) {
+		if (_sourcetable_add_unlocked(tmp_sourcetable, line, 0, caster) < 0) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse line %d in sourcetable", nlines);
 			strfree(line);
 			sourcetable_free(tmp_sourcetable);
@@ -105,7 +107,7 @@ static struct sourcetable *sourcetable_from_json(json_object *j, struct caster_s
 		struct json_object *source = json_object_iter_peek_value(&it);
 		const char *str = json_object_get_string(json_object_object_get(source, "str"));
 
-		if (str == NULL || sourcetable_add(tmp_sourcetable, str, tmp_sourcetable->pullable, caster) < 0) {
+		if (str == NULL || _sourcetable_add_unlocked(tmp_sourcetable, str, tmp_sourcetable->pullable, caster) < 0) {
 			sourcetable_free(tmp_sourcetable);
 			tmp_sourcetable = NULL;
 			break;
@@ -247,15 +249,13 @@ json_object *sourcetable_json(struct sourcetable *this) {
 
 static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
 	int r;
-	P_RWLOCK_WRLOCK(&this->lock);
 	r = hash_table_add(this->key_val, s->key, s);
 	if (s->virtual)
 		this->nvirtual++;
-	P_RWLOCK_UNLOCK(&this->lock);
 	return r;
 }
 
-int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand, struct caster_state *caster) {
+static int _sourcetable_add_unlocked(struct sourcetable *this, const char *sourcetable_entry, int on_demand, struct caster_state *caster) {
 	int r = 0;
 	if (!strncmp(sourcetable_entry, "STR;", 4)) {
 		struct sourceline *n1 = sourceline_new_parse(sourcetable_entry,
@@ -271,19 +271,22 @@ int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int
 			sourceline_free(n1);
 		}
 	} else {
-		P_RWLOCK_WRLOCK(&this->lock);
 		int new_len = strlen(this->header) + strlen(sourcetable_entry) + 3;
 		char *s = (char *)strrealloc(this->header, new_len);
-		if (s == NULL) {
-			P_RWLOCK_UNLOCK(&this->lock);
+		if (s == NULL)
 			return -1;
-		}
 		strcat(s, sourcetable_entry);
 		strcat(s, "\r\n");
 		this->header = s;
-		P_RWLOCK_UNLOCK(&this->lock);
 	}
 	return r;
+}
+
+int sourcetable_add(struct sourcetable *this, const char *sourcetable_entry, int on_demand, struct caster_state *caster) {
+	P_RWLOCK_WRLOCK(&this->lock);
+	int result = _sourcetable_add_unlocked(this, sourcetable_entry, on_demand, caster);
+	P_RWLOCK_UNLOCK(&this->lock);
+	return result;
 }
 
 /*
