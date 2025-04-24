@@ -1,11 +1,37 @@
 listen:
   - port:		2103
     ip:			::1
+
+node:
+  - host:		::1
+    port:		9999
+    authorization:      '29daf8491eaec44418e4f898cefa17d581964943f423b023c0d47a2e475beb65'
+    tls:		false
+    retry_delay:	5
+
+graylog:
+  - host:			::1
+    port:			9998
+    uri:			'/gelf'
+    tls:			false
+    log_level:			EDEBUG
+    retry_delay:		5
+    queue_max_size:		1000000
+    bulk_max_size:		62000
+    authorization:      	'29daf8491eaec44418e4f898cefa17d581964943f423b023c0d47a2e475beb65'
+
 host_auth_file:		host.auth
 source_auth_file:	source-wildcard.auth
 sourcetable_file:	sourcetable.dat
 blocklist_file:		blocklist
 access_log:		../test-access.log
 log:			../test-caster.log
+
+ntripcli_default_write_timeout:	10
+ntripcli_default_read_timeout:	10
+ntripsrv_default_write_timeout:	10
+ntripsrv_default_read_timeout:	10
+
+idle_max_delay:		5
 
 log_level:		EDEBUG
