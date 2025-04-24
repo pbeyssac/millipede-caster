@@ -674,7 +674,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
 					struct timeval read_timeout = { config->source_read_timeout, 0 };
 					st->state = NTRIP_WAIT_STREAM_SOURCE;
-					ntrip_set_rtcm_cache(st);
+					joblist_append_ntrip_locked(st->caster->joblist, st, ntrip_set_rtcm_cache);
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				} else {
 					err = 501;

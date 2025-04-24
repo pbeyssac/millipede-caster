@@ -340,7 +340,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				ntrip_log(st, LOG_INFO, "starting redistribute for %s", st->mountpoint);
 			}
 			st->state = NTRIP_WAIT_STREAM_GET;
-			ntrip_set_rtcm_cache(st);
+			joblist_append_ntrip_locked(st->caster->joblist, st, ntrip_set_rtcm_cache);
 		} else if (st->state == NTRIP_WAIT_STREAM_GET) {
 			int r = rtcm_packet_handle(st);
 			if (st->persistent || r == 0)
