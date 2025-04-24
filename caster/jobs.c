@@ -387,7 +387,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	P_MUTEX_UNLOCK(&this->append_mutex);
 
 	/* Log message out of locks to avoid deadlocks */
-	ntrip_log(st, LOG_EDEBUG, "job appended, ntrip %d in joblist ntrip_queue njobs %d newjobs %d",
+	ntrip_log(st, LOG_EDEBUG, "job appended, ntrip %s in joblist ntrip_queue njobs %d newjobs %d",
 		inserted?"inserted":"already in",
 		njobs, newjobs);
 
