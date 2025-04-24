@@ -18,12 +18,17 @@ static void redistribute_start(void *, int n);
  * Required lock: ntrip_state
  *
  * Switch client from a given source to another.
+ *
+ * Required lock: ntrip_state
  */
-int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource) {
-	ntrip_log(this, LOG_INFO, "Switching virtual source from %s to %s", this->virtual_mountpoint, new_mountpoint);
-	new_mountpoint = mystrdup(new_mountpoint);
-	if (new_mountpoint == NULL)
-		return -1;
+void redistribute_switch_source(struct ntrip_state *this, struct livesource *livesource, void *arg1) {
+	ntrip_log(this, LOG_INFO, "Switching virtual source from %s to %s", this->virtual_mountpoint, livesource->mountpoint);
+	char *new_mountpoint = mystrdup(livesource->mountpoint);
+	if (new_mountpoint == NULL) {
+		ntrip_log(this, LOG_NOTICE, "Unable to switch source from %s to %s", this->virtual_mountpoint, livesource->mountpoint);
+		livesource_decref(livesource);
+		return;
+	}
 	if (this->subscription) {
 		livesource_del_subscriber(this);
 	}
@@ -32,8 +37,7 @@ int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, p
 	if (this->virtual_mountpoint)
 		strfree(this->virtual_mountpoint);
 	this->virtual_mountpoint = new_mountpoint;
-	this->mountpoint_pos = *mountpoint_pos;
-	return 0;
+	this->mountpoint_pos = this->tmp_pos;
 }
 
 /*

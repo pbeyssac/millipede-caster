@@ -22,7 +22,7 @@ struct redistribute_cb_args {
 	int on_demand_source_timeout;
 };
 
-int redistribute_switch_source(struct ntrip_state *this, char *new_mountpoint, pos_t *mountpoint_pos, struct livesource *livesource);
+void redistribute_switch_source(struct ntrip_state *this, struct livesource *livesource, void *mountpoint_pos);
 struct redistribute_cb_args *redistribute_args_new(struct caster_state *caster, struct livesource *livesource,
 	struct endpoint *e,
 	char *mountpoint, pos_t *mountpoint_pos, int reconnect_delay, int persistent, int on_demand_source_timeout);

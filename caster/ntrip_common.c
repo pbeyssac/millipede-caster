@@ -560,6 +560,7 @@ void ntrip_unregister_livesource(struct ntrip_state *this) {
 	if (!this->own_livesource)
 		return;
 	livesource_del(this->own_livesource, this, this->caster);
+	livesource_decref(this->own_livesource);
 	this->own_livesource = NULL;
 }
 

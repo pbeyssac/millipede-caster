@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <time.h>
 
@@ -23,6 +24,8 @@ static const char *livesource_states[4] = {"INIT", "FETCH_PENDING", "RUNNING", N
 static const char *livesource_types[3] = {"DIRECT", "FETCHED", NULL};
 static const char *livesource_update_types[4] = {"none", "add", "del", "update"};
 
+static void livesource_free(struct livesource *this);
+static void livesource_decref_end(struct livesource *this);
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 static json_object *livesource_update_json(struct livesource *this,
 	struct caster_state *caster, enum livesource_update_type utype);
@@ -89,7 +92,6 @@ void livesource_table_free(struct livesources *this) {
 	if (this->remote != NULL)
 		hash_table_free(this->remote);
 	P_RWLOCK_DESTROY(&this->lock);
-	P_MUTEX_DESTROY(&this->delete_lock);
 	strfree(this->start_date);
 	strfree(this->hostname);
 	free(this);
@@ -102,9 +104,8 @@ struct livesources *livesource_table_new(const char *hostname, struct timeval *s
 		return NULL;
 
 	P_RWLOCK_INIT(&this->lock, NULL);
-	P_MUTEX_INIT(&this->delete_lock, NULL);
 	this->serial = 0;
-	this->hash = hash_table_new(509, (void(*)(void *))livesource_free);
+	this->hash = hash_table_new(509, (void(*)(void *))livesource_decref_end);
 	this->remote = hash_table_new(113, (void(*)(void *))livesources_remote_free);
 
 	char iso_date[40];
@@ -132,6 +133,7 @@ struct livesource *livesource_new(char *mountpoint, enum livesource_type type, e
 	this->npackets = 0;
 	this->state = state;
 	this->type = type;
+	atomic_init(&this->refcnt, 1);
 
 	P_RWLOCK_INIT(&this->lock, NULL);
 	return this;
@@ -177,13 +179,29 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 	return killed;
 }
 
-void livesource_free(struct livesource *this) {
-	P_RWLOCK_WRLOCK(&this->lock);
-	livesource_kill_subscribers_unlocked(this, 0);
-	P_RWLOCK_UNLOCK(&this->lock);
+static void livesource_free(struct livesource *this) {
 	P_RWLOCK_DESTROY(&this->lock);
 	strfree(this->mountpoint);
 	free(this);
+}
+
+static void livesource_decref_end(struct livesource *this) {
+	atomic_fetch_add_explicit(&this->refcnt, 1, memory_order_relaxed);
+	P_RWLOCK_WRLOCK(&this->lock);
+	livesource_kill_subscribers_unlocked(this, 0);
+	P_RWLOCK_UNLOCK(&this->lock);
+	assert(this->nsubs == 0);
+	if (atomic_fetch_sub_explicit(&this->refcnt, 2, memory_order_relaxed) == 2)
+		livesource_free(this);
+}
+
+void livesource_decref(struct livesource *this) {
+	if (atomic_fetch_sub_explicit(&this->refcnt, 1, memory_order_relaxed) == 1)
+		livesource_free(this);
+}
+
+void livesource_incref(struct livesource *this) {
+	atomic_fetch_add_explicit(&this->refcnt, 1, memory_order_relaxed);
 }
 
 void livesource_set_state(struct livesource *this, struct caster_state *caster, enum livesource_state state) {
@@ -224,6 +242,7 @@ void livesource_add_subscriber(struct ntrip_state *st, struct livesource *this, 
 		P_RWLOCK_WRLOCK(&this->lock);
 		TAILQ_INSERT_TAIL(&this->subscribers, sub, next);
 		this->nsubs++;
+		livesource_incref(this);
 		P_RWLOCK_UNLOCK(&this->lock);
 
 		ntrip_log(st, LOG_INFO, "subscription done to %s", this->mountpoint);
@@ -240,6 +259,7 @@ static void _livesource_del_subscriber_unlocked(struct ntrip_state *st) {
 		struct subscriber *sub = st->subscription;
 		TAILQ_REMOVE(&sub->livesource->subscribers, sub, next);
 		sub->livesource->nsubs--;
+		livesource_decref(sub->livesource);
 		sub->ntrip_state->subscription = NULL;
 		free(sub);
 	}
@@ -249,10 +269,10 @@ void livesource_del_subscriber(struct ntrip_state *st) {
 	/*
 	 * Lock order is mandatory to avoid deadlocks with livesource_send_subscribers
 	 */
-	P_MUTEX_LOCK(&st->caster->livesources->delete_lock);
 	struct subscriber *sub = st->subscription;
 	if (sub) {
 		struct livesource *livesource = sub->livesource;
+		livesource_incref(livesource);
 		P_RWLOCK_WRLOCK(&livesource->lock);
 		bufferevent_lock(st->bev);
 
@@ -260,8 +280,8 @@ void livesource_del_subscriber(struct ntrip_state *st) {
 
 		bufferevent_unlock(st->bev);
 		P_RWLOCK_UNLOCK(&livesource->lock);
+		livesource_decref(livesource);
 	}
-	P_MUTEX_UNLOCK(&st->caster->livesources->delete_lock);
 }
 
 /*
@@ -344,15 +364,15 @@ int livesource_del(struct livesource *this, struct ntrip_state *st, struct caste
 	json_object *j;
 	int r = 0;
 
-	P_MUTEX_LOCK(&caster->livesources->delete_lock);
 	P_RWLOCK_WRLOCK(&caster->livesources->lock);
 	const char *lstype = livesource_types[this->type];
 	j = livesource_update_json(this, caster, LIVESOURCE_UPDATE_DEL);
-	hash_table_del(caster->livesources->hash, this->mountpoint);
+	int e = hash_table_del(caster->livesources->hash, this->mountpoint);
+	// livesource_decref_end(this) done as a side effect of hash_table_del
+	assert(e == 0);
 	r = 1;
 	caster->livesources->serial++;
 	P_RWLOCK_UNLOCK(&caster->livesources->lock);
-	P_MUTEX_UNLOCK(&caster->livesources->delete_lock);
 	syncer_queue_json(caster, j);
 
 	if (r)
@@ -384,24 +404,30 @@ int livesource_connected(struct ntrip_state *st, char *mountpoint) {
 	if (existing_livesource) {
 		/* Here, we should perphaps destroy & replace any existing source fetcher. */
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
+		livesource_decref(existing_livesource);
 		return 0;
 	}
 	struct livesource *np = livesource_new(mountpoint, LIVESOURCE_TYPE_DIRECT, LIVESOURCE_RUNNING);
 	if (np == NULL) {
-		st->own_livesource = NULL;
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
 		return -1;
 	}
 	int e = hash_table_add(st->caster->livesources->hash, mountpoint, np);
 	if (e != 0) {
-		livesource_free(np);
-		ntrip_log(st, LOG_ERR, "Can't register livesource %s: already found", st->mountpoint);
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
+		livesource_decref(np);
+		ntrip_log(st, LOG_ERR, "Can't register livesource %s: already found", st->mountpoint);
 		return -1;
 	}
+	// count 1 reference for the hash table above, in addition
+	// to the initial refcnt of 1 for the reference stored in
+	// st->own_livesource.
+	livesource_incref(np);
+	st->own_livesource = np;
+
 	j = livesource_update_json(np, st->caster, LIVESOURCE_UPDATE_ADD);
 	st->caster->livesources->serial++;
-	st->own_livesource = np;
+	assert(atomic_load(&np->refcnt) == 2);
 	P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
 	ntrip_log(st, LOG_INFO, "livesource %s created RUNNING", mountpoint);
 	syncer_queue_json(st->caster, j);
@@ -455,7 +481,7 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 		if (!re && !sourceline_on_demand)
 			return NULL;
 
-		struct livesource *np = livesource_new(mountpoint, LIVESOURCE_TYPE_FETCHED, LIVESOURCE_FETCH_PENDING);
+		np = livesource_new(mountpoint, LIVESOURCE_TYPE_FETCHED, LIVESOURCE_FETCH_PENDING);
 		if (np == NULL) {
 			return NULL;
 		}
@@ -472,8 +498,11 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 	}
 
 	/* Copy current state while we are locked */
-	if (new_state && result)
-		*new_state = result->state;
+	if (result) {
+		if (new_state)
+			*new_state = result->state;
+		livesource_incref(result);
+	}
 	return result;
 }
 
@@ -490,16 +519,21 @@ struct livesource *livesource_find_on_demand(struct caster_state *this, struct n
 }
 
 int livesource_exists(struct caster_state *this, char *mountpoint, pos_t *mountpoint_pos) {
-	return livesource_find_on_demand(this, NULL, mountpoint, mountpoint_pos, 0, 0, NULL) != NULL;
+	struct livesource *lv = livesource_find_on_demand(this, NULL, mountpoint, mountpoint_pos, 0, 0, NULL);
+	if (lv != NULL) {
+		livesource_decref(lv);
+		return 1;
+	}
+	return 0;
 }
 
 struct livesource *livesource_find_and_subscribe(struct caster_state *caster, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand) {
-	P_MUTEX_LOCK(&st->caster->livesources->delete_lock);
-	struct livesource *l = livesource_find_on_demand(caster, st, mountpoint, mountpoint_pos, on_demand, sourceline_on_demand, NULL);
-	if (l)
-		livesource_add_subscriber(st, l, NULL);
-	P_MUTEX_UNLOCK(&st->caster->livesources->delete_lock);
-	return l;
+	struct livesource *lv = livesource_find_on_demand(caster, st, mountpoint, mountpoint_pos, on_demand, sourceline_on_demand, NULL);
+	if (lv != NULL) {
+		livesource_add_subscriber(st, lv, NULL);
+		livesource_decref(lv);
+	}
+	return lv;
 }
 
 /*
