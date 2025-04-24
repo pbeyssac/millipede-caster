@@ -87,6 +87,7 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 	endpoint_copy(&this->endpoint, e);
 	this->persistent = persistent;
 	this->livesource = livesource;
+	livesource_incref(livesource);
 	this->on_demand_source_timeout = on_demand_source_timeout;
 	return this;
 }
@@ -96,6 +97,7 @@ redistribute_args_free(struct redistribute_cb_args *this) {
 	if (this->task)
 		ntrip_task_free(this->task);
 	endpoint_free(&this->endpoint);
+	livesource_decref(this->livesource);
 	strfree(this->uri);
 	free(this);
 }

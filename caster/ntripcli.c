@@ -478,6 +478,8 @@ ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int t
 	st->ssl = ssl;
 	st->client = 1;
 	st->own_livesource = livesource;
+	if (livesource)
+		livesource_incref(livesource);
 	st->persistent = persistent;
 	if (task)
 		task->start = st->start;
