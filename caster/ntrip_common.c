@@ -553,13 +553,17 @@ int ntrip_drop_by_id(struct caster_state *caster, long long id) {
 	return r;
 }
 
+static void _livesource_del_dummy(struct ntrip_state *st, struct livesource *livesource, void *arg1) {
+	livesource_del(st, livesource);
+}
+
 /*
  * Required lock: ntrip_state
  */
 void ntrip_unregister_livesource(struct ntrip_state *this) {
 	if (!this->own_livesource)
 		return;
-	livesource_del(this->own_livesource, this, this->caster);
+	joblist_append_ntrip_livesource(this->caster->joblist, _livesource_del_dummy, this, this->own_livesource, NULL);
 	livesource_decref(this->own_livesource);
 	this->own_livesource = NULL;
 }

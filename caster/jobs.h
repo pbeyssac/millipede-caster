@@ -11,6 +11,7 @@ enum job_type {
 	JOB_LIBEVENT_RW,
 	JOB_LIBEVENT_EVENT,
 	JOB_NTRIP_LOCK,
+	JOB_NTRIP_LIVESOURCE,
 	JOB_NTRIP_PACKET,
 	JOB_NTRIP_UNLOCKED,
 	JOB_NTRIP_UNLOCKED_CONTENT,
@@ -20,6 +21,7 @@ enum job_type {
 
 struct ntrip_state;
 struct caster_state;
+struct livesource;
 struct packet;
 struct redistribute_cb_args;
 struct mime_content;
@@ -64,6 +66,14 @@ struct job {
 		} redistribute;
 
 		/*
+		 * type == JOB_CASTER_LIVESOURCE:
+		 */
+		struct {
+			void (*cb)(struct caster_state *caster, struct livesource *livesource);
+			struct livesource *livesource;
+		} caster_livesource;
+
+		/*
 		 * type == JOB_NTRIP_UNLOCKED: job associated with a ntrip_state,
 		 *	requires no lock on ntrip_state.
 		 */
@@ -71,6 +81,14 @@ struct job {
 			void (*cb)(struct ntrip_state *st);
 			struct ntrip_state *st;
 		} ntrip_unlocked;
+
+		/* type == JOB_NTRIP_LIVESOURCE */
+		struct {
+			void (*cb)(struct ntrip_state *st, struct livesource *livesource, void *arg1);
+			struct ntrip_state *st;
+			struct livesource *livesource;
+			void *arg1;
+		} ntrip_livesource;
 
 		/* type == JOB_NTRIP_PACKET */
 		struct {
@@ -148,6 +166,8 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 void joblist_append_ntrip_locked(struct joblist *this, struct ntrip_state *st, void (*cb)(struct ntrip_state *arg));
 void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistribute_cb_args *redis_args), struct redistribute_cb_args *redis_args);
 void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip_state *st), struct ntrip_state *st);
+void joblist_append_ntrip_livesource(struct joblist *this, void (*cb)(struct ntrip_state *st, struct livesource *livesource, void *arg1),
+	struct ntrip_state *st, struct livesource *livesource, void *arg1);
 void joblist_append_ntrip_packet(struct joblist *this, void (*cb)(struct ntrip_state *st, struct packet *p, void *arg1), struct ntrip_state *st, struct packet *p, void *arg1);
 void joblist_append_ntrip_unlocked_content(
 	struct joblist *this,

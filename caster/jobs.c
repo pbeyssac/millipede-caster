@@ -11,6 +11,7 @@
 #include "conf.h"
 #include "caster.h"
 #include "jobs.h"
+#include "livesource.h"
 #include "ntrip_common.h"
 
 
@@ -53,7 +54,11 @@ static int _joblist_drain(struct jobq *jobq) {
 		STAILQ_REMOVE_HEAD(jobq, next);
 		if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
 			ntrip_decref(j->ntrip_unlocked_content.st, "_joblist_drain");
-		else if (j->type == JOB_NTRIP_PACKET) {
+		else if (j->type == JOB_NTRIP_LIVESOURCE) {
+			ntrip_decref(j->ntrip_livesource.st, "_joblist_drain");
+			livesource_decref(j->ntrip_livesource.livesource);
+			free(j->ntrip_livesource.arg1);
+		} else if (j->type == JOB_NTRIP_PACKET) {
 			ntrip_decref(j->ntrip_packet.st, "_joblist_drain");
 			packet_decref(j->ntrip_packet.packet);
 		}
@@ -134,7 +139,14 @@ void joblist_run(struct joblist *this) {
 				j->redistribute.cb(j->redistribute.arg);
 			else if (j->type == JOB_NTRIP_UNLOCKED)
 				j->ntrip_unlocked.cb(j->ntrip_unlocked.st);
-			else if (j->type == JOB_NTRIP_PACKET) {
+			else if (j->type == JOB_NTRIP_LIVESOURCE) {
+				j->ntrip_livesource.cb(j->ntrip_livesource.st, j->ntrip_livesource.livesource, j->ntrip_livesource.arg1);
+				struct bufferevent *bev = j->ntrip_livesource.st->bev;
+				bufferevent_lock(bev);
+				ntrip_decref(j->ntrip_livesource.st, "joblist_run");
+				bufferevent_unlock(bev);
+				livesource_decref(j->ntrip_livesource.livesource);
+			} else if (j->type == JOB_NTRIP_PACKET) {
 				j->ntrip_packet.cb(j->ntrip_packet.st, j->ntrip_packet.packet, j->ntrip_packet.arg1);
 				struct bufferevent *bev = j->ntrip_packet.st->bev;
 				bufferevent_lock(bev);
@@ -435,6 +447,10 @@ void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistr
 }
 
 /*
+ * Queue a new livesource job
+ */
+
+/*
  * Queue a new unlocked ntrip job, or directly execute in unthreaded mode.
  */
 void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip_state *st), struct ntrip_state *st) {
@@ -446,6 +462,27 @@ void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip
 		_joblist_append_generic(this, NULL, &tmpj);
 	} else
 		cb(st);
+}
+
+/*
+ * Queue a new ntrip+livesource job, or directly execute in unthreaded mode.
+ * Handle ntrip & livesource reference counts and free() arg1 if drained
+ * from queue.
+ */
+void joblist_append_ntrip_livesource(struct joblist *this, void (*cb)(struct ntrip_state *st, struct livesource *livesource, void *arg1),
+	struct ntrip_state *st, struct livesource *livesource, void *arg1) {
+	if (threads) {
+		struct job tmpj;
+		tmpj.type = JOB_NTRIP_LIVESOURCE;
+		tmpj.ntrip_livesource.cb = cb;
+		tmpj.ntrip_livesource.st = st;
+		tmpj.ntrip_livesource.livesource = livesource;
+		tmpj.ntrip_livesource.arg1 = arg1;
+		ntrip_incref(st, "joblist_append_ntrip_livesource");
+		livesource_incref(livesource);
+		_joblist_append_generic(this, NULL, &tmpj);
+	} else
+		cb(st, livesource, arg1);
 }
 
 /*

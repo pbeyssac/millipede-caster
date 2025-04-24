@@ -25,7 +25,7 @@ static const char *livesource_types[3] = {"DIRECT", "FETCHED", NULL};
 static const char *livesource_update_types[4] = {"none", "add", "del", "update"};
 
 static void livesource_free(struct livesource *this);
-static void livesource_decref_end(struct livesource *this);
+static void livesource_end(struct livesource *this);
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 static json_object *livesource_update_json(struct livesource *this,
 	struct caster_state *caster, enum livesource_update_type utype);
@@ -105,7 +105,7 @@ struct livesources *livesource_table_new(const char *hostname, struct timeval *s
 
 	P_RWLOCK_INIT(&this->lock, NULL);
 	this->serial = 0;
-	this->hash = hash_table_new(509, (void(*)(void *))livesource_decref_end);
+	this->hash = hash_table_new(509, (void(*)(void *))livesource_decref);
 	this->remote = hash_table_new(113, (void(*)(void *))livesources_remote_free);
 
 	char iso_date[40];
@@ -185,14 +185,11 @@ static void livesource_free(struct livesource *this) {
 	free(this);
 }
 
-static void livesource_decref_end(struct livesource *this) {
-	atomic_fetch_add_explicit(&this->refcnt, 1, memory_order_relaxed);
+static void livesource_end(struct livesource *this) {
 	P_RWLOCK_WRLOCK(&this->lock);
 	livesource_kill_subscribers_unlocked(this, 0);
-	P_RWLOCK_UNLOCK(&this->lock);
 	assert(this->nsubs == 0);
-	if (atomic_fetch_sub_explicit(&this->refcnt, 2, memory_order_relaxed) == 2)
-		livesource_free(this);
+	P_RWLOCK_UNLOCK(&this->lock);
 }
 
 void livesource_decref(struct livesource *this) {
@@ -360,24 +357,20 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	return n;
 }
 
-int livesource_del(struct livesource *this, struct ntrip_state *st, struct caster_state *caster) {
+void livesource_del(struct ntrip_state *st, struct livesource *this) {
 	json_object *j;
-	int r = 0;
 
-	P_RWLOCK_WRLOCK(&caster->livesources->lock);
+	P_RWLOCK_WRLOCK(&st->caster->livesources->lock);
 	const char *lstype = livesource_types[this->type];
-	j = livesource_update_json(this, caster, LIVESOURCE_UPDATE_DEL);
-	int e = hash_table_del(caster->livesources->hash, this->mountpoint);
-	// livesource_decref_end(this) done as a side effect of hash_table_del
+	j = livesource_update_json(this, st->caster, LIVESOURCE_UPDATE_DEL);
+	int e = hash_table_del(st->caster->livesources->hash, this->mountpoint);
 	assert(e == 0);
-	r = 1;
-	caster->livesources->serial++;
-	P_RWLOCK_UNLOCK(&caster->livesources->lock);
-	syncer_queue_json(caster, j);
+	st->caster->livesources->serial++;
+	P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
+	livesource_end(this);
+	syncer_queue_json(st->caster, j);
 
-	if (r)
-		ntrip_log(st, LOG_INFO, "Unregistered livesource %s type %s", st->mountpoint, lstype);
-	return r;
+	ntrip_log(st, LOG_INFO, "Unregistered livesource %s type %s", st->mountpoint, lstype);
 }
 
 /*
