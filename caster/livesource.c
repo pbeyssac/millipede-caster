@@ -523,7 +523,7 @@ int livesource_exists(struct caster_state *this, char *mountpoint, pos_t *mountp
 struct livesource *livesource_find_and_subscribe(struct caster_state *caster, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand) {
 	struct livesource *lv = livesource_find_on_demand(caster, st, mountpoint, mountpoint_pos, on_demand, sourceline_on_demand, NULL);
 	if (lv != NULL) {
-		livesource_add_subscriber(st, lv, NULL);
+		joblist_append_ntrip_livesource(caster->joblist, livesource_add_subscriber, st, lv, NULL);
 		livesource_decref(lv);
 	}
 	return lv;
