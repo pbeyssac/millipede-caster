@@ -553,16 +553,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 
-					pos_t pos;
 					if (sourceline) {
 						st->source_virtual = sourceline->virtual;
 						st->source_on_demand = sourceline->on_demand;
-						pos = sourceline->pos;
 					} else {
 						st->source_virtual = 0;
 						st->source_on_demand = 1;
-						pos.lat = 0.0;
-						pos.lon = 0.0;
 					}
 
 					st->type = "client";
