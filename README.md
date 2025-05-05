@@ -28,7 +28,8 @@ Features:
 The current version requires:
  * libcyaml
  * libevent2
- * json-c
+ * json-c >= 0.16
+ * openssl >= 3.0.15
 
 Dependencies
 ============
