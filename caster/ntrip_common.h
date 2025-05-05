@@ -159,6 +159,7 @@ struct ntrip_state {
 	char local_addr[40];		// Conversion of the IP address part to an ASCII string
 
 	char *http_args[SIZE_HTTP_ARGS];
+	unsigned int n_http_args;	// Actual number of args provided by the client
 
 	// Set if this session is itself a source
 	struct livesource *own_livesource;

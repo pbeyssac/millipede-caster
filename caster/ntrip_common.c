@@ -96,6 +96,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->status_code = 0;
 	this->id = 0;
 	memset(&this->http_args, 0, sizeof(this->http_args));
+	this->n_http_args = 0;
 
 	this->remote_addr[0] = '\0';
 	this->remote = 0;
@@ -284,9 +285,11 @@ static void _ntrip_common_free(struct ntrip_state *this) {
 	if (this->chunk_buf)
 		evbuffer_free(this->chunk_buf);
 
+	/* Free SIZE_HTTP_ARGS instead of n_http_args because the last arg can be added as HTTP/0.9 */
 	for (char **arg = &this->http_args[0]; arg < &this->http_args[SIZE_HTTP_ARGS] && *arg; arg++)
 		strfree(*arg);
 	memset(&this->http_args, 0, sizeof(this->http_args));
+	this->n_http_args = 0;
 
 	strfree(this->user);
 	/*

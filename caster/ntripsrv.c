@@ -381,10 +381,21 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				}
 				i++;
 			}
+			st->n_http_args = i;
 			if (err) break;
-			if (i != SIZE_HTTP_ARGS || token != NULL) {
+
+			if (i < 2 || token != NULL) {
 				err = 400;
 				break;
+			}
+
+			/* No http version specified, assume 0.9 */
+			if (i == 2) {
+				st->http_args[2] = mystrdup("HTTP/0.9");
+				if (st->http_args[2] == NULL) {
+					err = 503;
+					break;
+				}
 			}
 			st->state = NTRIP_WAIT_HTTP_HEADER;
 			st->received_keepalive = 0;
@@ -620,6 +631,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						}
 						mountpoint = st->http_args[1]+1;
 					} else {
+						if (st->n_http_args == 2) {
+							err = 400;
+							break;
+						}
 						method_post_source = 1;
 						st->connection_keepalive = 0;
 						password = st->http_args[1];
