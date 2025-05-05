@@ -2,6 +2,7 @@
 #define _BITFIELD_H_
 
 #include <sys/types.h>
+#include <stdint.h>
 
 /*
  * Get or set up to 64 bits from a bit field.
