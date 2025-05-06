@@ -377,6 +377,54 @@ static int test_ip_analyze_prefixquota() {
 	return fail;
 }
 
+static int test_ip_convert() {
+	int fail = 0;
+	puts("test_ip_convert");
+
+	union sock addr;
+	char str[50];
+
+	struct test {
+		const char *parse;
+		int r_expect;
+		const char *str_expect;
+	};
+
+	struct test testlist[] = {
+		{"192.168.0.0", 1, "192.168.0.0"},
+		{"192.168.0.0/12", 0, NULL},
+		{"256.168.0.0", 0, NULL},
+		{"::", 1},
+		{"::/", 0, NULL},
+		{"::/128", 0, NULL},
+		{"1:2::3:4", 1, "1:2::3:4"},
+		{"...", 0, NULL},
+		{"9.9.9.9", 1, "9.9.9.9"},
+		{"9:9::9:9", 1, "9:9::9:9"},
+		{NULL, 0, NULL}
+	};
+
+	for (struct test *tl = testlist; tl->parse; tl++) {
+		int r;
+		char *r_str;
+		r = ip_convert(tl->parse, &addr);
+		if (r == tl->r_expect)
+			r_str = ip_str(&addr, str, sizeof str);
+		else
+			r_str = NULL;
+		if (r != tl->r_expect
+			|| (r_str == NULL && tl->str_expect != NULL)
+			|| (r_str != NULL && tl->str_expect != NULL && strcmp(r_str, tl->str_expect))) {
+			fail++;
+			printf("FAIL on %s: (%d, %s) instead of (%d, %s)\n", tl->parse, r, r_str, tl->r_expect, tl->str_expect);
+		} else
+			putchar('.');
+	}
+
+	putchar('\n');
+	return fail;
+}
+
 #if 0
 static void sourcetable_test(struct sourcetable *sourcetable) {
 	char *ggalist[] = {
@@ -412,5 +460,6 @@ int main() {
 	fail += test_getbits();
 	fail += test_setbits();
 	fail += test_rtcm_typeset_parse();
+	fail += test_ip_convert();
 	return fail != 0;
 }
