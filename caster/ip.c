@@ -243,7 +243,7 @@ static int _cmp_prefix(const void *p1, const void *p2) {
 /*
  * Sort the prefix tables
  */
-static void _prefix_table_sort(struct prefix_table *this) {
+void prefix_table_sort(struct prefix_table *this) {
 	qsort(this->v6_table.entries, this->v6_table.nentries, sizeof(this->v6_table.entries[0]), _cmp_prefix);
 	qsort(this->v4_table.entries, this->v4_table.nentries, sizeof(this->v4_table.entries[0]), _cmp_prefix);
 }
@@ -267,7 +267,7 @@ static int _monofamily_prefix_table_add(struct _monofamily_prefix_table *this, s
 /*
  * Add an element to an aggregate prefix table, choosing the right protocol.
  */
-static int _prefix_table_add(struct prefix_table *this, struct prefix_quota *new_entry) {
+int prefix_table_add(struct prefix_table *this, struct prefix_quota *new_entry) {
 	if (new_entry->prefix.addr.generic.sa_family == AF_INET6)
 		return _monofamily_prefix_table_add(&this->v6_table, new_entry);
 	else
@@ -277,7 +277,7 @@ static int _prefix_table_add(struct prefix_table *this, struct prefix_quota *new
 /*
  * Check whether addr is inside the prefix.
  */
-static int _in_prefix(struct prefix *prefix, union sock *addr) {
+int ip_in_prefix(struct prefix *prefix, union sock *addr) {
 	unsigned char *a, *ap;
 	int lenfull, remain;
 
@@ -310,7 +310,7 @@ static int _in_prefix(struct prefix *prefix, union sock *addr) {
  */
 static int _monofamily_prefix_table_get_quota(struct _monofamily_prefix_table *this, union sock *addr) {
 	for (int i = this->nentries-1; i >= 0; i--)
-		if (_in_prefix(&this->entries[i]->prefix, addr))
+		if (ip_in_prefix(&this->entries[i]->prefix, addr))
 			return this->entries[i]->quota;
 	return -1;
 }
@@ -362,12 +362,12 @@ int prefix_table_read(struct prefix_table *this, const char *filename, struct lo
 		struct prefix_quota *pq;
 		pq = prefix_quota_parse(p->pls[n][0], p->pls[n][1]);
 		if (pq != NULL)
-			_prefix_table_add(this, pq);
+			prefix_table_add(this, pq);
 		else
 			logfmt(log, LOG_ERR, "Can't parse %s %s, skipping", p->pls[n][0], p->pls[n][1]);
 	}
 	file_free(p);
-	_prefix_table_sort(this);
+	prefix_table_sort(this);
 	return 0;
 }
 

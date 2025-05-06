@@ -425,6 +425,62 @@ static int test_ip_convert() {
 	return fail;
 }
 
+static int test_prefix_table() {
+	int fail = 0;
+
+	puts("test_prefix_table");
+
+	union sock addr;
+
+	struct test {
+		const char *parse;
+		int expect;
+	};
+
+	struct test testlist[] = {
+		{"192.168.1.1", 84},
+		{"192.168.1.255", 84},
+		{"192.168.0.0", 126},
+		{"192.168.0.1", 126},
+		{"192.168.0.255", 126},
+		{"10.1.1.1", 42},
+		{"172.16.8.1", 42},
+		{"0.0.0.0", 42},
+		{"9.9.9.9", 9999},
+		{"9:9::9:9", 9998},
+		{NULL, 0}
+	};
+
+	struct prefix_table *p = prefix_table_new();
+	struct prefix_quota *pq;
+	pq = prefix_quota_parse("0.0.0.0/0", "42");
+	prefix_table_add(p, pq);
+	pq = prefix_quota_parse("192.168.0.0/16", "84");
+	prefix_table_add(p, pq);
+	pq = prefix_quota_parse("192.168.0.0/24", "126");
+	prefix_table_add(p, pq);
+	pq = prefix_quota_parse("9.9.9.9", "9999");
+	prefix_table_add(p, pq);
+	pq = prefix_quota_parse("::0/0", "6666");
+	prefix_table_add(p, pq);
+	pq = prefix_quota_parse("9:9::9:9/128", "9998");
+	prefix_table_add(p, pq);
+	prefix_table_sort(p);
+
+	for (struct test *tl = testlist; tl->parse; tl++) {
+		ip_convert(tl->parse, &addr);
+		int quota = prefix_table_get_quota(p, &addr);
+		if (quota != tl->expect) {
+			fail++;
+			printf("FAIL on %s: %d instead of %d\n", tl->parse, quota, tl->expect);
+		} else
+			putchar('.');
+	}
+
+	putchar('\n');
+	return fail;
+}
+
 #if 0
 static void sourcetable_test(struct sourcetable *sourcetable) {
 	char *ggalist[] = {
@@ -460,6 +516,7 @@ int main() {
 	fail += test_getbits();
 	fail += test_setbits();
 	fail += test_rtcm_typeset_parse();
+	fail += test_prefix_table();
 	fail += test_ip_convert();
 	return fail != 0;
 }
