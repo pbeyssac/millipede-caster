@@ -285,6 +285,10 @@ int ip_in_prefix(struct prefix *prefix, union sock *addr) {
 	remain = (prefix->len & 7);
 	unsigned char lastmask = ~(0xff >> remain);
 
+	/* Not in prefix if families differ */
+	if (prefix->addr.generic.sa_family != addr->generic.sa_family)
+		return 0;
+
 	switch(addr->generic.sa_family) {
 	case AF_INET6:
 		a = (unsigned char *)&addr->v6.sin6_addr;
@@ -294,6 +298,10 @@ int ip_in_prefix(struct prefix *prefix, union sock *addr) {
 		a = (unsigned char *)&addr->v4.sin_addr;
 		ap = (unsigned char *)&prefix->addr.v4.sin_addr;
 		break;
+
+	/* Address family unknown or zeroed-out */
+	default:
+		return 0;
 	}
 
 	if (lenfull && memcmp(a, ap, lenfull))
