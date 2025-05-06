@@ -55,6 +55,7 @@ struct caster_state {
 		int nfree;	// number of items in free_queue
 		struct hash_table *ipcount;	// count by IP
 	} ntrips;
+	P_RWLOCK_T quotalock;
 
 	_Atomic (struct config *)config;
 	// Configured endpoints, pre-processed in JSON format.

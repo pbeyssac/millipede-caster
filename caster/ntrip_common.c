@@ -138,12 +138,11 @@ struct config *ntrip_refresh_config(struct ntrip_state *this) {
 }
 
 /*
- *
  * Increment counter for this IP.
  *
- * Required lock: ntrips.lock
+ * Required locks: quotalock, ntrip_state
  */
-static int ntrip_quota_incr(struct ntrip_state *this) {
+int ntrip_quota_incr(struct ntrip_state *this) {
 	this->counted = 1;
 	return hash_table_incr(this->caster->ntrips.ipcount, this->remote_addr);
 }
@@ -151,12 +150,52 @@ static int ntrip_quota_incr(struct ntrip_state *this) {
 /*
  * Decrement counter for this IP.
  *
- * Required lock: ntrips.lock
+ * Required locks: quotalock, ntrip_state
  */
-static void ntrip_quota_decr(struct ntrip_state *this) {
+void ntrip_quota_decr(struct ntrip_state *this) {
 	if (!this->counted)
 		return;
 	hash_table_decr(this->caster->ntrips.ipcount, this->remote_addr);
+	this->counted = 0;
+}
+
+/*
+ * Change recorded IP for this connection.
+ * Returned the new count for this IP.
+ * Required lock: ntrip_state
+ */
+int ntrip_quota_change(struct ntrip_state *this, union sock *addr) {
+	P_RWLOCK_WRLOCK(&this->caster->quotalock);
+	if (this->counted)
+		ntrip_quota_decr(this);
+	ip_str(addr, this->remote_addr, sizeof this->remote_addr);
+	int ip_count = ntrip_quota_incr(this);
+	P_RWLOCK_UNLOCK(&this->caster->quotalock);
+	return ip_count;
+}
+
+/*
+ * Get allowed quota for the provided address.
+ * Required lock: ntrip_state
+ */
+int ntrip_quota_get(struct ntrip_state *this, union sock *addr) {
+	int quota = -1;
+	if (this->config->blocklist)
+		quota = prefix_table_get_quota(this->config->blocklist, addr);
+	return quota;
+}
+
+/*
+ * Check quota for this connection.
+ * Required lock: ntrip_state
+ */
+int ntrip_quota_check(struct ntrip_state *this, int quota, int ipcount) {
+	int r = 0;
+	if (quota >= 0 && ipcount > quota) {
+		ntrip_log(this, LOG_WARNING, "over quota (%d connections, max %d), dropping", ipcount, quota);
+		r = -1;
+	}
+	return r;
 }
 
 /*
@@ -167,25 +206,21 @@ static int _ntrip_register(struct ntrip_state *this, int quota_check) {
 	int r = 0;
 	int ipcount = -1, quota = -1;
 
-	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
-
+	P_RWLOCK_WRLOCK(&this->caster->quotalock);
 	if (quota_check)
 		ipcount = ntrip_quota_incr(this);
+	P_RWLOCK_UNLOCK(&this->caster->quotalock);
 
+	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 	this->id = this->caster->ntrips.next_id++;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.queue, this, nextg);
 	this->caster->ntrips.n++;
-
 	P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
 
+	if (quota_check)
+		quota = ntrip_quota_get(this, &this->peeraddr);
 
-	if (quota_check) {
-		if (this->config->blocklist)
-			quota = prefix_table_get_quota(this->config->blocklist, &this->peeraddr);
-	}
-
-	if (quota >= 0 && ipcount > quota) {
-		ntrip_log(this, LOG_WARNING, "over quota (%d connections, max %d), dropping", ipcount, quota);
+	if (ntrip_quota_check(this, quota, ipcount) < 0) {
 		r = -1;
 		// ntrip_quota_decr(this) will be called later, when we remove the state from ntrips.queue
 	}
@@ -346,8 +381,10 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 		P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
 		TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
 		this->caster->ntrips.n--;
-		ntrip_quota_decr(this);
 		P_RWLOCK_UNLOCK(&this->caster->ntrips.lock);
+		P_RWLOCK_WRLOCK(&this->caster->quotalock);
+		ntrip_quota_decr(this);
+		P_RWLOCK_UNLOCK(&this->caster->quotalock);
 	}
 
 	/*
@@ -367,13 +404,17 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 static void ntrip_deferred_free2(struct ntrip_state *this) {
 	struct caster_state *caster = this->caster;
 	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2");
+
+	P_RWLOCK_WRLOCK(&this->caster->quotalock);
+	ntrip_quota_decr(this);
+	P_RWLOCK_UNLOCK(&this->caster->quotalock);
+
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.lock);
+
 	// lock order: bev before free_lock, same as
 	// ntrip_deferred_run to fix harmless valgrind warning.
 	bufferevent_lock(this->bev);
 	P_RWLOCK_WRLOCK(&this->caster->ntrips.free_lock);
-
-	ntrip_quota_decr(this);
 	TAILQ_REMOVE(&this->caster->ntrips.queue, this, nextg);
 	this->caster->ntrips.n--;
 	TAILQ_INSERT_TAIL(&this->caster->ntrips.free_queue, this, nextf);

@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "auth.h"
+#include "ip.h"
 #include "log.h"
 #include "rtcm.h"
 
@@ -45,6 +46,11 @@ struct config_proxy {
 	 */
 	int priority;
 	int tls;
+};
+
+// IP prefix (IP address + prefix length)
+struct config_trusted_http_proxy_prefixes {
+	struct prefix prefix;
 };
 
 struct config_node {
@@ -152,6 +158,14 @@ struct config {
 	 */
 	struct config_proxy	*proxy;
 	int			proxy_count;
+
+	/*
+	 * Optional handling of X-Forwarded-For.
+	 */
+	const char		**trusted_http_proxy;
+	int			trusted_http_proxy_count;
+	struct prefix		*trusted_http_proxy_prefixes;
+	const char		*trusted_http_ip_header;
 
 	/*
 	 * Node list definition

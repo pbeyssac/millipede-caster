@@ -23,6 +23,9 @@ tests = [
    b'^HTTP/1\.1 200 OK\r\n',
    b'GET /WILDCARD HTTP/1.1\nUser-Agent: NTRIP test\nNtrip-Version: Ntrip/2.0\n\n',
    b'^HTTP/1\.1 200 OK\r\n'),
+  (b'GET /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: .....\n\n$',
+   b'^HTTP/1\.1 400 Bad Request\r\n',
+   b'', b''),
 ]
 
 err = 0

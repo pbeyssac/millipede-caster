@@ -195,6 +195,7 @@ caster_new(const char *config_file) {
 	P_RWLOCK_INIT(&this->rtcm_lock, NULL);
 	this->ntrips.next_id = 1;
 
+	P_RWLOCK_INIT(&this->quotalock, NULL);
 	this->ntrips.ipcount = hash_table_new(509, NULL);
 
 	// Used for access to source_auth, host_auth, blocklist and listener config
@@ -406,6 +407,7 @@ void caster_free(struct caster_state *this) {
 
 	if (this->joblist) joblist_free(this->joblist);
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
+	P_RWLOCK_DESTROY(&this->quotalock);
 	P_RWLOCK_DESTROY(&this->rtcm_lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.free_lock);

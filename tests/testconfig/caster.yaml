@@ -10,6 +10,7 @@ proxy:
 host_auth_file:		host.auth
 source_auth_file:	source.auth
 sourcetable_file:	sourcetable.dat
+blocklist_file:		blocklist1
 access_log:		../test-access.log
 log:			../test-caster.log
 

@@ -28,7 +28,7 @@ proxy:
 host_auth_file:		host.auth
 source_auth_file:	source-wildcard.auth
 sourcetable_file:	sourcetable.dat
-blocklist_file:		blocklist
+blocklist_file:		blocklist2
 access_log:		../test-access.log
 log:			../test-caster.log
 
@@ -36,6 +36,8 @@ ntripcli_default_write_timeout:	10
 ntripcli_default_read_timeout:	10
 ntripsrv_default_write_timeout:	10
 ntripsrv_default_read_timeout:	10
+
+trusted_http_proxy:	[ "127.0.0.1", "::1" ]
 
 idle_max_delay:		5
 

@@ -153,6 +153,7 @@ struct ntrip_state {
 	char remote;				// Flag: remote address is filled in peeraddr
 	char counted;				// Flag: counted in IP quotas
 	union sock peeraddr;
+	union sock realaddr;
 	char remote_addr[40];		// Conversion of the IP address part to an ASCII string
 	char local;			// Flag: local address is filled in localaddr
 	union sock myaddr;
@@ -234,6 +235,11 @@ struct ntrip_state {
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev,
 	char *host, unsigned short port, const char *uri, char *mountpoint);
 struct config *ntrip_refresh_config(struct ntrip_state *this);
+int ntrip_quota_incr(struct ntrip_state *this);
+void ntrip_quota_decr(struct ntrip_state *this);
+int ntrip_quota_change(struct ntrip_state *this, union sock *addr);
+int ntrip_quota_get(struct ntrip_state *this, union sock *addr);
+int ntrip_quota_check(struct ntrip_state *this, int quota, int ipcount);
 void ntrip_register(struct ntrip_state *this);
 int ntrip_register_check(struct ntrip_state *this);
 void ntrip_set_fd(struct ntrip_state *this);

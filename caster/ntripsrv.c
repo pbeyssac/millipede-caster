@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -326,6 +327,42 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 	dist_table_free(s);
 }
 
+static int _handle_forwarded_header(struct ntrip_state *st, struct config *config, char *value) {
+	union sock realaddr;
+
+	int trust = 0;
+	for (int i = 0; i < config->trusted_http_proxy_count; i++)
+		if (ip_in_prefix(&config->trusted_http_proxy_prefixes[i], &st->peeraddr)) {
+			trust = 1;
+			break;
+		}
+
+	if (!trust)
+		/* Ignore header, don't check quota from header IP */
+		return 0;
+
+	char *realaddr_str = strrchr(value, ',');
+	if (realaddr_str == NULL)
+		realaddr_str = value;
+	else
+		realaddr_str++;
+	while (isspace(*realaddr_str)) realaddr_str++;
+
+	memset(&realaddr, 0, sizeof realaddr);
+	if (ip_convert(realaddr_str, &realaddr) <= 0)
+		return 400;
+
+	ntrip_log(st, LOG_EDEBUG, "quota changing");
+	int ip_count = ntrip_quota_change(st, &realaddr);
+	st->realaddr = realaddr;
+	st->peeraddr = realaddr;
+	int quota = ntrip_quota_get(st, &realaddr);
+	ntrip_log(st, LOG_EDEBUG, "quota changed, count %d quota %d", ip_count, quota);
+	if (ntrip_quota_check(st, quota, ip_count) < 0)
+		return 1;
+	return 0;
+}
+
 /*
  * Main NTRIP server HTTP connection loop.
  */
@@ -466,6 +503,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						st->last_pos = pos;
 						st->last_pos_valid = 1;
 					}
+				} else if (!strcasecmp(key,
+						config->trusted_http_ip_header ?
+						config->trusted_http_ip_header : "x-forwarded-for")) {
+					err = _handle_forwarded_header(st, config, value);
+					if (err)
+						break;
 				} else {
 					ntrip_log(st, LOG_EDEBUG, "Header %s: %s", key, value);
 				}

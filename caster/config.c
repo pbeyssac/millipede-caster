@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -284,6 +285,10 @@ static const cyaml_schema_value_t rtcm_filter_schema = {
 		struct config_rtcm_filter, rtcm_filter_fields_schema),
 };
 
+static const cyaml_schema_value_t trusted_http_proxy_schema = {
+	CYAML_VALUE_STRING(CYAML_FLAG_POINTER, const char *, 0, CYAML_UNLIMITED)
+};
+
 /* CYAML mapping schema fields array for the top level mapping. */
 static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
@@ -298,6 +303,11 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
 		"proxy", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, proxy, &proxy_schema, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_SEQUENCE(
+		"trusted_http_proxy", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
+		struct config, trusted_http_proxy, &trusted_http_proxy_schema, 0, CYAML_UNLIMITED),
+	CYAML_FIELD_STRING_PTR(
+		"trusted_http_ip_header", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config, trusted_http_ip_header, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_SEQUENCE(
 		"node", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, node, &node_schema, 0, CYAML_UNLIMITED),
@@ -378,6 +388,14 @@ static const cyaml_config_t cyaml_config = {
 	.mem_fn = cyaml_mem,		/* Use the default memory allocator. */
 	.log_level = CYAML_LOG_WARNING,	/* Logging errors and warnings only. */
 };
+
+static void
+_log(cyaml_log_t level, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	cyaml_log(level, NULL, fmt, ap);
+	va_end(ap);
+}
 
 struct config *config_parse(const char *filename) {
 	struct config *this;
@@ -460,6 +478,22 @@ struct config *config_parse(const char *filename) {
 		DEFAULT_ASSIGN_ARRAY(this, i, bind, default_config_bind, queue_size);
 	}
 
+	if (this->trusted_http_proxy_count) {
+		this->trusted_http_proxy_prefixes = (struct prefix *)malloc(sizeof(*this->trusted_http_proxy_prefixes)*this->trusted_http_proxy_count);
+		if (this->trusted_http_proxy_prefixes == NULL) {
+			config_free(this);
+			return NULL;
+		}
+	} else
+		this->trusted_http_proxy_prefixes = NULL;
+
+	for (int i = 0; i < this->trusted_http_proxy_count; i++)
+		if (ip_prefix_parse(this->trusted_http_proxy[i], &this->trusted_http_proxy_prefixes[i].addr, &this->trusted_http_proxy_prefixes[i].len) <= 0) {
+			_log(CYAML_LOG_ERROR, "Invalid IP prefix %s", this->trusted_http_proxy[i]);
+			config_free(this);
+			return NULL;
+		}
+
 	if (this->threads_count == 0) {
 		this->threads = (struct config_threads *)malloc(sizeof(struct config_threads));
 		if (this->threads == NULL) {
@@ -533,8 +567,13 @@ void config_free(struct config *this) {
 	}
 	free(this->rtcm_filter);
 
+	for (int i = 0; i < this->trusted_http_proxy_count; i++)
+		free((char *)this->trusted_http_proxy[i]);
+	free(this->trusted_http_proxy_prefixes);
+
 	free(this->threads);
 
+	free((char *)this->trusted_http_proxy);
 	free((char *)this->syncer_auth);
 	free((char *)this->host_auth_filename);
 	free((char *)this->source_auth_filename);
