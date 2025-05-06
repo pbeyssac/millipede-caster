@@ -11,15 +11,19 @@ int log_init(struct log *this, const char *filename, log_cb_t log_cb, void *arg)
 	this->log_cb = log_cb;
 	this->state = arg;
 
-	if (filename)
+	// If filename is NULL, can't assign stderr to this->logfile as this causes weird side effects
+	// Use NULL instead.
+
+	this->logfile = NULL;
+	if (filename) {
 		this->logfile = fopen(filename, "a+");
-	else
-		this->logfile = stderr;
-	if (!this->logfile) {
-		fprintf(stderr, "Can't open log file %s: %s\n", filename, strerror(errno));
-		return -1;
+		if (!this->logfile) {
+			fprintf(stderr, "Can't open log file %s: %s\n", filename, strerror(errno));
+			return -1;
+		}
 	}
-	setlinebuf(this->logfile);
+	if (this->logfile)
+		setlinebuf(this->logfile);
 	return 0;
 }
 
@@ -31,7 +35,8 @@ int log_reopen(struct log *this, const char *filename) {
 	}
 	setlinebuf(newfile);
 	P_RWLOCK_WRLOCK(&this->lock);
-	fclose(this->logfile);
+	if (this->logfile)
+		fclose(this->logfile);
 	this->logfile = newfile;
 	P_RWLOCK_UNLOCK(&this->lock);
 	return 0;
@@ -50,7 +55,7 @@ logfmt_direct(struct log *this, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	P_RWLOCK_WRLOCK(&this->lock);
-	vfprintf(this->logfile, fmt, ap);
+	vfprintf(this->logfile?this->logfile:stderr, fmt, ap);
 	P_RWLOCK_UNLOCK(&this->lock);
 	va_end(ap);
 }

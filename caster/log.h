@@ -9,7 +9,7 @@
 typedef void (*log_cb_t)(void *, struct gelf_entry *, int, const char *, va_list);
 
 struct log {
-	FILE *logfile;
+	FILE *logfile;		// NULL causes use of stderr instead
 	void *state;
 	log_cb_t log_cb;
 	P_RWLOCK_T lock;
