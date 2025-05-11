@@ -397,6 +397,22 @@ _log(cyaml_log_t level, const char *fmt, ...) {
 	va_end(ap);
 }
 
+/*
+ * Return configured endpoints as JSON.
+ */
+static json_object *_endpoints_json(struct config *config) {
+	json_object *jmain = json_object_new_array_ext(config->endpoint_count);
+	for (int i = 0; i < config->endpoint_count; i++) {
+		json_object *j = json_object_new_object();
+		if (config->endpoint[i].host)
+			json_object_object_add_ex(j, "host", json_object_new_string(config->endpoint[i].host), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "port", json_object_new_int(config->endpoint[i].port), JSON_C_CONSTANT_NEW);
+		json_object_object_add_ex(j, "tls", json_object_new_boolean(config->endpoint[i].tls), JSON_C_CONSTANT_NEW);
+		json_object_array_add(jmain, j);
+	}
+	return jmain;
+}
+
 struct config *config_parse(const char *filename) {
 	struct config *this;
 	cyaml_err_t err;
@@ -510,6 +526,7 @@ struct config *config_parse(const char *filename) {
 	this->host_auth = NULL;
 	this->source_auth = NULL;
 	this->blocklist = NULL;
+	this->endpoints_json = _endpoints_json(this);
 	return this;
 }
 
@@ -587,5 +604,7 @@ void config_free(struct config *this) {
 		auth_free(this->source_auth);
 	if (this->blocklist)
 		prefix_table_free(this->blocklist);
+	if (this->endpoints_json)
+		json_object_put(this->endpoints_json);
 	free(this);
 }

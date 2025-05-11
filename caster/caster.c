@@ -132,22 +132,6 @@ caster_tls_log_cb(const char *str, size_t len, void *u) {
 	return 1;
 }
 
-/*
- * Return configured endpoints as JSON.
- */
-json_object *caster_endpoints_json(struct caster_state *caster) {
-	json_object *jmain = json_object_new_array_ext(caster->config->endpoint_count);
-	for (int i = 0; i < caster->config->endpoint_count; i++) {
-		json_object *j = json_object_new_object();
-		if (caster->config->endpoint[i].host)
-			json_object_object_add_ex(j, "host", json_object_new_string(caster->config->endpoint[i].host), JSON_C_CONSTANT_NEW);
-		json_object_object_add_ex(j, "port", json_object_new_int(caster->config->endpoint[i].port), JSON_C_CONSTANT_NEW);
-		json_object_object_add_ex(j, "tls", json_object_new_boolean(caster->config->endpoint[i].tls), JSON_C_CONSTANT_NEW);
-		json_object_array_add(jmain, j);
-	}
-	return jmain;
-}
-
 static struct caster_state *
 caster_new(const char *config_file) {
 	int err = 0;
@@ -208,7 +192,6 @@ caster_new(const char *config_file) {
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
 	atomic_init(&this->config, NULL);
-	this->endpoints_json = NULL;
 	this->config_file = config_file;
 
 	char *abs_config_path = realpath(config_file, NULL);
@@ -415,8 +398,6 @@ void caster_free(struct caster_state *this) {
 	log_free(&this->flog);
 	log_free(&this->alog);
 	strfree(this->config_dir);
-	if (this->endpoints_json)
-		json_object_put(this->endpoints_json);
 	if (this->config)
 		config_decref(this->config);
 	caster_free_rtcm_filters(this);
@@ -750,8 +731,6 @@ static int caster_reload_config(struct caster_state *this) {
 	if (atomic_load(&this->config))
 		config_decref(atomic_load(&this->config));
 	atomic_store(&this->config, config);
-	json_object_put(this->endpoints_json);
-	this->endpoints_json = caster_endpoints_json(this);
 	return 0;
 }
 

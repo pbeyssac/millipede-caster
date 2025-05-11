@@ -4,6 +4,8 @@
 #include <stdatomic.h>
 #include <stdio.h>
 
+#include <json-c/json_object.h>
+
 #include "auth.h"
 #include "ip.h"
 #include "log.h"
@@ -175,6 +177,8 @@ struct config {
 
 	struct config_endpoint	*endpoint;
 	int			endpoint_count;
+	// Configured endpoints, pre-processed in JSON format.
+	json_object		*endpoints_json;
 
 	/*
 	 * Graylog server definition

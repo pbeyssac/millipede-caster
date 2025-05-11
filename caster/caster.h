@@ -58,8 +58,6 @@ struct caster_state {
 	P_RWLOCK_T quotalock;
 
 	_Atomic (struct config *)config;
-	// Configured endpoints, pre-processed in JSON format.
-	json_object *endpoints_json;
 
 	// cached from config to avoid locking
 	int log_level, graylog_log_level;

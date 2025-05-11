@@ -580,8 +580,8 @@ static json_object *livesource_list_local_json(struct caster_state *caster, stru
 	json_object *new_list;
 
 	jmain = _livesource_list_base_json(this);
-	json_object_get(caster->endpoints_json);
-	json_object_object_add_ex(jmain, "endpoints", caster->endpoints_json, JSON_C_CONSTANT_NEW);
+	json_object_get(caster->config->endpoints_json);
+	json_object_object_add_ex(jmain, "endpoints", caster->config->endpoints_json, JSON_C_CONSTANT_NEW);
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;
