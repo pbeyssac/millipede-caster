@@ -27,6 +27,8 @@ test_series = [
   [(b'EF\r\n', b'EF'),
    (b'W\r\n01234', b'^$'),
   ],
+  [(b'EF\r\nW\r\nVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV', b'^$'),
+  ],
 ]
 
 err = 0

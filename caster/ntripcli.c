@@ -350,9 +350,10 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				ntrip_log(st, LOG_NOTICE, "last_useful %s: %d seconds ago, dropping", st->mountpoint, idle_time);
 				end = 1;
 			}
-		}
+		} else if (st->state == NTRIP_FORCE_CLOSE)
+			end = 1;
 	}
-	if (end || st->state == NTRIP_FORCE_CLOSE) {
+	if (end) {
 		ntrip_notify_close(st);
 		ntripcli_log_close(st);
 		ntrip_decref_end(st, "ntripcli_readcb");

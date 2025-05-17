@@ -757,7 +757,7 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 			*p = '\0';
 
 			if (sscanf(line, "%zx", &chunk_len) != 1) {
-				ntrip_log(st, LOG_INFO, "failed chunk_len: \"%s\"", line);
+				ntrip_log(st, LOG_NOTICE, "failed chunk_len: \"%s\"", line);
 				free(line);
 				st->state = NTRIP_FORCE_CLOSE;
 				st->chunk_state = CHUNK_NONE;
