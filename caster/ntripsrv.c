@@ -775,6 +775,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		} else if (st->state == NTRIP_FORCE_CLOSE) {
 			err = 1;
 			break;
+		} else {
+			/* Catchall for unknown states */
+			st->state = NTRIP_FORCE_CLOSE;
+			err = 1;
+			break;
 		}
 
 		if (line) {

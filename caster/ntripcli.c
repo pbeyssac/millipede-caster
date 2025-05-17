@@ -352,6 +352,11 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 		} else if (st->state == NTRIP_FORCE_CLOSE)
 			end = 1;
+		else {
+			/* Catchall for unknown states */
+			st->state = NTRIP_FORCE_CLOSE;
+			end = 1;
+		}
 	}
 	if (end) {
 		ntrip_notify_close(st);
