@@ -397,6 +397,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			char *token;
 
 			ntrip_clear_request(st);
+			strfree(st->mountpoint);
+			st->mountpoint = NULL;
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if ((line?len:waiting_len) > config->http_header_max_size) {
@@ -611,12 +613,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 
 					if (!st->source_virtual) {
-						if (l) {
-							ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d", mountpoint, st->source_on_demand);
-							ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
-							st->state = NTRIP_WAIT_CLIENT_INPUT;
-
-						} else {
+						if (!l) {
 							if (st->client_version == 1) {
 								err = ntripsrv_send_sourcetable(st, output);
 								st->state = NTRIP_WAIT_CLOSE;
@@ -624,10 +621,16 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 								err = 404;
 							break;
 						}
-					} else {
-						ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
-						st->state = NTRIP_WAIT_CLIENT_INPUT;
+						ntrip_log(st, LOG_DEBUG, "Found requested source %s, on_demand=%d", mountpoint, st->source_on_demand);
 					}
+
+					st->mountpoint = mystrdup(mountpoint);
+					if (st->mountpoint == NULL) {
+						err = 503;
+						break;
+					}
+					ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
+					st->state = NTRIP_WAIT_CLIENT_INPUT;
 
 					/* If we have a position (Ntrip-gga header), use it */
 

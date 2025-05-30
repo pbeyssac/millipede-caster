@@ -43,8 +43,12 @@ static json_object *api_ntrip_json(struct ntrip_state *st) {
 	json_object_object_add_ex(new_obj, "wildcard", json_object_new_boolean(st->wildcard), JSON_C_CONSTANT_NEW);
 	if (!strcmp(st->type, "source") || !strcmp(st->type, "source_fetcher"))
 		json_object_object_add_ex(new_obj, "mountpoint", json_object_new_string(st->mountpoint), JSON_C_CONSTANT_NEW);
-	else if (!strcmp(st->type, "client"))
-		json_object_object_add_ex(new_obj, "mountpoint", json_object_new_string(st->http_args[1]+1), JSON_C_CONSTANT_NEW);
+	else if (!strcmp(st->type, "client")) {
+		if (st->mountpoint != NULL)
+			json_object_object_add_ex(new_obj, "mountpoint", json_object_new_string(st->mountpoint), JSON_C_CONSTANT_NEW);
+		else
+			json_object_object_add_ex(new_obj, "mountpoint", json_object_new_null(), JSON_C_CONSTANT_NEW);
+	}
 
 	if (st->user_agent)
 		json_object_object_add_ex(new_obj, "user_agent", json_object_new_string(st->user_agent), JSON_C_CONSTANT_NEW);

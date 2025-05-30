@@ -169,6 +169,9 @@ struct ntrip_state {
 	time_t last_useful;			// last time a packet was resent to someone
 	char persistent;			// Flag: don't unregister & close the livesource even after idle_max_delay
 
+	/* Can be a source mountpoint, a fetched mountpoint, or a mountpoint requested by a client */
+	char *mountpoint;
+
 	/*
 	 * NTRIP client state
 	 */
@@ -186,7 +189,6 @@ struct ntrip_state {
 	 */
 	int scheme_basic;			// Flag: "Basic" or "internal" auth scheme
 	char *user, *password;
-	char *mountpoint;
 	pos_t mountpoint_pos;			// geographical position of the current source
 	pos_t tmp_pos;				// temporary: future source position redistribute_switch_source()
 	char user_agent_ntrip;			// Flag: set if the User-Agent header
