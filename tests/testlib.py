@@ -46,11 +46,13 @@ class SourceStream(object):
 # Client stream to server on a given mountpoint: wait for n samples
 #
 class ClientStream(object):
-  def __init__(self, host, mountpoint, n):
+  def __init__(self, host, mountpoint, n, firstline=''):
     self.host = host
     self.n = n
     self.mountpoint = mountpoint
     self.err = 0
+    self.firstline = firstline.encode('ascii')
+    self._stop = False
   def start(self):
     self._thr = threading.Thread(target=self._run, daemon=True, args=())
     self._thr.start()
@@ -60,7 +62,12 @@ class ClientStream(object):
     sclient.sendall(b'GET /%s HTTP/1.1\r\nUser-Agent: NTRIP test\r\n\r\n'
         % self.mountpoint.encode('ascii'))
 
+    if self.firstline:
+      sclient.send(self.firstline)
+
     for i in range(self.n):
+      if self._stop:
+        break
       data = sclient.recv(10240)
       if data == b'':
         print("FAIL: unexpected stop")
@@ -68,9 +75,12 @@ class ClientStream(object):
         break
       print(".", end='')
       sys.stdout.flush()
-    print()
+    if self.n:
+      print()
     sclient.close()
   def is_alive(self):
     return self._thr.is_alive()
   def join(self, timeout):
     self._thr.join(timeout)
+  def stop(self):
+    self._stop = True

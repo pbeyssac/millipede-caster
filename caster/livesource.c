@@ -221,14 +221,15 @@ void livesource_add_subscriber(struct ntrip_state *st, struct livesource *this, 
 	if (sub != NULL) {
 		sub->livesource = this;
 		sub->backlogged = 0;
-		sub->virtual = 0;
 
 		bufferevent_lock(st->bev);
 		int cancel = (st->state == NTRIP_END);
 		if (!cancel) {
+			int *virtual = (int *)arg1;
 			assert(st->subscription == NULL);
 			st->subscription = sub;
 			sub->ntrip_state = st;
+			sub->virtual = virtual?*virtual:0;
 		}
 		bufferevent_unlock(st->bev);
 		if (cancel) {

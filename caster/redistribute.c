@@ -32,8 +32,8 @@ void redistribute_switch_source(struct ntrip_state *this, struct livesource *liv
 	if (this->subscription) {
 		livesource_del_subscriber(this);
 	}
-	livesource_add_subscriber(this, livesource, NULL);
-	this->subscription->virtual = 1;
+	int virtual = 1;
+	livesource_add_subscriber(this, livesource, &virtual);
 	if (this->virtual_mountpoint)
 		strfree(this->virtual_mountpoint);
 	this->virtual_mountpoint = new_mountpoint;

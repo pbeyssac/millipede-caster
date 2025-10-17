@@ -57,7 +57,6 @@ static int _joblist_drain(struct jobq *jobq) {
 		else if (j->type == JOB_NTRIP_LIVESOURCE) {
 			ntrip_decref(j->ntrip_livesource.st, "_joblist_drain");
 			livesource_decref(j->ntrip_livesource.livesource);
-			free(j->ntrip_livesource.arg1);
 		} else if (j->type == JOB_NTRIP_PACKET) {
 			ntrip_decref(j->ntrip_packet.st, "_joblist_drain");
 			packet_decref(j->ntrip_packet.packet);
