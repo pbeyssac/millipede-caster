@@ -47,11 +47,15 @@ struct joblist *joblist_new(struct caster_state *caster) {
 /*
  * Required lock: ntrip_state
  */
-static int _joblist_drain(struct jobq *jobq) {
+static int _joblist_drain(struct jobq *jobq, P_MUTEX_T *mutex) {
 	struct job *j;
 	int n = 0;
+	if (mutex)
+		P_MUTEX_LOCK(mutex);
 	while ((j = STAILQ_FIRST(jobq))) {
 		STAILQ_REMOVE_HEAD(jobq, next);
+		if (mutex)
+			P_MUTEX_UNLOCK(mutex);
 		if (j->type == JOB_NTRIP_UNLOCKED_CONTENT)
 			ntrip_decref(j->ntrip_unlocked_content.st, "_joblist_drain");
 		else if (j->type == JOB_NTRIP_LIVESOURCE) {
@@ -63,7 +67,11 @@ static int _joblist_drain(struct jobq *jobq) {
 		}
 		n++;
 		free(j);
+		if (mutex)
+			P_MUTEX_LOCK(mutex);
 	}
+	if (mutex)
+		P_MUTEX_UNLOCK(mutex);
 	return n;
 }
 
@@ -75,17 +83,21 @@ void joblist_free(struct joblist *this) {
 	P_MUTEX_LOCK(&this->mutex);
 	while ((st = STAILQ_FIRST(&this->ntrip_queue))) {
 		STAILQ_REMOVE_HEAD(&this->ntrip_queue, next);
+		P_MUTEX_UNLOCK(&this->mutex);
 		joblist_drain(st);
+		P_MUTEX_LOCK(&this->mutex);
 	}
-	_joblist_drain(&this->jobq);
 	P_MUTEX_UNLOCK(&this->mutex);
+	_joblist_drain(&this->jobq, &this->mutex);
 	P_MUTEX_LOCK(&this->append_mutex);
 	while ((st = STAILQ_FIRST(&this->append_queue))) {
 		STAILQ_REMOVE_HEAD(&this->append_queue, next);
+		P_MUTEX_UNLOCK(&this->append_mutex);
 		joblist_drain(st);
+		P_MUTEX_LOCK(&this->append_mutex);
 	}
-	_joblist_drain(&this->append_jobq);
 	P_MUTEX_UNLOCK(&this->append_mutex);
+	_joblist_drain(&this->append_jobq, &this->append_mutex);
 	P_MUTEX_DESTROY(&this->mutex);
 	P_MUTEX_DESTROY(&this->append_mutex);
 	P_MUTEX_DESTROY(&this->condlock);
@@ -541,7 +553,7 @@ void joblist_append_stop(struct joblist *this) {
  */
 void joblist_drain(struct ntrip_state *st) {
 	int old_newjobs = st->newjobs;
-	int n = _joblist_drain(&st->jobq);
+	int n = _joblist_drain(&st->jobq, NULL);
 	st->njobs -= n;
 	if (old_newjobs > 0)
 		st->newjobs = st->newjobs > n ? st->newjobs-n : 0;

@@ -371,6 +371,7 @@ void caster_free(struct caster_state *this) {
 	caster_free_syncers(this);
 	caster_free_graylog(this);
 
+	if (this->joblist) joblist_free(this->joblist);
 	livesource_table_free(this->livesources);
 
 	hash_table_free(this->ntrips.ipcount);
@@ -388,7 +389,6 @@ void caster_free(struct caster_state *this) {
 	}
 	P_RWLOCK_UNLOCK(&this->sourcetablestack.lock);
 
-	if (this->joblist) joblist_free(this->joblist);
 	P_RWLOCK_DESTROY(&this->sourcetablestack.lock);
 	P_RWLOCK_DESTROY(&this->quotalock);
 	P_RWLOCK_DESTROY(&this->rtcm_lock);
