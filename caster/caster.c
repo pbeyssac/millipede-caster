@@ -54,6 +54,9 @@ static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *
 static int caster_reload_fetchers(struct caster_state *this);
 static void caster_free_fetchers(struct caster_state *this);
 static void caster_free_rtcm_filters(struct caster_state *caster);
+static void listener_free(struct listener *this);
+static void listener_incref(struct listener *this);
+static void listener_decref(struct listener *this);
 
 void caster_log_error(struct caster_state *this, char *orig) {
 	char s[256];
@@ -255,17 +258,9 @@ caster_new(const char *config_file) {
 	return this;
 }
 
-static void caster_free_listener(struct listener *this) {
-	if (this->listener)
-		evconnlistener_free(this->listener);
-	if (this->tls && this->ssl_server_ctx)
-		SSL_CTX_free(this->ssl_server_ctx);
-	free(this);
-}
-
 static void caster_free_listeners(struct caster_state *this) {
 	for (int i = 0; i < this->listeners_count; i++)
-		caster_free_listener(this->listeners[i]);
+		listener_decref(this->listeners[i]);
 	free(this->listeners);
 	this->listeners = NULL;
 	this->listeners_count = 0;
@@ -465,18 +460,24 @@ static int listener_setup_tls(struct listener *this, struct config_bind *config)
 /*
  * Configure a listening port for libevent.
  */
-static int caster_start_listener(struct caster_state *this, struct config_bind *config, union sock *sin, struct listener *listener) {
-	listener->listener = NULL;
+static struct listener *listener_new(struct caster_state *this, struct config_bind *config, union sock *sin) {
+	struct listener *listener = (struct listener *)malloc(sizeof(struct listener));
+
+	if (listener == NULL)
+		return NULL;
+
 	listener->sockaddr = *sin;
 	listener->caster = this;
-	int tls = config->tls;
-	listener->tls = tls;
+	listener->tls = config->tls;
 	listener->ssl_server_ctx = NULL;
 	listener->hostname = NULL;
+	atomic_init(&listener->refcnt, 1);
 
 	if (config->tls && config->tls_full_certificate_chain && config->tls_private_key) {
-		if (listener_setup_tls(listener, config) < 0)
-			return -1;
+		if (listener_setup_tls(listener, config) < 0) {
+			free(listener);
+			return NULL;
+		}
 	}
 
 	listener->listener = evconnlistener_new_bind(this->base, ntripsrv_listener_cb, listener,
@@ -484,9 +485,29 @@ static int caster_start_listener(struct caster_state *this, struct config_bind *
 		(struct sockaddr *)sin, sin->generic.sa_family == AF_INET ? sizeof(sin->v4) : sizeof(sin->v6));
 	if (!listener->listener) {
 		logfmt(&this->flog, LOG_ERR, "Could not create a listener for %s:%d!", config->ip, config->port);
-		return -1;
+		free(listener);
+		return NULL;
 	}
-	return 0;
+	return listener;
+}
+
+static void listener_free(struct listener *this) {
+	char ip[64];
+	logfmt(&this->caster->flog, LOG_INFO, "Closing listener %s", ip_str_port(&this->sockaddr, ip, sizeof ip));
+	if (this->listener)
+		evconnlistener_free(this->listener);
+	if (this->tls && this->ssl_server_ctx)
+		SSL_CTX_free(this->ssl_server_ctx);
+	free(this);
+}
+
+static void listener_incref(struct listener *this) {
+	atomic_fetch_add(&this->refcnt, 1);
+}
+
+static void listener_decref(struct listener *this) {
+	if (atomic_fetch_add_explicit(&this->refcnt, -1, memory_order_relaxed) == 1)
+		listener_free(this);
 }
 
 /*
@@ -561,22 +582,19 @@ static int caster_reload_listeners(struct caster_state *this) {
 				}
 				logfmt(&this->flog, LOG_INFO, "Reusing listener %s", ip_str_port(&sin, ip, sizeof ip));
 				new_listeners[nlisteners++] = recycled_listener;
-				this->listeners[j] = NULL;
+				listener_incref(recycled_listener);
 			}
 		}
 		if (!recycled_listener) {
 			/*
 			 * No reusable listener found, or reuse failed, start a new listener instance.
 			 */
-			struct listener *new_listener = (struct listener *)malloc(sizeof(struct listener));
-			if (new_listener) {
-				if (caster_start_listener(this, this->config->bind+i, &sin, new_listener) >= 0) {
-					new_listeners[nlisteners++] = new_listener;
-					logfmt(&this->flog, LOG_INFO, "Opening listener %s", ip_str_port(&sin, ip, sizeof ip));
-				} else {
-					logfmt(&this->flog, LOG_ERR, "Unable to open listener %s", ip_str_port(&sin, ip, sizeof ip));
-					caster_free_listener(new_listener);
-				}
+			struct listener *new_listener = listener_new(this, this->config->bind+i, &sin);
+			if (new_listener != NULL) {
+				new_listeners[nlisteners++] = new_listener;
+				logfmt(&this->flog, LOG_INFO, "Opening listener %s", ip_str_port(&sin, ip, sizeof ip));
+			} else {
+				logfmt(&this->flog, LOG_ERR, "Unable to open listener %s", ip_str_port(&sin, ip, sizeof ip));
 			}
 		}
 	}
@@ -584,13 +602,10 @@ static int caster_reload_listeners(struct caster_state *this) {
 	close(current_dir);
 
 	/*
-	 * Drop remaining listening sockets we haven't reused.
+	 * Unreference former listeners
 	 */
 	for (int j = 0; j < this->listeners_count; j++)
-		if (this->listeners[j]) {
-			logfmt(&this->flog, LOG_INFO, "Closing listener %s", ip_str_port(&this->listeners[j]->sockaddr, ip, sizeof ip));
-			caster_free_listener(this->listeners[j]);
-		}
+		listener_decref(this->listeners[j]);
 
 	free(this->listeners);
 	this->listeners = new_listeners;
