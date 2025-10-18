@@ -107,7 +107,7 @@ static int gga_test() {
 			fail++;
 			continue;
 		}
-		if (fabs(pos.lat-gga->lat) > 1e-6 || fabs(pos.lon-gga->lon) > 1e6) {
+		if (fabs(pos.lat-gga->lat) > 1e-6 || fabs(pos.lon-gga->lon) > 1e-6) {
 			printf("FAIL: gga from %s\n-> %f %f\n", gga->gga, pos.lat, pos.lon);
 			fail++;
 		}
