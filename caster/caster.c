@@ -551,7 +551,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 		struct config_bind *config = this->config->bind + i;
 		port = htons(config->port);
 		r = ip_convert(config->ip, &sin);
-		if (!r) {
+		if (r <= 0) {
 			logfmt(&this->flog, LOG_ERR, "Invalid IP %s", this->config->bind[i].ip);
 			continue;
 		}

@@ -88,6 +88,8 @@ int ip_cmp(union sock *s1, union sock *s2) {
 
 /*
  * Convert a v6 or v4 IP address from a string to a union sock.
+ *
+ * Return 1 if parsing is ok, 0 if not, -1 in case of a system error.
  */
 int ip_convert(const char *ipstr, union sock *sock) {
 	int r;
