@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 
 import base64
+import re
 import socket
 import sys
 import threading
@@ -15,7 +16,7 @@ class SourceStream(object):
     self._stop = False
     self._ok = False
     self.host = host
-    self.mountpoint = mountpoint
+    self.mountpoint = mountpoint.encode('ascii')
     self.b64userpass = base64.b64encode(userpass.encode('ascii'))
     self.n = n
   def start(self):
@@ -28,13 +29,13 @@ class SourceStream(object):
     ssource = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     ssource.connect(self.host)
     ssource.sendall(b'POST /%s HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic %s\n\n'
-        % (self.mountpoint.encode('ascii'), self.b64userpass))
+        % (self.mountpoint, self.b64userpass))
     sdata = ssource.recv(10240)
     self._ok = True
     for i in range(self.n):
       if self._stop:
         break
-      ssource.sendall(b'%d\n' % i)
+      ssource.sendall(b'%s %d\n' % (self.mountpoint, i))
       time.sleep(1)
     ssource.close()
   def stop(self):
@@ -53,6 +54,9 @@ class ClientStream(object):
     self.err = 0
     self.firstline = firstline.encode('ascii')
     self._stop = False
+    self.re_expect = None
+  def set_expect(self, re_expect):
+    self.re_expect = None if re_expect is None else re.compile(re_expect.encode('ascii'))
   def start(self):
     self._thr = threading.Thread(target=self._run, daemon=True, args=())
     self._thr.start()
@@ -71,9 +75,16 @@ class ClientStream(object):
       data = sclient.recv(10240)
       if data == b'':
         print("FAIL: unexpected stop")
-        self.err = 1
+        self.err += 1
         break
-      print(".", end='')
+      if not self.re_expect:
+        print(".", end='')
+      elif self.re_expect.match(data):
+        print(".", end='')
+      else:
+        print("Got", data)
+        print("X", end='')
+        self.err += 1
       sys.stdout.flush()
     if self.n:
       print()

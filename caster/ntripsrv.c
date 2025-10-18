@@ -228,9 +228,12 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 }
 
 /*
+ * Do rate limit checks then run ntripsrv_redo_virtual_pos()
+ * if adequate.
+ *
  * Required lock: ntrip_state
  */
-void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
+void ntripsrv_redo_virtual_pos_limited(struct ntrip_state *st) {
 	if (!st->last_pos_valid || !st->source_virtual)
 		return;
 
@@ -247,6 +250,22 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 		&& t1.tv_sec < st->config->max_nearest_recompute_interval
 		&& distance(&st->last_pos, &st->last_recompute_pos) < st->config->min_nearest_recompute_pos_delta)
 		return;
+
+	ntripsrv_redo_virtual_pos(st);
+}
+
+/*
+ * Recompute the nearest base list for the current client;
+ * initiate a base switch if adequate.
+ *
+ * Required lock: ntrip_state
+ */
+void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
+	if (!st->last_pos_valid || !st->source_virtual)
+		return;
+
+	struct timeval t0, t1;
+	gettimeofday(&t0, NULL);
 
 	struct sourcetable *pos_sourcetable = stack_flatten_dist(st->caster, &st->caster->sourcetablestack, &st->last_pos, st->lookup_dist);
 	if (pos_sourcetable == NULL)
@@ -296,7 +315,11 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 
 	char *m = s->dist_array[0].mountpoint;
 
-	if (!st->virtual_mountpoint || strcmp(m, st->virtual_mountpoint)) {
+	int current_livesource_live = 0;
+	if (st->virtual_mountpoint)
+		current_livesource_live = livesource_exists(st->caster, st->virtual_mountpoint, &st->mountpoint_pos);
+
+	if (!current_livesource_live || strcmp(m, st->virtual_mountpoint)) {
 		/*
 		 * The closest base has changed.
 		 */
@@ -308,7 +331,7 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 
 		float current_dist = st->virtual_mountpoint ? (distance(&st->mountpoint_pos, &st->last_pos)-st->config->hysteresis_m) : 1e10;
 
-		if (current_dist < s->dist_array[0].dist) {
+		if (current_livesource_live && current_dist < s->dist_array[0].dist) {
 			ntrip_log(st, LOG_DEBUG, "Virtual source ignoring switch from %s to %s due to %.2f hysteresis", st->virtual_mountpoint, m, st->config->hysteresis_m);
 		} else {
 			enum livesource_state source_state;
@@ -635,7 +658,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					/* If we have a position (Ntrip-gga header), use it */
 
 					if (st->last_pos_valid)
-						joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
+						joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos_limited);
 
 					/*
 					 * We only limit the send buffer on NTRIP clients, except for the sourcetable.
@@ -745,12 +768,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
 			st->received_bytes += len + 1;
 			pos_t pos;
-			ntrip_log(st, LOG_EDEBUG, "GGA? \"%s\", %zd bytes", line, len);
 			if (parse_gga(line, &pos) >= 0) {
 				st->last_pos = pos;
 				st->last_pos_valid = 1;
-				joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
-			}
+				joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos_limited);
+			} else
+				ntrip_log(st, LOG_DEBUG, "BAD GGA \"%s\", %zd bytes", line, len);
 		} else if (st->state == NTRIP_WAIT_CLIENT_CONTENT) {
 			int len;
 			len = evbuffer_remove(st->input, st->content+st->content_done, st->content_length-st->content_done);
