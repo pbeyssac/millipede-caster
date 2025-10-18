@@ -263,7 +263,7 @@ int parse_gga(const char *line, pos_t *pos) {
 			if (sscanf(token, "%3f%f", &s1, &s2) != 2) {
 				err = 1;
 			} else {
-				if (s1 < 0 | s2 < 0 || s1 > 180. || s2 >= 60. || s1 + s2/60 > 180.)
+				if (s1 < 0 || s2 < 0 || s1 > 180. || s2 >= 60. || s1 + s2/60 > 180.)
 					err = 1;
 				else
 					p.lon = s1 + s2/60;
