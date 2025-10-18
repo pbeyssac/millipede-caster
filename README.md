@@ -1,5 +1,5 @@
-Millipede 0.8
-=============
+Millipede 0.8.1
+===============
 
 
 Millipede is a high-performance NTRIP caster written in C for the [CentipedeRTK](https://github.com/CentipedeRTK) project, a network of [RTK](https://en.wikipedia.org/wiki/Real-time_kinematic_positioning) bases based in France (see https://centipede.fr).
