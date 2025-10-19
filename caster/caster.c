@@ -219,9 +219,6 @@ caster_new(const char *config_file) {
 			this->config_dir = mystrdup(".");
 	}
 
-	int current_dir = open(".", O_DIRECTORY);
-	if (this->config_dir) chdir(this->config_dir);
-
 	this->joblist = threads ? joblist_new(this) : NULL;
 
 	int r1 = log_init(&this->flog, NULL, &caster_log_cb, this);
@@ -233,9 +230,6 @@ caster_new(const char *config_file) {
 	this->syncers_count = 0;
 	this->rtcm_filter = NULL;
 	this->rtcm_filter_dict = NULL;
-
-	fchdir(current_dir);
-	close(current_dir);
 
 	if (err || r1 < 0 || r2 < 0 || !this->config_dir
 	    || (threads && this->joblist == NULL)
@@ -557,8 +551,6 @@ static int caster_reload_listeners(struct caster_state *this, struct config *new
 	 * Create listening socket addresses.
 	 * Create a libevent listener for each.
 	 */
-	int current_dir = open(".", O_DIRECTORY);
-	chdir(this->config_dir);
 
 	int nlisteners = 0;
 
@@ -613,9 +605,6 @@ static int caster_reload_listeners(struct caster_state *this, struct config *new
 			}
 		}
 	}
-	fchdir(current_dir);
-	close(current_dir);
-
 	/*
 	 * Unreference former listeners
 	 */
@@ -769,28 +758,6 @@ static struct config *caster_reload_config(struct caster_state *this) {
 	return config;
 }
 
-/*
- * reload with chdir to allow relative paths in the configuration.
- */
-static int caster_chdir_reload(struct caster_state *this, struct config *config, int reopen_logs) {
-	int r = 0;
-	int current_dir = open(".", O_DIRECTORY);
-	chdir(this->config_dir);
-	if (reopen_logs && caster_reopen_logs(this, config) < 0)
-		r = -1;
-	if (caster_reload_sourcetables(this, config) < 0)
-		r = -1;
-	if (caster_reload_auth(this, config) < 0)
-		r = -1;
-	if (caster_reload_blocklist(this, config) < 0)
-		r = -1;
-	if (caster_reload_rtcm_filters(this, config) < 0)
-		r = -1;
-	fchdir(current_dir);
-	close(current_dir);
-	return r;
-}
-
 static void
 signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	struct caster_signal_cb_info *info = user_data;
@@ -823,7 +790,15 @@ int caster_reload(struct caster_state *this) {
 	atomic_store(&this->config, config);
 
 	this->log_level = config->log_level;
-	if (caster_chdir_reload(this, config, 1) < 0)
+	if (caster_reopen_logs(this, config) < 0)
+		r = -1;
+	if (caster_reload_sourcetables(this, config) < 0)
+		r = -1;
+	if (caster_reload_auth(this, config) < 0)
+		r = -1;
+	if (caster_reload_blocklist(this, config) < 0)
+		r = -1;
+	if (caster_reload_rtcm_filters(this, config) < 0)
 		r = -1;
 	if (caster_reload_graylog(this, config) < 0)
 		r = -1;
