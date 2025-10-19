@@ -43,6 +43,17 @@ struct caster_signal_cb_info {
 };
 
 /*
+ * Structure used to manage config reload
+ */
+struct caster_dynconfig {
+	/* Array of pointers to listener configurations */
+	struct listener **listeners;
+	int listeners_count;
+
+	struct caster_state *caster;
+};
+
+/*
  * State for a caster
  */
 struct caster_state {
@@ -70,10 +81,6 @@ struct caster_state {
 	struct evdns_base *dns_base;
 	struct hash_table *rtcm_cache;
 	P_RWLOCK_T rtcm_lock;
-
-	// Array of pointers to listener configurations
-	struct listener **listeners;
-	int listeners_count;
 
 	// Protect access to the config structures
 	P_MUTEX_T configmtx;
@@ -117,6 +124,8 @@ struct caster_state {
 	 */
 	struct sourcetable_fetch_args **sourcetable_fetchers;
 	int sourcetable_fetchers_count;
+
+	struct caster_dynconfig *dyn;
 };
 
 void caster_log_error(struct caster_state *this, char *orig);

@@ -135,6 +135,31 @@ caster_tls_log_cb(const char *str, size_t len, void *u) {
 	return 1;
 }
 
+static struct caster_dynconfig *dynconfig_new(struct caster_state *caster) {
+	struct caster_dynconfig *this = (struct caster_dynconfig *)malloc(sizeof(struct caster_dynconfig));
+	if (this == NULL)
+		return NULL;
+	this->listeners = NULL;
+	this->listeners_count = 0;
+	this->caster = caster;
+	return this;
+}
+
+static void
+dynconfig_free_listeners(struct caster_dynconfig *dyn) {
+	for (int i = 0; i < dyn->listeners_count; i++)
+		listener_decref(dyn->listeners[i]);
+	free(dyn->listeners);
+	dyn->listeners = NULL;
+	dyn->listeners_count = 0;
+}
+
+static void
+dynconfig_free(struct caster_dynconfig *this) {
+	dynconfig_free_listeners(this);
+	free(this);
+}
+
 static struct caster_state *
 caster_new(const char *config_file) {
 	int err = 0;
@@ -158,8 +183,6 @@ caster_new(const char *config_file) {
 		return NULL;
 	}
 
-	this->listeners = NULL;
-	this->listeners_count = 0;
 	this->sourcetable_fetchers = NULL;
 	this->sourcetable_fetchers_count = 0;
 
@@ -257,14 +280,6 @@ caster_new(const char *config_file) {
 	return this;
 }
 
-static void caster_free_listeners(struct caster_state *this) {
-	for (int i = 0; i < this->listeners_count; i++)
-		listener_decref(this->listeners[i]);
-	free(this->listeners);
-	this->listeners = NULL;
-	this->listeners_count = 0;
-}
-
 static int caster_start_syncers(struct caster_state *this, struct config *config) {
 	if (config->node_count == 0) {
 		this->syncers_count = 0;
@@ -356,7 +371,8 @@ void caster_free(struct caster_state *this) {
 	if (threads)
 		jobs_stop_threads(this->joblist);
 
-	caster_free_listeners(this);
+	if (this->config)
+		dynconfig_free_listeners(this->config->dyn);
 
 	if (this->signalhup_event)
 		event_free(this->signalhup_event);
@@ -398,8 +414,9 @@ void caster_free(struct caster_state *this) {
 	strfree(this->config_dir);
 	strfree((char *)this->config_file);
 	if (this->config) {
+		dynconfig_free(this->config->dyn);
 		config_decref(this->config);
-	caster_free_rtcm_filters(this);
+	}
 	libevent_global_shutdown();
 	free(this);
 }
@@ -522,7 +539,10 @@ static void listener_decref(struct listener *this) {
 /*
  * Configure/reconfigure listening ports, reusing already existing sockets if possible.
  */
-static int caster_reload_listeners(struct caster_state *this, struct config *new_config) {
+static int caster_reload_listeners(struct caster_state *this,
+	struct config *new_config,
+	struct caster_dynconfig *olddyn,
+	struct caster_dynconfig *newdyn) {
 	union sock sin;
 	unsigned short port;
 	int r, i;
@@ -532,8 +552,6 @@ static int caster_reload_listeners(struct caster_state *this, struct config *new
 	P_MUTEX_LOCK(&this->configmtx);
 	if (new_config->bind_count == 0) {
 		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
-		if (this->listeners)
-			caster_free_listeners(this);
 		P_MUTEX_UNLOCK(&this->configmtx);
 		return -1;
 	}
@@ -541,8 +559,6 @@ static int caster_reload_listeners(struct caster_state *this, struct config *new
 	new_listeners = (struct listener **)malloc(sizeof(struct listener *)*new_config->bind_count);
 	if (!new_listeners) {
 		logfmt(&this->flog, LOG_CRIT, "Can't allocate listeners");
-		if (this->listeners)
-			caster_free_listeners(this);
 		P_MUTEX_UNLOCK(&this->configmtx);
 		return -1;
 	}
@@ -572,15 +588,17 @@ static int caster_reload_listeners(struct caster_state *this, struct config *new
 		 */
 		struct listener *recycled_listener = NULL;
 		int j;
-		for (j = 0; j < this->listeners_count; j++) {
-			if (this->listeners[j] && !ip_cmp(&sin, &this->listeners[j]->sockaddr)) {
-				recycled_listener = this->listeners[j];
-				break;
-			}
-		}
+		if (olddyn)
+			for (j = 0; j < olddyn->listeners_count; j++)
+				if (olddyn->listeners[j] && !ip_cmp(&sin, &olddyn->listeners[j]->sockaddr)) {
+					recycled_listener = olddyn->listeners[j];
+					listener_incref(recycled_listener);
+					break;
+				}
 		if (recycled_listener) {
 			if (config->tls && listener_setup_tls(recycled_listener, config) < 0) {
 				logfmt(&this->flog, LOG_ERR, "Can't reuse listener %s: TLS setup failed", ip_str_port(&sin, ip, sizeof ip));
+				listener_decref(recycled_listener);
 				recycled_listener = NULL;
 			} else {
 				if (recycled_listener->tls && !config->tls) {
@@ -589,7 +607,6 @@ static int caster_reload_listeners(struct caster_state *this, struct config *new
 				}
 				logfmt(&this->flog, LOG_INFO, "Reusing listener %s", ip_str_port(&sin, ip, sizeof ip));
 				new_listeners[nlisteners++] = recycled_listener;
-				listener_incref(recycled_listener);
 			}
 		}
 		if (!recycled_listener) {
@@ -605,22 +622,15 @@ static int caster_reload_listeners(struct caster_state *this, struct config *new
 			}
 		}
 	}
-	/*
-	 * Unreference former listeners
-	 */
-	for (int j = 0; j < this->listeners_count; j++)
-		listener_decref(this->listeners[j]);
-
-	free(this->listeners);
-	this->listeners = new_listeners;
-	this->listeners_count = nlisteners;
-
 	P_MUTEX_UNLOCK(&this->configmtx);
 
-	if (this->listeners_count == 0) {
+	if (nlisteners == 0) {
 		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
 		return -1;
 	}
+
+	newdyn->listeners = new_listeners;
+	newdyn->listeners_count = nlisteners;
 	return 0;
 }
 
@@ -770,24 +780,40 @@ signal_cb(evutil_socket_t sig, short events, void *user_data) {
 
 int caster_reload(struct caster_state *this) {
 	struct config *config, *old_config;
+	struct caster_dynconfig *olddyn;
+
 	int r = 0;
 
+	struct caster_dynconfig *newdyn = dynconfig_new(this);
+	if (newdyn == NULL)
+		return -1;
+
 	P_MUTEX_LOCK(&this->configmtx);
+
+	config = caster_reload_config(this);
+
 	this->graylog_log_level = -1;
 	old_config = atomic_load(&this->config);
-	if ((config = caster_reload_config(this)) == NULL) {
+	if (config == NULL) {
 		r = -1;
 		if (old_config == NULL) {
 			// Incorrect new config and no former config:
 			// abort all because we can't log more errors anyway.
 			P_MUTEX_UNLOCK(&this->configmtx);
+			dynconfig_free(newdyn);
 			return -1;
 		}
+		/* Keep the former config */
+		config = old_config;
+		old_config = NULL;
 	}
+	config->dyn = newdyn;
+	olddyn = old_config?old_config->dyn:NULL;
+
+	atomic_store(&this->config, config);
 
 	if (old_config)
 		config_decref(old_config);
-	atomic_store(&this->config, config);
 
 	this->log_level = config->log_level;
 	if (caster_reopen_logs(this, config) < 0)
@@ -803,12 +829,16 @@ int caster_reload(struct caster_state *this) {
 	if (caster_reload_graylog(this, config) < 0)
 		r = -1;
 	this->graylog_log_level = config->graylog_count > 0 ? config->graylog[0].log_level : -1;
-	if (caster_reload_listeners(this, config) < 0)
+	if (caster_reload_listeners(this, config, olddyn, newdyn) < 0)
 		r = -1;
 	if (caster_reload_fetchers(this, config) < 0)
 		r = -1;
 	if (caster_reload_syncers(this, config) < 0)
 		r = -1;
+
+	if (olddyn)
+		dynconfig_free(olddyn);
+
 	P_MUTEX_UNLOCK(&this->configmtx);
 	return r;
 }

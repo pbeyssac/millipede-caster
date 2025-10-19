@@ -311,6 +311,9 @@ struct config {
 
 	/* Quota/block list by IP prefix */
 	struct prefix_table *blocklist;
+
+	/* Pointer to caster-specific structures derived from config */
+	struct caster_dynconfig *dyn;
 };
 
 extern int backlog_delay;

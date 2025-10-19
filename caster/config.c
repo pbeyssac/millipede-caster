@@ -527,6 +527,7 @@ struct config *config_parse(const char *filename) {
 	this->source_auth = NULL;
 	this->blocklist = NULL;
 	this->endpoints_json = _endpoints_json(this);
+	this->dyn = NULL;
 	return this;
 }
 
