@@ -8,7 +8,7 @@
  */
 struct auth_entry *auth_parse(struct caster_state *caster, const char *filename) {
 	struct parsed_file *p;
-	p = file_parse(filename, 3, ":", 0, &caster->flog);
+	p = file_parse(caster->config_dir, filename, 3, ":", 0, &caster->flog);
 
 	if (p == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Can't read or parse %s", filename);

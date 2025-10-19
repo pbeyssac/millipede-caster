@@ -588,7 +588,7 @@ static string_array_t *split(const char *s, char sep, int maxsplits) {
  * Read a file with fields separated by characters in seps.
  * Skip empty fields if skipempty is not 0.
  */
-struct parsed_file *file_parse(const char *filename, int nfields, const char *seps, const int skipempty, struct log *log) {
+struct parsed_file *file_parse(const char *dir, const char *filename, int nfields, const char *seps, const int skipempty, struct log *log) {
 	char *line = NULL;
 	size_t linecap = 0;
 	ssize_t linelen;
@@ -596,7 +596,7 @@ struct parsed_file *file_parse(const char *filename, int nfields, const char *se
 	int nlines = 0;
 	int err = 0;
 
-	FILE *fp = fopen(filename, "r");
+	FILE *fp = fopen_absolute(dir, filename, "r");
 
 	if (fp == NULL) {
 		logfmt(log, LOG_ERR, "Can't open %s", filename);

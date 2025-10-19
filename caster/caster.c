@@ -195,14 +195,19 @@ caster_new(const char *config_file) {
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
 	atomic_init(&this->config, NULL);
-	this->config_file = config_file;
 
 	char *abs_config_path = realpath(config_file, NULL);
 	if (abs_config_path == NULL) {
 		fprintf(stderr, "Error: can't determine absolute path for config file %s\n", config_file);
 		err = 1;
 		this->config_dir = NULL;
+		this->config_file = mystrdup(config_file);
+		if (this->config_file == NULL)
+			err = 1;
 	} else {
+		this->config_file = mystrdup(abs_config_path);
+		if (this->config_file == NULL)
+			err = 1;
 		char *last_slash = strrchr(abs_config_path, '/');
 		if (last_slash) {
 			if (last_slash == abs_config_path)
@@ -397,7 +402,8 @@ void caster_free(struct caster_state *this) {
 	log_free(&this->flog);
 	log_free(&this->alog);
 	strfree(this->config_dir);
-	if (this->config)
+	strfree((char *)this->config_file);
+	if (this->config) {
 		config_decref(this->config);
 	caster_free_rtcm_filters(this);
 	libevent_global_shutdown();
@@ -408,10 +414,19 @@ void caster_free(struct caster_state *this) {
  * Load TLS certificates from file paths.
  */
 static int listener_load_certs(struct listener *this, const char *tls_full_certificate_chain, const char *tls_private_key) {
-	if (SSL_CTX_use_certificate_chain_file(this->ssl_server_ctx, tls_full_certificate_chain) <= 0)
+	char *full_certificate_chain = joinpath(this->caster->config_dir, tls_full_certificate_chain);
+	char *private_key = joinpath(this->caster->config_dir, tls_private_key);
+
+	if (full_certificate_chain == NULL || private_key == NULL
+		|| SSL_CTX_use_certificate_chain_file(this->ssl_server_ctx, full_certificate_chain) <= 0
+		|| SSL_CTX_use_PrivateKey_file(this->ssl_server_ctx, private_key, SSL_FILETYPE_PEM) <= 0) {
+		strfree(private_key);
+		strfree(full_certificate_chain);
 		return -1;
-	if (SSL_CTX_use_PrivateKey_file(this->ssl_server_ctx, tls_private_key, SSL_FILETYPE_PEM) <= 0)
-		return -1;
+	}
+	strfree(private_key);
+	strfree(full_certificate_chain);
+
 	if (!SSL_CTX_check_private_key(this->ssl_server_ctx)) {
 		char ip[64];
 		logfmt(&this->caster->flog, LOG_ERR, "Private key for %s does not match the certificate public key", ip_str_port(&this->sockaddr, ip, sizeof ip));
@@ -635,10 +650,14 @@ caster_reload_sourcetables(struct caster_state *caster, struct config *config) {
 static int
 caster_reopen_logs(struct caster_state *this, struct config *config) {
 	int r = 0;
-	if (log_reopen(&this->flog, config->log) < 0)
+	char *config_log = joinpath(this->config_dir, config->log);
+	char *access_log = joinpath(this->config_dir, config->access_log);
+	if (config_log == NULL || log_reopen(&this->flog, config_log) < 0)
 		r = -1;
-	if (log_reopen(&this->alog, config->access_log) < 0)
+	if (access_log == NULL || log_reopen(&this->alog, access_log) < 0)
 		r = -1;
+	strfree(config_log);
+	strfree(access_log);
 	return r;
 }
 
@@ -674,7 +693,7 @@ caster_reload_blocklist(struct caster_state *caster, struct config *config) {
 		p = prefix_table_new();
 		if (p == NULL)
 			r = -1;
-		else if (prefix_table_read(p, config->blocklist_filename, &caster->flog) < 0) {
+		else if (prefix_table_read(p, caster->config_dir, config->blocklist_filename, &caster->flog) < 0) {
 			prefix_table_free(p);
 			p = NULL;
 			r = -1;

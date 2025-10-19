@@ -9,6 +9,7 @@
 #include "conf.h"
 #include "ntripcli.h"
 #include "ntrip_task.h"
+#include "util.h"
 
 static void
 _ntrip_task_restart_cb(int fd, short what, void *arg) {
@@ -211,7 +212,7 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
 	if (this->drainfilename) {
 		char filename[PATH_MAX];
 		filedate(filename, sizeof filename, this->drainfilename);
-		f = fopen(filename, "a+");
+		f = fopen_absolute(this->caster->config_dir, filename, "a+");
 	}
 	while ((m = STAILQ_FIRST(&tmp_mimeq))) {
 		STAILQ_REMOVE_HEAD(&tmp_mimeq, next);

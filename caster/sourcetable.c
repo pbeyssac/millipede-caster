@@ -12,6 +12,7 @@
 #include "log.h"
 #include "ntrip_common.h"
 #include "sourcetable.h"
+#include "util.h"
 
 static int _sourcetable_add_unlocked(struct sourcetable *this, const char *sourcetable_entry, int on_demand, struct caster_state *caster);
 
@@ -24,7 +25,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 	ssize_t linelen;
 	int nlines = 0;
 
-	FILE *fp = fopen(filename, "r");
+	FILE *fp = fopen_absolute(caster->config_dir, filename, "r");
 	if (fp == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Can't open %s", filename);
 		return NULL;

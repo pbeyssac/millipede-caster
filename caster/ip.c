@@ -360,9 +360,9 @@ struct prefix_table *prefix_table_new() {
 	return this;
 }
 
-int prefix_table_read(struct prefix_table *this, const char *filename, struct log *log) {
+int prefix_table_read(struct prefix_table *this, const char *dir, const char *filename, struct log *log) {
 	struct parsed_file *p;
-	p = file_parse(filename, 2, "\t ", 1, log);
+	p = file_parse(dir, filename, 2, "\t ", 1, log);
 	if (p == NULL) {
 		logfmt(log, LOG_ERR, "Can't read or parse %s", filename);
 		return -1;
