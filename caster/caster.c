@@ -147,6 +147,8 @@ static struct caster_dynconfig *dynconfig_new(struct caster_state *caster) {
 	this->graylog_count = 0;
 	this->syncers = NULL;
 	this->syncers_count = 0;
+	this->rtcm_filter = NULL;
+	this->rtcm_filter_dict = NULL;
 	this->caster = caster;
 	return this;
 }
@@ -164,6 +166,17 @@ static void dynconfig_free_fetchers(struct caster_dynconfig *this) {
 	free(a);
 	this->sourcetable_fetchers = NULL;
 	this->sourcetable_fetchers_count = 0;
+}
+
+static void
+dynconfig_free_rtcm_filters(struct caster_dynconfig *dyn) {
+	if (dyn->rtcm_filter_dict) {
+		hash_table_free(dyn->rtcm_filter_dict);
+		dyn->rtcm_filter_dict = NULL;
+	}
+	if (dyn->rtcm_filter)
+		rtcm_filter_free(dyn->rtcm_filter);
+	dyn->rtcm_filter = NULL;
 }
 
 static void
@@ -199,6 +212,7 @@ static void
 dynconfig_free(struct caster_dynconfig *this) {
 	dynconfig_free_listeners(this);
 	dynconfig_free_fetchers(this);
+	dynconfig_free_rtcm_filters(this);
 	dynconfig_free_syncers(this);
 	dynconfig_free_graylog(this);
 	free(this);
@@ -287,9 +301,6 @@ caster_new(const char *config_file) {
 
 	int r1 = log_init(&this->flog, NULL, &caster_log_cb, this);
 	int r2 = log_init(&this->alog, NULL, &caster_alog, this);
-
-	this->rtcm_filter = NULL;
-	this->rtcm_filter_dict = NULL;
 
 	if (err || r1 < 0 || r2 < 0 || !this->config_dir
 	    || (threads && this->joblist == NULL)
@@ -721,32 +732,17 @@ caster_reload_blocklist(struct caster_state *caster, struct config *config) {
 	return r;
 }
 
-static void
-caster_free_rtcm_filters(struct caster_state *caster) {
-	if (caster->rtcm_filter_dict) {
-		hash_table_free(caster->rtcm_filter_dict);
-		caster->rtcm_filter_dict = NULL;
-	}
-	if (caster->rtcm_filter)
-		rtcm_filter_free(caster->rtcm_filter);
-	caster->rtcm_filter = NULL;
-}
-
 static int
-caster_reload_rtcm_filters(struct caster_state *caster, struct config *config) {
-	if (config->rtcm_filter_count == 0) {
-		caster_free_rtcm_filters(caster);
+caster_reload_rtcm_filters(struct caster_state *caster, struct config *config, struct caster_dynconfig *newdyn) {
+	if (config->rtcm_filter_count == 0)
 		return 0;
-	}
-	if (config->rtcm_filter_count != 1) {
-		caster_free_rtcm_filters(caster);
+	if (config->rtcm_filter_count != 1)
 		return -1;
-	}
 
-	if (caster->rtcm_filter_dict)
-		hash_table_free(caster->rtcm_filter_dict);
-	caster->rtcm_filter_dict = hash_table_new(5, NULL);
-	if (caster->rtcm_filter_dict == NULL)
+	if (newdyn->rtcm_filter_dict)
+		hash_table_free(newdyn->rtcm_filter_dict);
+	newdyn->rtcm_filter_dict = hash_table_new(5, NULL);
+	if (newdyn->rtcm_filter_dict == NULL)
 		return -1;
 
 	for (int i = 0; i < config->rtcm_filter_count; i++) {
@@ -766,11 +762,11 @@ caster_reload_rtcm_filters(struct caster_state *caster, struct config *config) {
 			rtcm_filter_free(rtcm_filter);
 			return -1;
 		}
-		hash_table_update(caster->rtcm_filter_dict, h);
+		hash_table_update(newdyn->rtcm_filter_dict, h);
 		hash_table_free(h);
-		if (caster->rtcm_filter)
-			rtcm_filter_free(caster->rtcm_filter);
-		caster->rtcm_filter = rtcm_filter;
+		if (newdyn->rtcm_filter)
+			rtcm_filter_free(newdyn->rtcm_filter);
+		newdyn->rtcm_filter = rtcm_filter;
 	}
 	return 0;
 }
@@ -843,7 +839,7 @@ int caster_reload(struct caster_state *this) {
 		r = -1;
 	if (caster_reload_blocklist(this, config) < 0)
 		r = -1;
-	if (caster_reload_rtcm_filters(this, config) < 0)
+	if (caster_reload_rtcm_filters(this, config, newdyn) < 0)
 		r = -1;
 
 	if (caster_reload_graylog(this, config, newdyn) < 0)

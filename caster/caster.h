@@ -62,6 +62,10 @@ struct caster_dynconfig {
 	struct syncer **syncers;
 	int syncers_count;
 
+	/* RTCM filtering */
+	struct rtcm_filter *rtcm_filter;	// filters (max 1 currently)
+	struct hash_table *rtcm_filter_dict;	// mountpoint => filter dictionary
+
 	struct caster_state *caster;
 };
 
@@ -108,13 +112,15 @@ struct caster_state {
 
 	sourcetable_stack_t sourcetablestack;
 
-	/* RTCM filtering */
-	struct rtcm_filter *rtcm_filter;	// filters (max 1 currently)
-	struct hash_table *rtcm_filter_dict;	// mountpoint => filter dictionary
-
 	/* Logs */
 	struct log flog, alog;
 	char hostname[128];
+	//struct graylog_sender **graylog;
+	//int graylog_count;	/* 0 or 1 */
+
+	/* Table synchronization */
+	//struct syncer **syncers;
+	//int syncers_count;
 
 	/* Thread id (thread-specific variable) for logs */
 	pthread_key_t thread_id;

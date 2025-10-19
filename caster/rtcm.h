@@ -9,6 +9,7 @@
 #include "packet.h"
 
 struct ntrip_state;
+struct caster_dynconfig;
 
 #define	RTCM_1K_MIN	1000
 #define	RTCM_1K_MAX	1230
@@ -49,7 +50,7 @@ char *rtcm_typeset_str(struct rtcm_typeset *this);
 struct hash_table *rtcm_filter_dict_parse(struct rtcm_filter *this, const char *apply);
 void rtcm_filter_free(struct rtcm_filter *this);
 struct rtcm_filter *rtcm_filter_new(const char *pass, const char *convert, enum rtcm_conversion conversion);
-int rtcm_filter_check_mountpoint(struct caster_state *caster, const char *mountpoint);
+int rtcm_filter_check_mountpoint(struct caster_dynconfig *dyn, const char *mountpoint);
 int rtcm_filter_pass(struct rtcm_filter *this, struct packet *packet);
 struct packet *rtcm_filter_convert(struct rtcm_filter *this, struct ntrip_state *st, struct packet *p);
 struct rtcm_info *rtcm_info_new();

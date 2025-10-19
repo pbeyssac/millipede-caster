@@ -336,9 +336,9 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			st->rtcm_client_state = NTRIP_RTCM_POS_OK;
 		}
 		p = packet;
-		if (st->rtcm_filter && !rtcm_filter_pass(st->caster->rtcm_filter, packet)) {
+		if (st->rtcm_filter && !rtcm_filter_pass(st->config->dyn->rtcm_filter, packet)) {
 			if (!pconv)
-				pconv = rtcm_filter_convert(st->caster->rtcm_filter, st, packet);
+				pconv = rtcm_filter_convert(st->config->dyn->rtcm_filter, st, packet);
 			p = pconv;
 		}
 		if (p)

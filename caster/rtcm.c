@@ -709,8 +709,8 @@ struct rtcm_filter *rtcm_filter_new(const char *pass, const char *convert, enum 
 /*
  * Return whether a mountpoint has a filter.
  */
-int rtcm_filter_check_mountpoint(struct caster_state *caster, const char *mountpoint) {
-	return hash_table_get_element(caster->rtcm_filter_dict, mountpoint) != NULL;
+int rtcm_filter_check_mountpoint(struct caster_dynconfig *dyn, const char *mountpoint) {
+	return hash_table_get_element(dyn->rtcm_filter_dict, mountpoint) != NULL;
 }
 
 static void handle_1006(struct rtcm_info *rp, struct packet *p) {
