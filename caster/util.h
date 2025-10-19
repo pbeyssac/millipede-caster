@@ -69,6 +69,9 @@ struct mime_content *mime_new(char *s, long long len, const char *mime_type, int
 void mime_set_type(struct mime_content *this, const char *mime_type);
 void mime_free(struct mime_content *this);
 void mime_append(struct mime_content *this, const char *s);
+char *joinpath(const char *dir, const char *path);
+FILE *fopen_absolute(const char *dir, const char *filename, const char *mode);
+
 void iso_date_from_timeval(char *iso_date, size_t iso_date_len, struct timeval *t);
 void timeval_from_iso_date(struct timeval *t, const char *iso_date);
 struct parsed_file *file_parse(const char *filename, int nfields, const char *seps, int skipempty, struct log *log);

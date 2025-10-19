@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/cdefs.h>
@@ -487,6 +488,44 @@ void strfree_callback(const void *data, size_t datalen, void *extra) {
  */
 void mime_free_callback(const void *data, size_t datalen, void *extra) {
 	mime_free((struct mime_content *)extra);
+}
+
+/*
+ * Return a malloc'd absolute file path with dir preprended.
+ * If path is already absolute, return a copy of path.
+ */
+char *joinpath(const char *dir, const char *path) {
+	char *new_path;
+	int len, addslash;
+	if (*path != '/') {
+		int lendir = strlen(dir);
+		addslash = (lendir == 0 || dir[lendir-1] != '/');
+		len = strlen(path) + lendir + addslash + 1;
+	} else {
+		len = strlen(path) + 1;
+	}
+
+	new_path = (char *)strmalloc(len);
+	if (new_path == NULL)
+		return NULL;
+
+	if (*path != '/')
+		snprintf(new_path, len, "%s%s%s", dir, addslash?"/":"", path);
+	else
+		strncpy(new_path, path, len);
+	return new_path;
+}
+
+/*
+ * fopen using dir to make file paths absolute (see joinpath).
+ */
+FILE *fopen_absolute(const char *dir, const char *filename, const char *mode) {
+	char *path = joinpath(dir, filename);
+	if (path == NULL)
+		return NULL;
+	FILE *r = fopen(path, mode);
+	strfree(path);
+	return r;
 }
 
 static void string_array_free(string_array_t *s) {
