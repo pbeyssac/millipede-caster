@@ -51,7 +51,7 @@
 
 static void caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
 static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
-static int caster_reload_fetchers(struct caster_state *this);
+static int caster_reload_fetchers(struct caster_state *this, struct config *config);
 static void caster_free_fetchers(struct caster_state *this);
 static void caster_free_rtcm_filters(struct caster_state *caster);
 static void listener_free(struct listener *this);
@@ -266,8 +266,8 @@ static void caster_free_listeners(struct caster_state *this) {
 	this->listeners_count = 0;
 }
 
-static int caster_start_syncers(struct caster_state *this) {
-	if (this->config->node_count == 0) {
+static int caster_start_syncers(struct caster_state *this, struct config *config) {
+	if (config->node_count == 0) {
 		this->syncers_count = 0;
 		return 0;
 	}
@@ -275,8 +275,8 @@ static int caster_start_syncers(struct caster_state *this) {
 	this->syncers = (struct syncer **)malloc(sizeof(struct syncer *)*this->syncers_count);
 	for (int i = 0; i < this->syncers_count; i++) {
 		this->syncers[i] = syncer_new(this,
-			this->config->node, this->config->node_count, "/adm/api/v1/sync", 0);
-		for (int j = 0; j < this->config->node_count; j++)
+			config->node, config->node_count, "/adm/api/v1/sync", 0);
+		for (int j = 0; j < config->node_count; j++)
 			syncer_start(this->syncers[i], j);
 	}
 	return 0;
@@ -292,9 +292,9 @@ static void caster_free_syncers(struct caster_state *this) {
 	this->syncers = NULL;
 }
 
-static int caster_reload_syncers(struct caster_state *this) {
+static int caster_reload_syncers(struct caster_state *this, struct config *config) {
 	caster_free_syncers(this);
-	return caster_start_syncers(this);
+	return caster_start_syncers(this, config);
 }
 
 static void caster_free_graylog(struct caster_state *this) {
@@ -306,7 +306,7 @@ static void caster_free_graylog(struct caster_state *this) {
 	this->graylog_count = 0;
 }
 
-static int caster_reload_graylog(struct caster_state *this) {
+static int caster_reload_graylog(struct caster_state *this, struct config *config) {
 	int r = 0;
 	int i;
 
@@ -314,23 +314,23 @@ static int caster_reload_graylog(struct caster_state *this) {
 
 	struct graylog_sender **new_graylog = NULL;
 
-	if (this->config->graylog_count) {
-		new_graylog = (struct graylog_sender **)malloc(sizeof(struct graylog_sender *)*this->config->graylog_count);
+	if (config->graylog_count) {
+		new_graylog = (struct graylog_sender **)malloc(sizeof(struct graylog_sender *)*config->graylog_count);
 		if (new_graylog == NULL)
 			return -1;
 	}
 
-	for (i = 0; i < this->config->graylog_count; i++) {
+	for (i = 0; i < config->graylog_count; i++) {
 		new_graylog[i] = graylog_sender_new(this,
-			this->config->graylog[i].host,
-			this->config->graylog[i].port,
-			this->config->graylog[i].uri,
-			this->config->graylog[i].tls,
-			this->config->graylog[i].retry_delay,
-			this->config->graylog[i].bulk_max_size,
-			this->config->graylog[i].queue_max_size,
-			this->config->graylog[i].authorization,
-			this->config->graylog[i].drainfilename);
+			config->graylog[i].host,
+			config->graylog[i].port,
+			config->graylog[i].uri,
+			config->graylog[i].tls,
+			config->graylog[i].retry_delay,
+			config->graylog[i].bulk_max_size,
+			config->graylog[i].queue_max_size,
+			config->graylog[i].authorization,
+			config->graylog[i].drainfilename);
 		if (!new_graylog[i]) {
 			r = -1;
 			break;
@@ -344,7 +344,7 @@ static int caster_reload_graylog(struct caster_state *this) {
 	} else {
 		caster_free_graylog(this);
 		this->graylog = new_graylog;
-		this->graylog_count = this->config->graylog_count;
+		this->graylog_count = config->graylog_count;
 	}
 	return r;
 }
@@ -513,7 +513,7 @@ static void listener_decref(struct listener *this) {
 /*
  * Configure/reconfigure listening ports, reusing already existing sockets if possible.
  */
-static int caster_reload_listeners(struct caster_state *this) {
+static int caster_reload_listeners(struct caster_state *this, struct config *new_config) {
 	union sock sin;
 	unsigned short port;
 	int r, i;
@@ -521,7 +521,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 	char ip[64];
 
 	P_MUTEX_LOCK(&this->configmtx);
-	if (this->config->bind_count == 0) {
+	if (new_config->bind_count == 0) {
 		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
 		if (this->listeners)
 			caster_free_listeners(this);
@@ -529,7 +529,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 		return -1;
 	}
 
-	new_listeners = (struct listener **)malloc(sizeof(struct listener *)*this->config->bind_count);
+	new_listeners = (struct listener **)malloc(sizeof(struct listener *)*new_config->bind_count);
 	if (!new_listeners) {
 		logfmt(&this->flog, LOG_CRIT, "Can't allocate listeners");
 		if (this->listeners)
@@ -547,12 +547,12 @@ static int caster_reload_listeners(struct caster_state *this) {
 
 	int nlisteners = 0;
 
-	for (i = 0; i < this->config->bind_count; i++) {
-		struct config_bind *config = this->config->bind + i;
+	for (i = 0; i < new_config->bind_count; i++) {
+		struct config_bind *config = new_config->bind + i;
 		port = htons(config->port);
 		r = ip_convert(config->ip, &sin);
 		if (r <= 0) {
-			logfmt(&this->flog, LOG_ERR, "Invalid IP %s", this->config->bind[i].ip);
+			logfmt(&this->flog, LOG_ERR, "Invalid IP %s", new_config->bind[i].ip);
 			continue;
 		}
 		if (sin.generic.sa_family == AF_INET)
@@ -589,7 +589,7 @@ static int caster_reload_listeners(struct caster_state *this) {
 			/*
 			 * No reusable listener found, or reuse failed, start a new listener instance.
 			 */
-			struct listener *new_listener = listener_new(this, this->config->bind+i, &sin);
+			struct listener *new_listener = listener_new(this, new_config->bind+i, &sin);
 			if (new_listener != NULL) {
 				new_listeners[nlisteners++] = new_listener;
 				logfmt(&this->flog, LOG_INFO, "Opening listener %s", ip_str_port(&sin, ip, sizeof ip));
@@ -621,9 +621,9 @@ static int caster_reload_listeners(struct caster_state *this) {
 }
 
 static int
-caster_reload_sourcetables(struct caster_state *caster) {
+caster_reload_sourcetables(struct caster_state *caster, struct config *config) {
 	struct sourcetable *local_table
-		= sourcetable_read(caster, caster->config->sourcetable_filename, caster->config->sourcetable_priority);
+		= sourcetable_read(caster, config->sourcetable_filename, config->sourcetable_priority);
 
 	if (local_table == NULL)
 		return -1;
@@ -633,31 +633,31 @@ caster_reload_sourcetables(struct caster_state *caster) {
 }
 
 static int
-caster_reopen_logs(struct caster_state *this) {
+caster_reopen_logs(struct caster_state *this, struct config *config) {
 	int r = 0;
-	if (log_reopen(&this->flog, this->config->log) < 0)
+	if (log_reopen(&this->flog, config->log) < 0)
 		r = -1;
-	if (log_reopen(&this->alog, this->config->access_log) < 0)
+	if (log_reopen(&this->alog, config->access_log) < 0)
 		r = -1;
 	return r;
 }
 
 static int
-caster_reload_auth(struct caster_state *caster) {
+caster_reload_auth(struct caster_state *caster, struct config *config) {
 	int r = 0;
-	logfmt(&caster->flog, LOG_INFO, "Reloading %s and %s", caster->config->host_auth_filename, caster->config->source_auth_filename);
+	logfmt(&caster->flog, LOG_INFO, "Reloading %s and %s", config->host_auth_filename, config->source_auth_filename);
 
-	if (caster->config->host_auth_filename) {
-		struct auth_entry *tmp = auth_parse(caster, caster->config->host_auth_filename);
+	if (config->host_auth_filename) {
+		struct auth_entry *tmp = auth_parse(caster, config->host_auth_filename);
 		if (tmp != NULL) {
-			caster->config->host_auth = tmp;
+			config->host_auth = tmp;
 		} else
 			r = -1;
 	}
-	if (caster->config->source_auth_filename) {
-		struct auth_entry *tmp = auth_parse(caster, caster->config->source_auth_filename);
+	if (config->source_auth_filename) {
+		struct auth_entry *tmp = auth_parse(caster, config->source_auth_filename);
 		if (tmp != NULL) {
-			caster->config->source_auth = tmp;
+			config->source_auth = tmp;
 		} else
 			r = -1;
 	}
@@ -665,21 +665,21 @@ caster_reload_auth(struct caster_state *caster) {
 }
 
 static int
-caster_reload_blocklist(struct caster_state *caster) {
+caster_reload_blocklist(struct caster_state *caster, struct config *config) {
 	int r = 0;
 	struct prefix_table *p;
 
-	if (caster->config->blocklist_filename) {
-		logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->blocklist_filename);
+	if (config->blocklist_filename) {
+		logfmt(&caster->flog, LOG_INFO, "Reloading %s", config->blocklist_filename);
 		p = prefix_table_new();
 		if (p == NULL)
 			r = -1;
-		else if (prefix_table_read(p, caster->config->blocklist_filename, &caster->flog) < 0) {
+		else if (prefix_table_read(p, config->blocklist_filename, &caster->flog) < 0) {
 			prefix_table_free(p);
 			p = NULL;
 			r = -1;
 		}
-		caster->config->blocklist = p;
+		config->blocklist = p;
 	}
 	return r;
 }
@@ -696,12 +696,12 @@ caster_free_rtcm_filters(struct caster_state *caster) {
 }
 
 static int
-caster_reload_rtcm_filters(struct caster_state *caster) {
-	if (caster->config->rtcm_filter_count == 0) {
+caster_reload_rtcm_filters(struct caster_state *caster, struct config *config) {
+	if (config->rtcm_filter_count == 0) {
 		caster_free_rtcm_filters(caster);
 		return 0;
 	}
-	if (caster->config->rtcm_filter_count != 1) {
+	if (config->rtcm_filter_count != 1) {
 		caster_free_rtcm_filters(caster);
 		return -1;
 	}
@@ -712,18 +712,18 @@ caster_reload_rtcm_filters(struct caster_state *caster) {
 	if (caster->rtcm_filter_dict == NULL)
 		return -1;
 
-	for (int i = 0; i < caster->config->rtcm_filter_count; i++) {
+	for (int i = 0; i < config->rtcm_filter_count; i++) {
 		struct rtcm_filter *rtcm_filter;
 		rtcm_filter = rtcm_filter_new(
-			caster->config->rtcm_filter[i].pass,
-			caster->config->rtcm_filter[i].convert_count ? caster->config->rtcm_filter[i].convert[0].types : NULL,
-			caster->config->rtcm_filter[i].convert_count ? caster->config->rtcm_filter[i].convert[0].conversion : 0
+			config->rtcm_filter[i].pass,
+			config->rtcm_filter[i].convert_count ? config->rtcm_filter[i].convert[0].types : NULL,
+			config->rtcm_filter[i].convert_count ? config->rtcm_filter[i].convert[0].conversion : 0
 		);
 		if (rtcm_filter == NULL) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
 			return -1;
 		}
-		struct hash_table *h = rtcm_filter_dict_parse(rtcm_filter, caster->config->rtcm_filter[i].apply);
+		struct hash_table *h = rtcm_filter_dict_parse(rtcm_filter, config->rtcm_filter[i].apply);
 		if (h == NULL) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
 			rtcm_filter_free(rtcm_filter);
@@ -738,37 +738,34 @@ caster_reload_rtcm_filters(struct caster_state *caster) {
 	return 0;
 }
 
-static int caster_reload_config(struct caster_state *this) {
+static struct config *caster_reload_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
 		if (this->config)
 			logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s", this->config_file);
 		else
 			fprintf(stderr, "Can't parse configuration from %s\n", this->config_file);
-		return -1;
+		return NULL;
 	}
-	if (atomic_load(&this->config))
-		config_decref(atomic_load(&this->config));
-	atomic_store(&this->config, config);
-	return 0;
+	return config;
 }
 
 /*
  * reload with chdir to allow relative paths in the configuration.
  */
-static int caster_chdir_reload(struct caster_state *this, int reopen_logs) {
+static int caster_chdir_reload(struct caster_state *this, struct config *config, int reopen_logs) {
 	int r = 0;
 	int current_dir = open(".", O_DIRECTORY);
 	chdir(this->config_dir);
-	if (reopen_logs && caster_reopen_logs(this) < 0)
+	if (reopen_logs && caster_reopen_logs(this, config) < 0)
 		r = -1;
-	if (caster_reload_sourcetables(this) < 0)
+	if (caster_reload_sourcetables(this, config) < 0)
 		r = -1;
-	if (caster_reload_auth(this) < 0)
+	if (caster_reload_auth(this, config) < 0)
 		r = -1;
-	if (caster_reload_blocklist(this) < 0)
+	if (caster_reload_blocklist(this, config) < 0)
 		r = -1;
-	if (caster_reload_rtcm_filters(this) < 0)
+	if (caster_reload_rtcm_filters(this, config) < 0)
 		r = -1;
 	fchdir(current_dir);
 	close(current_dir);
@@ -786,29 +783,37 @@ signal_cb(evutil_socket_t sig, short events, void *user_data) {
 }
 
 int caster_reload(struct caster_state *this) {
+	struct config *config, *old_config;
 	int r = 0;
+
 	P_MUTEX_LOCK(&this->configmtx);
 	this->graylog_log_level = -1;
-	if (caster_reload_config(this) < 0) {
+	old_config = atomic_load(&this->config);
+	if ((config = caster_reload_config(this)) == NULL) {
 		r = -1;
-		if (this->config == NULL) {
+		if (old_config == NULL) {
 			// Incorrect new config and no former config:
 			// abort all because we can't log more errors anyway.
 			P_MUTEX_UNLOCK(&this->configmtx);
 			return -1;
 		}
 	}
-	this->log_level = this->config->log_level;
-	if (caster_chdir_reload(this, 1) < 0)
+
+	if (old_config)
+		config_decref(old_config);
+	atomic_store(&this->config, config);
+
+	this->log_level = config->log_level;
+	if (caster_chdir_reload(this, config, 1) < 0)
 		r = -1;
-	if (caster_reload_graylog(this) < 0)
+	if (caster_reload_graylog(this, config) < 0)
 		r = -1;
-	this->graylog_log_level = this->config->graylog_count > 0 ? this->config->graylog[0].log_level : -1;
-	if (caster_reload_listeners(this) < 0)
+	this->graylog_log_level = config->graylog_count > 0 ? config->graylog[0].log_level : -1;
+	if (caster_reload_listeners(this, config) < 0)
 		r = -1;
-	if (caster_reload_fetchers(this) < 0)
+	if (caster_reload_fetchers(this, config) < 0)
 		r = -1;
-	if (caster_reload_syncers(this) < 0)
+	if (caster_reload_syncers(this, config) < 0)
 		r = -1;
 	P_MUTEX_UNLOCK(&this->configmtx);
 	return r;
@@ -861,8 +866,7 @@ static int caster_set_signals(struct caster_state *this) {
 /*
  * Start/reload sourcetable fetchers (proxy)
  */
-static int caster_reload_fetchers(struct caster_state *this) {
-	struct config *config = this->config;
+static int caster_reload_fetchers(struct caster_state *this, struct config *config) {
 	int r = 0;
 	struct sourcetable_fetch_args **new_fetchers;
 	if (config->proxy_count)
