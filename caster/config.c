@@ -421,11 +421,11 @@ struct config *config_parse(const char *filename) {
 	err = cyaml_load_file(filename, &cyaml_config,
 		&top_schema, (cyaml_data_t **)&this, NULL);
 	if (err != CYAML_OK) {
-		fprintf(stderr, "ERROR: %s\n", cyaml_strerror(err));
+		fprintf(stderr, "ERROR: %s on %s\n", cyaml_strerror(err), filename);
 		return NULL;
 	}
 	if (this == NULL) {
-		fprintf(stderr, "ERROR: empty config\n");
+		fprintf(stderr, "ERROR: empty config on %s\n", filename);
 		return NULL;
 	}
 
