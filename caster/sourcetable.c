@@ -465,11 +465,20 @@ void dist_table_free(struct dist_table *this) {
 }
 
 void dist_table_display(struct ntrip_state *st, struct dist_table *this, int max) {
-	float max_dist = this->size_dist_array ? this->dist_array[this->size_dist_array-1].dist : 40000;
+	const char *mp[2];
+	float min_dist[2];
+	min_dist[0] = -1;
+	min_dist[1] = -1;
+	mp[0] = "-";
+	mp[1] = "-";
+	for (int i = 0; i < 2 && i < this->size_dist_array; i++) {
+		mp[i] = (i < this->size_dist_array) ? this->dist_array[i].mountpoint : NULL;
+		min_dist[i] = (i < this->size_dist_array) ? this->dist_array[i].dist : -1;
+	}
 
-	ntrip_log(st, LOG_INFO, "dist_table from (%f, %f) %s:%d, furthest base dist %.2f:", this->pos.lat, this->pos.lon, this->host, this->port, max_dist);
+	ntrip_log(st, LOG_INFO, "dist_table from (%f, %f) %s:%d, closest bases %s dist %.2f, %s dist %.2f", this->pos.lat, this->pos.lon, this->host, this->port, mp[0], min_dist[0], mp[1], min_dist[1]);
 	for (int i = 0; i < max && i < this->size_dist_array; i++) {
-		ntrip_log(st, LOG_INFO, "%.2f: %s", this->dist_array[i].dist, this->dist_array[i].mountpoint);
+		ntrip_log(st, LOG_DEBUG, "%.2f: %s", this->dist_array[i].dist, this->dist_array[i].mountpoint);
 	}
 }
 
