@@ -214,6 +214,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if ((line?len:waiting_len) > config->http_header_max_size) {
+				free(line);
 				end = 1;
 				break;
 			}
@@ -267,6 +268,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 						if (length_err) {
 							ntrip_log(st, LOG_NOTICE, "Content-Length %d: exceeds max configured value %d",
 									content_length, config->http_content_length_max);
+							free(line);
 							end = 1;
 							break;
 						}
