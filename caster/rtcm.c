@@ -193,6 +193,17 @@ static unsigned long rtcm_crc24q_hash(unsigned char *data, size_t len) {
 	return crc;
 }
 
+static int rtcm_crc_check(struct packet *p) {
+	int len = p->datalen;
+	if (len < 4)
+		return 0;
+	unsigned long crc = rtcm_crc24q_hash(p->data, len-3);
+	unsigned long packet_crc = (p->data[len-3]<<16) + (p->data[len-2]<<8) + (p->data[len-1]);
+	if (crc != packet_crc)
+		return 0;
+	return 1;
+}
+
 // WGS84 constants
 static double a = 6378137.0;
 static double e = 8.1819190842622e-2;
@@ -827,15 +838,14 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		}
 
 		evbuffer_remove(input, &rtcmp->data[0], len_rtcm);
-		unsigned long crc = rtcm_crc24q_hash(&rtcmp->data[0], len_rtcm-3);
-		if (crc == (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]) {
+
+		if (rtcm_crc_check(rtcmp)) {
 			rtcmp->is_rtcm = 1;
 			unsigned short type = getbits(rtcmp->data+3, 0, 12);
 			ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len_rtcm, type);
 			joblist_append_ntrip_packet(st->caster->joblist, rtcm_handler, st, rtcmp, st->rtcm_info);
-		} else {
-			ntrip_log(st, LOG_INFO, "RTCM: bad checksum! %08lx %08x", crc, (rtcmp->data[len_rtcm-3]<<16)+(rtcmp->data[len_rtcm-2]<<8)+rtcmp->data[len_rtcm-1]);
-		}
+		} else
+			ntrip_log(st, LOG_INFO, "RTCM: bad checksum!");
 
 		if (livesource_send_subscribers(st->own_livesource, rtcmp, st->caster))
 			st->last_useful = time(NULL);
