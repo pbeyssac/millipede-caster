@@ -31,8 +31,7 @@ struct rtcm_info {
 	// ECEF coordinates for a base, in tenths of millimeters
 	long x, y, z;
 	struct rtcm_typeset typeset;
-	char copy1005[25];
-	char copy1006[27];
+	struct packet *copy1005, *copy1006;
 	struct timeval date1005, date1006, posdate;
 };
 
