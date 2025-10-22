@@ -852,6 +852,8 @@ void ntrip_set_rtcm_cache(struct ntrip_state *st) {
 struct packet *ntrip_get_rtcm_pos(struct ntrip_state *st, const char *mountpoint) {
 	P_RWLOCK_RDLOCK(&st->caster->rtcm_lock);
 	struct rtcm_info *rp = (struct rtcm_info *)hash_table_get(st->caster->rtcm_cache, mountpoint);
+	if (rp == NULL)
+		return NULL;
 	struct packet *p = rtcm_info_pos_packet(rp, st->caster);
 	if (p)
 		packet_incref(p);
