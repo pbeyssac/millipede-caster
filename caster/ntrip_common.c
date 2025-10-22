@@ -572,25 +572,28 @@ void ntrip_deferred_run(struct caster_state *this) {
 
 /*
  * Drop a connection by ID
+ * Drop all connections if id == 0
  */
 int ntrip_drop_by_id(struct caster_state *caster, long long id) {
 	int r = 0;
 
-	struct ntrip_state *st;
-	P_RWLOCK_RDLOCK(&caster->ntrips.lock);
-	TAILQ_FOREACH(st, &caster->ntrips.queue, nextg) {
+	struct ntrip_state *st, *tmpst;
+	P_RWLOCK_WRLOCK(&caster->ntrips.lock);
+	TAILQ_FOREACH_SAFE(st, &caster->ntrips.queue, nextg, tmpst) {
 		struct bufferevent *bev = st->bev;
 		bufferevent_lock(bev);
-		if (st->id > id) {
+		if (id && st->id > id) {
 			bufferevent_unlock(bev);
 			break;
 		}
-		if (st->id == id) {
+		if (id == 0 || st->id == id) {
 			ntrip_notify_close(st);
 			ntrip_decref_end(st, "ntrip_drop_by_id");
-			bufferevent_unlock(bev);
-			r = 1;
-			break;
+			r += 1;
+			if (id) {
+				bufferevent_unlock(bev);
+				break;
+			}
 		}
 		bufferevent_unlock(bev);
 	}
