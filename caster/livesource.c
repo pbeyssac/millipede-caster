@@ -294,6 +294,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	struct packet *pconv = NULL, *p;
 	time_t t = time(NULL);
 	int n = 0;
+	int is_pos = rtcm_packet_is_pos(packet);
 
 	if (this == NULL)
 		/* Dead livesource */
@@ -324,6 +325,14 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			bufferevent_unlock(bev);
 			n++;
 			continue;
+		}
+		if (st->rtcm_client_state == NTRIP_RTCM_POS_WAIT) {
+			if (!is_pos) {
+				bufferevent_unlock(bev);
+				n++;
+				continue;
+			}
+			st->rtcm_client_state = NTRIP_RTCM_POS_OK;
 		}
 		p = packet;
 		if (st->rtcm_filter && !rtcm_filter_pass(st->caster->rtcm_filter, packet)) {

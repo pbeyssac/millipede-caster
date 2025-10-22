@@ -49,6 +49,11 @@ enum ntrip_chunk_state {
 	CHUNK_END		// finished, ready to be freed
 };
 
+enum ntrip_rtcm_state {
+	NTRIP_RTCM_POS_WAIT,		// Waiting for known RTCM packets 1005 or 1006
+	NTRIP_RTCM_POS_OK		// RTCM position 1005 or 1006 is known
+};
+
 /*
  * Number of HTTP args.
  * This works both for a NTRIP request:
@@ -136,7 +141,8 @@ struct ntrip_state {
 	char *content;				// Received content
 	char *content_type;			// MIME type
 
-	struct rtcm_info *rtcm_info;
+	struct rtcm_info *rtcm_info;			// Only for a source
+	enum ntrip_rtcm_state rtcm_client_state;	// Used for client packet filtering
 
 	struct {
 		struct evbuffer *raw_input;
@@ -264,5 +270,6 @@ int ntrip_filter_run_input(struct ntrip_state *st);
 int ntrip_handle_raw_chunk(struct ntrip_state *st);
 int ntrip_chunk_decode_init(struct ntrip_state *st);
 void ntrip_set_rtcm_cache(struct ntrip_state *st);
+struct packet *ntrip_get_rtcm_pos(struct ntrip_state *st, const char *mountpoint);
 
 #endif

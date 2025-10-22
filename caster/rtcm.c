@@ -610,6 +610,23 @@ void rtcm_info_free(struct rtcm_info *this) {
 }
 
 /*
+ * Return a pointer to the most recent 1005 or 1006 packet, if any.
+ */
+struct packet *rtcm_info_pos_packet(struct rtcm_info *this, struct caster_state *caster) {
+	struct packet *p = NULL;
+	struct timeval *date = NULL;
+	if (this->copy1006) {
+		p = this->copy1006;
+		date = &this->date1006;
+	}
+	if (this->copy1005 && (date == NULL || date->tv_sec < this->date1005.tv_sec))
+		p = this->copy1005;
+	if (p)
+		packet_incref(p);
+	return p;
+}
+
+/*
  * Return a comma-separated list of keys in a hash table.
  * Trim leading and trailing white space in keys.
  */
@@ -721,6 +738,18 @@ json_object *rtcm_info_json(struct rtcm_info *this) {
 		json_object_object_add_ex(jpos, "date", json_object_new_string(iso_date), JSON_C_CONSTANT_NEW);
 	}
 	return j;
+}
+
+/*
+ * Return whether a packet is a position packet (types 1005 or 1006).
+ */
+int rtcm_packet_is_pos(struct packet *p) {
+	unsigned char *d = p->data;
+	int len = p->datalen;
+	if (!p->is_rtcm || len < 25)
+		return 0;
+	unsigned short type = getbits(d+3, 0, 12);
+	return (type == 1005 && len == 25) || (type == 1006 && len == 27);
 }
 
 static void rtcm_handler(struct ntrip_state *st, struct packet *p, void *arg1) {
