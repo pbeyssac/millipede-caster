@@ -169,7 +169,7 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 			/*
 			 * Try to resubscribe virtual sources to a new source
 			 */
-			joblist_append_ntrip_locked(st->caster->joblist, ntrip_state, &ntripsrv_redo_virtual_pos);
+			joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
 		}
 
 		if (kill_backlogged == 0 || backlogged) {
