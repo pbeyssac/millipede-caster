@@ -355,6 +355,10 @@ static int caster_reload_graylog(struct caster_state *this) {
 }
 
 void caster_free(struct caster_state *this) {
+	/* Kill all connections */
+	ntrip_drop_by_id(this, 0);
+
+	/* Wait for the threads to finish their tasks */
 	if (threads)
 		jobs_stop_threads(this->joblist);
 
