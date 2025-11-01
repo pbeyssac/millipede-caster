@@ -528,6 +528,7 @@ struct config *config_parse(const char *filename) {
 	this->blocklist = NULL;
 	this->endpoints_json = _endpoints_json(this);
 	this->dyn = NULL;
+	this->free_callback = NULL;
 	return this;
 }
 
@@ -607,5 +608,7 @@ void config_free(struct config *this) {
 		prefix_table_free(this->blocklist);
 	if (this->endpoints_json)
 		json_object_put(this->endpoints_json);
+	if (this->free_callback)
+		this->free_callback(this);
 	free(this);
 }

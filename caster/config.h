@@ -314,6 +314,9 @@ struct config {
 
 	/* Pointer to caster-specific structures derived from config */
 	struct caster_dynconfig *dyn;
+
+	/* Pointer to callback function for housekeeping tasks at config_free() */
+	void (*free_callback)(struct config *config);
 };
 
 extern int backlog_delay;
