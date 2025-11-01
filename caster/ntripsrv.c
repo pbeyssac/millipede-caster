@@ -592,7 +592,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					struct livesource *l = NULL;
 
 					if (*mountpoint) {
-						if (st->config->dyn->rtcm_filter && rtcm_filter_check_mountpoint(st->config->dyn, mountpoint))
+						if (config->dyn->rtcm_filter && rtcm_filter_check_mountpoint(config->dyn, mountpoint))
 							st->rtcm_filter = 1;
 						/*
 						 * Find both a relevant source line and a live source (actually live or on-demand).
