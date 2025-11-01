@@ -399,15 +399,24 @@ static int caster_reload_graylog(struct caster_state *this, struct config *confi
 }
 
 void caster_free(struct caster_state *this) {
-	/* Kill all connections */
+	if (this->config) {
+		/* Stop accepting incoming connections */
+		dynconfig_free_listeners(this->config->dyn);
+
+		/* Stop outgoing connections */
+		dynconfig_free_fetchers(this->config->dyn);
+		dynconfig_free_syncers(this->config->dyn);
+
+		this->graylog_log_level = -1;
+		dynconfig_free_graylog(this->config->dyn);
+	}
+
+	/* Kill all remaining connections */
 	ntrip_drop_by_id(this, 0);
 
 	/* Wait for the threads to finish their tasks */
 	if (threads)
 		jobs_stop_threads(this->joblist);
-
-	if (this->config)
-		dynconfig_free_listeners(this->config->dyn);
 
 	if (this->signalhup_event)
 		event_free(this->signalhup_event);
@@ -415,12 +424,6 @@ void caster_free(struct caster_state *this) {
 		event_free(this->signalint_event);
 	if (this->signalterm_event)
 		event_free(this->signalterm_event);
-
-	if (this->config) {
-		dynconfig_free_fetchers(this->config->dyn);
-		dynconfig_free_syncers(this->config->dyn);
-	}
-	this->graylog_log_level = -1;
 
 	if (this->joblist) joblist_free(this->joblist);
 	livesource_table_free(this->livesources);
