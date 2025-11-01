@@ -577,9 +577,11 @@ void ntrip_deferred_run(struct caster_state *this) {
 int ntrip_drop_by_id(struct caster_state *caster, long long id) {
 	int r = 0;
 
-	struct ntrip_state *st, *tmpst;
+	struct ntrip_state *st;
+
+    restart:
 	P_RWLOCK_WRLOCK(&caster->ntrips.lock);
-	TAILQ_FOREACH_SAFE(st, &caster->ntrips.queue, nextg, tmpst) {
+	TAILQ_FOREACH(st, &caster->ntrips.queue, nextg) {
 		struct bufferevent *bev = st->bev;
 		bufferevent_lock(bev);
 		if (id && st->id > id) {
@@ -590,9 +592,16 @@ int ntrip_drop_by_id(struct caster_state *caster, long long id) {
 			ntrip_notify_close(st);
 			ntrip_decref_end(st, "ntrip_drop_by_id");
 			r += 1;
-			if (id) {
-				bufferevent_unlock(bev);
+			bufferevent_unlock(bev);
+			if (id)
 				break;
+			else {
+				// Restart from the head, as
+				// TAILQ_FOREACH_SAFE does not
+				// protect us from all deletion cases
+				// caused by ntrip_notify_close().
+				P_RWLOCK_UNLOCK(&caster->ntrips.lock);
+				goto restart;
 			}
 		}
 		bufferevent_unlock(bev);
