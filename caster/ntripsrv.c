@@ -404,13 +404,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 	int err = 0;
 	struct evbuffer *output = bufferevent_get_output(bev);
 	struct evkeyvalq opt_headers;
-	struct config *config;
 
 	int method_post_source = 0;
 
 	TAILQ_INIT(&opt_headers);
 
-	config = ntrip_refresh_config(st);
+	struct config *config = ntrip_refresh_config(st);
 
 	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
 
@@ -866,6 +865,9 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 {
 	int initial_errno = errno;
 	struct ntrip_state *st = (struct ntrip_state *)arg;
+	struct config *config;
+
+	config = ntrip_refresh_config(st);
 
 	if (events & BEV_EVENT_CONNECTED) {
 		ntrip_log(st, LOG_INFO, "Connected srv");
@@ -888,13 +890,13 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			 */
 			if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
 				int idle_time = time(NULL) - st->last_send;
-				if (idle_time <= st->config->idle_max_delay) {
+				if (idle_time <= config->idle_max_delay) {
 					/* Reenable read */
 					bufferevent_enable(bev, EV_READ);
 					return;
 				}
 				/* No data sent or read, close. */
-				ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, max %d, dropping", idle_time, st->config->idle_max_delay);
+				ntrip_log(st, LOG_NOTICE, "last_send: %d seconds ago, max %d, dropping", idle_time, config->idle_max_delay);
 			} else
 				ntrip_log(st, LOG_NOTICE, "ntripsrv read timeout");
 		}
