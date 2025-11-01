@@ -415,6 +415,9 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
+			if (errno == EINPROGRESS)
+				/* Ignore */
+				return;
 			ntrip_log(st, LOG_NOTICE, "Error: %s", strerror(errno));
 		} else {
 			ntrip_log(st, LOG_INFO, "Server EOF");
