@@ -91,6 +91,10 @@ void ntrip_task_clear_st(struct ntrip_task *this) {
 	ntrip_task_clear_get_st(this, 0);
 }
 
+enum task_state ntrip_task_get_state(struct ntrip_task *this) {
+	return atomic_load_explicit(&this->state, memory_order_relaxed);
+}
+
 static inline void ntrip_task_set_st(struct ntrip_task *this, struct ntrip_state *st) {
 	P_RWLOCK_WRLOCK(&this->st_lock);
 	ntrip_incref(st, "ntrip_task_set_st");

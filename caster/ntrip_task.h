@@ -118,6 +118,7 @@ void ntrip_task_ack_pending(struct ntrip_task *this);
 void ntrip_task_free(struct ntrip_task *this);
 struct ntrip_state *ntrip_task_clear_get_st(struct ntrip_task *this, int getref);
 void ntrip_task_clear_st(struct ntrip_task *this);
+enum task_state ntrip_task_get_state(struct ntrip_task *this);
 int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
