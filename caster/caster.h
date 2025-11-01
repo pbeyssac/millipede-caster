@@ -2,6 +2,7 @@
 #define __CASTER_H__
 
 #include <netinet/in.h>
+#include <stdatomic.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <pthread.h>
@@ -98,8 +99,10 @@ struct caster_state {
 	struct hash_table *rtcm_cache;
 	P_RWLOCK_T rtcm_lock;
 
-	// Protect access to the config structures
-	P_MUTEX_T configmtx;
+	// Protect access to the config pointer
+	P_RWLOCK_T configlock;
+	// Serialize simultaneous reloads
+	P_MUTEX_T configreload;
 
 	SSL_CTX *ssl_client_ctx;	// TLS context for fetchers
 
@@ -148,11 +151,10 @@ json_object *caster_endpoints_json(struct caster_state *caster);
 int caster_reload(struct caster_state *this);
 
 static inline struct config *caster_config_getref(struct caster_state *caster) {
-	P_MUTEX_LOCK(&caster->configmtx);
-	struct config *config = caster->config;
+	P_RWLOCK_RDLOCK(&caster->configlock);
+	struct config *config = atomic_load(&caster->config);
 	config_incref(config);
-	P_MUTEX_UNLOCK(&caster->configmtx);
+	P_RWLOCK_UNLOCK(&caster->configlock);
 	return config;
 }
-
 #endif

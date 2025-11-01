@@ -270,12 +270,9 @@ caster_new(const char *config_file) {
 	P_RWLOCK_INIT(&this->quotalock, NULL);
 	this->ntrips.ipcount = hash_table_new(509, NULL);
 
-	// Used for access to source_auth, host_auth, blocklist and listener config
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-	P_MUTEX_INIT(&this->configmtx, &attr);
-	pthread_mutexattr_destroy(&attr);
+	// Used for access to config and reload serializing
+	P_RWLOCK_INIT(&this->configlock, NULL);
+	P_MUTEX_INIT(&this->configreload, NULL);
 
 	P_RWLOCK_INIT(&this->sourcetablestack.lock, NULL);
 
@@ -448,7 +445,8 @@ void caster_free(struct caster_state *this) {
 	P_RWLOCK_DESTROY(&this->rtcm_lock);
 	P_RWLOCK_DESTROY(&this->ntrips.lock);
 	P_RWLOCK_DESTROY(&this->ntrips.free_lock);
-	P_MUTEX_DESTROY(&this->configmtx);
+	P_RWLOCK_DESTROY(&this->configlock);
+	P_MUTEX_DESTROY(&this->configreload);
 	log_free(&this->flog);
 	log_free(&this->alog);
 	strfree(this->config_dir);
@@ -587,17 +585,14 @@ static int caster_reload_listeners(struct caster_state *this,
 	struct listener **new_listeners;
 	char ip[64];
 
-	P_MUTEX_LOCK(&this->configmtx);
 	if (new_config->bind_count == 0) {
 		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
-		P_MUTEX_UNLOCK(&this->configmtx);
 		return -1;
 	}
 
 	new_listeners = (struct listener **)malloc(sizeof(struct listener *)*new_config->bind_count);
 	if (!new_listeners) {
 		logfmt(&this->flog, LOG_CRIT, "Can't allocate listeners");
-		P_MUTEX_UNLOCK(&this->configmtx);
 		return -1;
 	}
 
@@ -660,7 +655,6 @@ static int caster_reload_listeners(struct caster_state *this,
 			}
 		}
 	}
-	P_MUTEX_UNLOCK(&this->configmtx);
 
 	if (nlisteners == 0) {
 		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
@@ -811,9 +805,9 @@ int caster_reload(struct caster_state *this) {
 	if (newdyn == NULL)
 		return -1;
 
-	P_MUTEX_LOCK(&this->configmtx);
-
 	config = caster_reload_config(this);
+
+	P_MUTEX_LOCK(&this->configreload);
 
 	this->graylog_log_level = -1;
 	old_config = atomic_load(&this->config);
@@ -822,7 +816,7 @@ int caster_reload(struct caster_state *this) {
 		if (old_config == NULL) {
 			// Incorrect new config and no former config:
 			// abort all because we can't log more errors anyway.
-			P_MUTEX_UNLOCK(&this->configmtx);
+			P_MUTEX_UNLOCK(&this->configreload);
 			dynconfig_free(newdyn);
 			return -1;
 		}
@@ -834,7 +828,9 @@ int caster_reload(struct caster_state *this) {
 	config->free_callback = dynconfig_free_callback;
 	olddyn = old_config?old_config->dyn:NULL;
 
+	P_RWLOCK_WRLOCK(&this->configlock);
 	atomic_store(&this->config, config);
+	P_RWLOCK_UNLOCK(&this->configlock);
 
 	this->log_level = config->log_level;
 	if (caster_reopen_logs(this, config) < 0)
@@ -866,7 +862,7 @@ int caster_reload(struct caster_state *this) {
 	if (caster_start_fetchers(this, config, newdyn) < 0)
 		r = -1;
 
-	P_MUTEX_UNLOCK(&this->configmtx);
+	P_MUTEX_UNLOCK(&this->configreload);
 	return r;
 }
 

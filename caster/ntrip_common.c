@@ -117,6 +117,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->rtcm_filter = 0;
 	this->rtcm_client_state = NTRIP_RTCM_POS_WAIT;
 
+	this->tmpconfig = NULL;
 	this->config = caster_config_getref(this->caster);
 	this->lookup_dist = this->config->max_nearest_lookup_distance_m;
 	return this;
@@ -128,14 +129,13 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
  * Required locks: ntrip_state
  */
 struct config *ntrip_refresh_config(struct ntrip_state *this) {
-	struct config *new_config = atomic_load(&this->caster->config);
-	struct config *old_config = this->config;
-	if (new_config != old_config) {
-		new_config = caster_config_getref(this->caster);
-		this->config = new_config;
-		config_decref(old_config);
+	struct config *config = this->tmpconfig?this->tmpconfig:this->config;
+	if (this->tmpconfig && this->tmpconfig != this->config) {
+		config_incref(this->tmpconfig);
+		config_decref(this->config);
+		this->config = config;
 	}
-	return new_config;
+	return config;
 }
 
 /*

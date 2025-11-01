@@ -237,8 +237,10 @@ void joblist_run(struct joblist *this) {
 		 * The bufferevent is associated with the ntrip_state, it's the same for all jobs in the queue,
 		 * so we only need to lock it once.
 		 */
+		struct config *c = caster_config_getref(st->caster);
 		bufferevent_lock(bev);
 		st->newjobs = 0;
+		st->tmpconfig = c;
 
 		P_MUTEX_UNLOCK(&this->mutex);
 
@@ -270,6 +272,8 @@ void joblist_run(struct joblist *this) {
 			free(j);
 		}
 
+		st->tmpconfig = NULL;
+		config_decref(c);
 		bufferevent_unlock(bev);
 
 		ntrip_deferred_run(this->caster);
@@ -398,9 +402,14 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	P_MUTEX_UNLOCK(&this->append_mutex);
 
 	/* Log message out of locks to avoid deadlocks */
+	struct config *c = caster_config_getref(st->caster);
+	st->tmpconfig = c;
+	(void)ntrip_refresh_config(st);
 	ntrip_log(st, LOG_EDEBUG, "job appended, ntrip %s in joblist ntrip_queue njobs %d newjobs %d",
 		inserted?"inserted":"already in",
 		njobs, newjobs);
+	st->tmpconfig = NULL;
+	config_decref(c);
 
 	/*
 	 * Signal waiting workers there is a new job.

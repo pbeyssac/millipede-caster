@@ -14,6 +14,7 @@
 #define	P_RWLOCK_DESTROY(arg)		{if (threads) pthread_rwlock_destroy(arg);}
 #define	P_MUTEX_T			pthread_mutex_t
 #define	P_MUTEX_INIT(arg, attr)		{if (threads) pthread_mutex_init((arg),(attr));}
+#define	P_MUTEX_TRYLOCK(arg)		(threads?pthread_mutex_trylock(arg):0)
 #define	P_MUTEX_LOCK(arg)		{if (threads) pthread_mutex_lock(arg);}
 #define	P_MUTEX_UNLOCK(arg)		{if (threads) pthread_mutex_unlock(arg);}
 #define	P_MUTEX_DESTROY(arg)		{if (threads) pthread_mutex_destroy(arg);}

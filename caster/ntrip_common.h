@@ -238,6 +238,8 @@ struct ntrip_state {
 
 	/* Our own reference to the current configuration, to reduce locking */
 	struct config *config;
+	/* A possibly new configuration, if not NULL */
+	struct config *tmpconfig;
 };
 
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev,
