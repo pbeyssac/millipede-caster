@@ -145,6 +145,8 @@ static struct caster_dynconfig *dynconfig_new(struct caster_state *caster) {
 	this->sourcetable_fetchers_count = 0;
 	this->graylog = NULL;
 	this->graylog_count = 0;
+	this->syncers = NULL;
+	this->syncers_count = 0;
 	this->caster = caster;
 	return this;
 }
@@ -183,9 +185,21 @@ dynconfig_free_graylog(struct caster_dynconfig *this) {
 }
 
 static void
+dynconfig_free_syncers(struct caster_dynconfig *dyn) {
+	if (dyn->syncers == NULL)
+		return;
+	for (int i = 0; i < dyn->syncers_count; i++)
+		syncer_free(dyn->syncers[i]);
+	free(dyn->syncers);
+	dyn->syncers_count = 0;
+	dyn->syncers = NULL;
+}
+
+static void
 dynconfig_free(struct caster_dynconfig *this) {
 	dynconfig_free_listeners(this);
 	dynconfig_free_fetchers(this);
+	dynconfig_free_syncers(this);
 	dynconfig_free_graylog(this);
 	free(this);
 }
@@ -274,8 +288,6 @@ caster_new(const char *config_file) {
 	int r1 = log_init(&this->flog, NULL, &caster_log_cb, this);
 	int r2 = log_init(&this->alog, NULL, &caster_alog, this);
 
-	this->syncers = NULL;
-	this->syncers_count = 0;
 	this->rtcm_filter = NULL;
 	this->rtcm_filter_dict = NULL;
 
@@ -305,35 +317,25 @@ caster_new(const char *config_file) {
 	return this;
 }
 
-static int caster_start_syncers(struct caster_state *this, struct config *config) {
+static int caster_start_syncers(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
 	if (config->node_count == 0) {
-		this->syncers_count = 0;
+		dyn->syncers_count = 0;
 		return 0;
 	}
-	this->syncers_count = 1;
-	this->syncers = (struct syncer **)malloc(sizeof(struct syncer *)*this->syncers_count);
-	for (int i = 0; i < this->syncers_count; i++) {
-		this->syncers[i] = syncer_new(this,
+	dyn->syncers_count = 1;
+	dyn->syncers = (struct syncer **)malloc(sizeof(struct syncer *)*dyn->syncers_count);
+	for (int i = 0; i < dyn->syncers_count; i++) {
+		dyn->syncers[i] = syncer_new(this,
 			config->node, config->node_count, "/adm/api/v1/sync", 0);
 		for (int j = 0; j < config->node_count; j++)
-			syncer_start(this->syncers[i], j);
+			syncer_start(dyn->syncers[i], j);
 	}
 	return 0;
 }
 
-static void caster_free_syncers(struct caster_state *this) {
-	if (this->syncers == NULL)
-		return;
-	for (int i = 0; i < this->syncers_count; i++)
-		syncer_free(this->syncers[i]);
-	free(this->syncers);
-	this->syncers_count = 0;
-	this->syncers = NULL;
-}
-
-static int caster_reload_syncers(struct caster_state *this, struct config *config) {
-	caster_free_syncers(this);
-	return caster_start_syncers(this, config);
+static int caster_reload_syncers(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
+	dynconfig_free_syncers(dyn);
+	return caster_start_syncers(this, config, dyn);
 }
 
 static int caster_reload_graylog(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
@@ -396,9 +398,10 @@ void caster_free(struct caster_state *this) {
 	if (this->signalterm_event)
 		event_free(this->signalterm_event);
 
-	if (this->config)
+	if (this->config) {
 		dynconfig_free_fetchers(this->config->dyn);
-	caster_free_syncers(this);
+		dynconfig_free_syncers(this->config->dyn);
+	}
 	this->graylog_log_level = -1;
 
 	if (this->joblist) joblist_free(this->joblist);
@@ -852,7 +855,7 @@ int caster_reload(struct caster_state *this) {
 		r = -1;
 	if (caster_reload_fetchers(this, config, olddyn, newdyn) < 0)
 		r = -1;
-	if (caster_reload_syncers(this, config) < 0)
+	if (caster_reload_syncers(this, config, newdyn) < 0)
 		r = -1;
 
 	if (olddyn)

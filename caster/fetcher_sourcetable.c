@@ -118,7 +118,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 			sourcetable_nentries(sourcetable, 0),
 			t1.tv_sec*1000 + t1.tv_usec/1000.);
 		stack_replace_host(a->task->caster, &a->task->caster->sourcetablestack, a->task->host, a->task->port, sourcetable);
-		if (st->caster->syncers_count >= 1) {
+		if (st->config->dyn->syncers_count >= 1) {
 			json_object *j = sourcetable_json(sourcetable);
 			json_object *type = json_object_new_string("sourcetable");
 			json_object_object_add(j, "type", type);

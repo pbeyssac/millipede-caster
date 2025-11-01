@@ -58,6 +58,10 @@ struct caster_dynconfig {
 	struct sourcetable_fetch_args **sourcetable_fetchers;
 	int sourcetable_fetchers_count;
 
+	/* Table synchronization */
+	struct syncer **syncers;
+	int syncers_count;
+
 	struct caster_state *caster;
 };
 
@@ -111,10 +115,6 @@ struct caster_state {
 	/* Logs */
 	struct log flog, alog;
 	char hostname[128];
-
-	/* Table synchronization */
-	struct syncer **syncers;
-	int syncers_count;
 
 	/* Thread id (thread-specific variable) for logs */
 	pthread_key_t thread_id;
