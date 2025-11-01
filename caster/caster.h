@@ -54,6 +54,10 @@ struct caster_dynconfig {
 	struct graylog_sender **graylog;
 	int graylog_count;	/* 0 or 1 */
 
+	/* Sourcetable fetcher configuration */
+	struct sourcetable_fetch_args **sourcetable_fetchers;
+	int sourcetable_fetchers_count;
+
 	struct caster_state *caster;
 };
 

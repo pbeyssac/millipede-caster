@@ -51,9 +51,9 @@
 
 static void caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
 static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
-static int caster_reload_fetchers(struct caster_state *this, struct config *config);
-static void caster_free_fetchers(struct caster_state *this);
-static void caster_free_rtcm_filters(struct caster_state *caster);
+static int caster_reload_fetchers(struct caster_state *this, struct config *config,
+	struct caster_dynconfig *olddyn, struct caster_dynconfig *newdyn);
+static void dynconfig_free_fetchers(struct caster_dynconfig *this);
 static void listener_free(struct listener *this);
 static void listener_incref(struct listener *this);
 static void listener_decref(struct listener *this);
@@ -141,10 +141,27 @@ static struct caster_dynconfig *dynconfig_new(struct caster_state *caster) {
 		return NULL;
 	this->listeners = NULL;
 	this->listeners_count = 0;
+	this->sourcetable_fetchers = NULL;
+	this->sourcetable_fetchers_count = 0;
 	this->graylog = NULL;
 	this->graylog_count = 0;
 	this->caster = caster;
 	return this;
+}
+
+static void dynconfig_free_fetchers(struct caster_dynconfig *this) {
+	struct sourcetable_fetch_args **a = this->sourcetable_fetchers;
+	if (!a)
+		return;
+	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
+		if (a[i]) {
+			logfmt(&this->caster->flog, LOG_INFO, "Stopping fetcher %s:%d", a[i]->task->host, a[i]->task->port);
+			fetcher_sourcetable_free(a[i]);
+		}
+	}
+	free(a);
+	this->sourcetable_fetchers = NULL;
+	this->sourcetable_fetchers_count = 0;
 }
 
 static void
@@ -168,6 +185,7 @@ dynconfig_free_graylog(struct caster_dynconfig *this) {
 static void
 dynconfig_free(struct caster_dynconfig *this) {
 	dynconfig_free_listeners(this);
+	dynconfig_free_fetchers(this);
 	dynconfig_free_graylog(this);
 	free(this);
 }
@@ -194,9 +212,6 @@ caster_new(const char *config_file) {
 		fprintf(stderr, "Could not initialize dns_base!\n");
 		return NULL;
 	}
-
-	this->sourcetable_fetchers = NULL;
-	this->sourcetable_fetchers_count = 0;
 
 	this->ssl_client_ctx = SSL_CTX_new(TLS_client_method());
 	if (this->ssl_client_ctx == NULL) {
@@ -381,7 +396,8 @@ void caster_free(struct caster_state *this) {
 	if (this->signalterm_event)
 		event_free(this->signalterm_event);
 
-	caster_free_fetchers(this);
+	if (this->config)
+		dynconfig_free_fetchers(this->config->dyn);
 	caster_free_syncers(this);
 	this->graylog_log_level = -1;
 
@@ -834,7 +850,7 @@ int caster_reload(struct caster_state *this) {
 
 	if (caster_reload_listeners(this, config, olddyn, newdyn) < 0)
 		r = -1;
-	if (caster_reload_fetchers(this, config) < 0)
+	if (caster_reload_fetchers(this, config, olddyn, newdyn) < 0)
 		r = -1;
 	if (caster_reload_syncers(this, config) < 0)
 		r = -1;
@@ -893,7 +909,9 @@ static int caster_set_signals(struct caster_state *this) {
 /*
  * Start/reload sourcetable fetchers (proxy)
  */
-static int caster_reload_fetchers(struct caster_state *this, struct config *config) {
+static int caster_reload_fetchers(struct caster_state *this, struct config *config,
+	struct caster_dynconfig *olddyn,
+	struct caster_dynconfig *newdyn) {
 	int r = 0;
 	struct sourcetable_fetch_args **new_fetchers;
 	if (config->proxy_count)
@@ -906,18 +924,19 @@ static int caster_reload_fetchers(struct caster_state *this, struct config *conf
 	 */
 	for (int i = 0; i < config->proxy_count; i++) {
 		struct sourcetable_fetch_args *p = NULL;
-		for (int j = 0; j < this->sourcetable_fetchers_count; j++) {
-			if (this->sourcetable_fetchers[j] == NULL)
-				/* Already cleared */
-				continue;
-			if (!strcmp(this->sourcetable_fetchers[j]->task->host, config->proxy[i].host)
-			&& this->sourcetable_fetchers[j]->task->port == config->proxy[i].port) {
-				p = this->sourcetable_fetchers[j];
-				/* Found, clear in the old table */
-				this->sourcetable_fetchers[j] = NULL;
-				break;
+		if (olddyn)
+			for (int j = 0; j < olddyn->sourcetable_fetchers_count; j++) {
+				if (olddyn->sourcetable_fetchers[j] == NULL)
+					/* Already cleared */
+					continue;
+				if (!strcmp(olddyn->sourcetable_fetchers[j]->task->host, config->proxy[i].host)
+				&& olddyn->sourcetable_fetchers[j]->task->port == config->proxy[i].port) {
+					p = olddyn->sourcetable_fetchers[j];
+					/* Found, clear in the old table */
+					olddyn->sourcetable_fetchers[j] = NULL;
+					break;
+				}
 			}
-		}
 		if (!p) {
 			/* Not found, create */
 			p = fetcher_sourcetable_new(this,
@@ -940,31 +959,9 @@ static int caster_reload_fetchers(struct caster_state *this, struct config *conf
 		}
 		new_fetchers[i] = p;
 	}
-	/*
-	 * Stop and free all remaining fetchers in the old configuration.
-	 */
-	for (int j = 0; j < this->sourcetable_fetchers_count; j++)
-		if (this->sourcetable_fetchers[j]) {
-			logfmt(&this->flog, LOG_INFO, "Stopping fetcher %s:%d", this->sourcetable_fetchers[j]->task->host, this->sourcetable_fetchers[j]->task->port);
-			fetcher_sourcetable_free(this->sourcetable_fetchers[j]);
-		}
-	free(this->sourcetable_fetchers);
-	this->sourcetable_fetchers_count = config->proxy_count;
-	this->sourcetable_fetchers = new_fetchers;
+	newdyn->sourcetable_fetchers_count = config->proxy_count;
+	newdyn->sourcetable_fetchers = new_fetchers;
 	return r;
-}
-
-static void caster_free_fetchers(struct caster_state *this) {
-	struct sourcetable_fetch_args **a = this->sourcetable_fetchers;
-	if (!a)
-		return;
-	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
-		if (a[i])
-			fetcher_sourcetable_free(a[i]);
-	}
-	free(a);
-	this->sourcetable_fetchers = NULL;
-	this->sourcetable_fetchers_count = 0;
 }
 
 int caster_main(char *config_file) {
