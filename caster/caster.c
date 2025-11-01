@@ -219,6 +219,12 @@ dynconfig_free(struct caster_dynconfig *this) {
 	free(this);
 }
 
+static void
+dynconfig_free_callback(struct config *config) {
+	dynconfig_free(config->dyn);
+	config->dyn = NULL;
+}
+
 static struct caster_state *
 caster_new(const char *config_file) {
 	int err = 0;
@@ -444,10 +450,8 @@ void caster_free(struct caster_state *this) {
 	log_free(&this->alog);
 	strfree(this->config_dir);
 	strfree((char *)this->config_file);
-	if (this->config) {
-		dynconfig_free(this->config->dyn);
+	if (this->config)
 		config_decref(this->config);
-	}
 	libevent_global_shutdown();
 	free(this);
 }
@@ -824,12 +828,10 @@ int caster_reload(struct caster_state *this) {
 		old_config = NULL;
 	}
 	config->dyn = newdyn;
+	config->free_callback = dynconfig_free_callback;
 	olddyn = old_config?old_config->dyn:NULL;
 
 	atomic_store(&this->config, config);
-
-	if (old_config)
-		config_decref(old_config);
 
 	this->log_level = config->log_level;
 	if (caster_reopen_logs(this, config) < 0)
@@ -855,8 +857,8 @@ int caster_reload(struct caster_state *this) {
 	if (caster_reload_syncers(this, config, newdyn) < 0)
 		r = -1;
 
-	if (olddyn)
-		dynconfig_free(olddyn);
+	if (old_config)
+		config_decref(old_config);
 
 	if (caster_start_fetchers(this, config, newdyn) < 0)
 		r = -1;
