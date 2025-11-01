@@ -50,6 +50,10 @@ struct caster_dynconfig {
 	struct listener **listeners;
 	int listeners_count;
 
+	/* Graylog senders */
+	struct graylog_sender **graylog;
+	int graylog_count;	/* 0 or 1 */
+
 	struct caster_state *caster;
 };
 
@@ -103,8 +107,6 @@ struct caster_state {
 	/* Logs */
 	struct log flog, alog;
 	char hostname[128];
-	struct graylog_sender **graylog;
-	int graylog_count;	/* 0 or 1 */
 
 	/* Table synchronization */
 	struct syncer **syncers;

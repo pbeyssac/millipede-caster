@@ -99,7 +99,7 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 		json_object *j = gelf_json(g);
 		char *s = mystrdup(json_object_to_json_string(j));
 		json_object_put(j);
-		graylog_sender_queue(caster->graylog[0], s);
+		graylog_sender_queue(caster->config->dyn->graylog[0], s);
 		strfree(s);
 	}
 
@@ -141,6 +141,8 @@ static struct caster_dynconfig *dynconfig_new(struct caster_state *caster) {
 		return NULL;
 	this->listeners = NULL;
 	this->listeners_count = 0;
+	this->graylog = NULL;
+	this->graylog_count = 0;
 	this->caster = caster;
 	return this;
 }
@@ -155,8 +157,18 @@ dynconfig_free_listeners(struct caster_dynconfig *dyn) {
 }
 
 static void
+dynconfig_free_graylog(struct caster_dynconfig *this) {
+	for (int i = 0; i < this->graylog_count; i++)
+		graylog_sender_free(this->graylog[i]);
+	free(this->graylog);
+	this->graylog = NULL;
+	this->graylog_count = 0;
+}
+
+static void
 dynconfig_free(struct caster_dynconfig *this) {
 	dynconfig_free_listeners(this);
+	dynconfig_free_graylog(this);
 	free(this);
 }
 
@@ -247,8 +259,6 @@ caster_new(const char *config_file) {
 	int r1 = log_init(&this->flog, NULL, &caster_log_cb, this);
 	int r2 = log_init(&this->alog, NULL, &caster_alog, this);
 
-	this->graylog = NULL;
-	this->graylog_count = 0;
 	this->syncers = NULL;
 	this->syncers_count = 0;
 	this->rtcm_filter = NULL;
@@ -311,16 +321,7 @@ static int caster_reload_syncers(struct caster_state *this, struct config *confi
 	return caster_start_syncers(this, config);
 }
 
-static void caster_free_graylog(struct caster_state *this) {
-	this->graylog_log_level = -1;
-	for (int i = 0; i < this->graylog_count; i++)
-		graylog_sender_free(this->graylog[i]);
-	free(this->graylog);
-	this->graylog = NULL;
-	this->graylog_count = 0;
-}
-
-static int caster_reload_graylog(struct caster_state *this, struct config *config) {
+static int caster_reload_graylog(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
 	int r = 0;
 	int i;
 
@@ -356,9 +357,8 @@ static int caster_reload_graylog(struct caster_state *this, struct config *confi
 			graylog_sender_free(new_graylog[j]);
 		free(new_graylog);
 	} else {
-		caster_free_graylog(this);
-		this->graylog = new_graylog;
-		this->graylog_count = config->graylog_count;
+		dyn->graylog = new_graylog;
+		dyn->graylog_count = config->graylog_count;
 	}
 	return r;
 }
@@ -383,7 +383,7 @@ void caster_free(struct caster_state *this) {
 
 	caster_free_fetchers(this);
 	caster_free_syncers(this);
-	caster_free_graylog(this);
+	this->graylog_log_level = -1;
 
 	if (this->joblist) joblist_free(this->joblist);
 	livesource_table_free(this->livesources);
@@ -826,9 +826,12 @@ int caster_reload(struct caster_state *this) {
 		r = -1;
 	if (caster_reload_rtcm_filters(this, config) < 0)
 		r = -1;
-	if (caster_reload_graylog(this, config) < 0)
+
+	if (caster_reload_graylog(this, config, newdyn) < 0)
 		r = -1;
-	this->graylog_log_level = config->graylog_count > 0 ? config->graylog[0].log_level : -1;
+	else
+		this->graylog_log_level = config->graylog_count > 0 ? config->graylog[0].log_level : -1;
+
 	if (caster_reload_listeners(this, config, olddyn, newdyn) < 0)
 		r = -1;
 	if (caster_reload_fetchers(this, config) < 0)
