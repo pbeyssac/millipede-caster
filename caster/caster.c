@@ -53,6 +53,7 @@ static void caster_log_cb(void *arg, struct gelf_entry *g, int level, const char
 static void caster_alog(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap);
 static int caster_reload_fetchers(struct caster_state *this, struct config *config,
 	struct caster_dynconfig *olddyn, struct caster_dynconfig *newdyn);
+static int caster_start_fetchers(struct caster_state *this, struct config *config, struct caster_dynconfig *newdyn);
 static void dynconfig_free_fetchers(struct caster_dynconfig *this);
 static void listener_free(struct listener *this);
 static void listener_incref(struct listener *this);
@@ -857,6 +858,9 @@ int caster_reload(struct caster_state *this) {
 	if (olddyn)
 		dynconfig_free(olddyn);
 
+	if (caster_start_fetchers(this, config, newdyn) < 0)
+		r = -1;
+
 	P_MUTEX_UNLOCK(&this->configmtx);
 	return r;
 }
@@ -906,7 +910,7 @@ static int caster_set_signals(struct caster_state *this) {
 }
 
 /*
- * Start/reload sourcetable fetchers (proxy)
+ * Reload sourcetable fetchers
  */
 static int caster_reload_fetchers(struct caster_state *this, struct config *config,
 	struct caster_dynconfig *olddyn,
@@ -943,23 +947,36 @@ static int caster_reload_fetchers(struct caster_state *this, struct config *conf
 				config->proxy[i].tls,
 				config->proxy[i].table_refresh_delay,
 				config->proxy[i].priority);
-			if (p) {
-				logfmt(&this->flog, LOG_INFO, "New fetcher %s:%d", config->proxy[i].host, config->proxy[i].port);
-				fetcher_sourcetable_start(p, 0);
-			} else {
-				logfmt(&this->flog, LOG_ERR, "Can't start fetcher %s:%d", config->proxy[i].host, config->proxy[i].port);
-				r = -1;
-			}
-		} else {
-			fetcher_sourcetable_reload(p,
-				config->proxy[i].table_refresh_delay,
-				config->proxy[i].priority);
-			logfmt(&this->flog, LOG_INFO, "Reusing fetcher %s:%d", config->proxy[i].host, config->proxy[i].port);
 		}
 		new_fetchers[i] = p;
 	}
 	newdyn->sourcetable_fetchers_count = config->proxy_count;
 	newdyn->sourcetable_fetchers = new_fetchers;
+	return r;
+}
+
+/*
+ * Start sourcetable fetchers
+ */
+static int caster_start_fetchers(struct caster_state *this, struct config *config, struct caster_dynconfig *newdyn) {
+	int r = 0;
+	for (int i = 0; i < newdyn->sourcetable_fetchers_count; i++) {
+		struct sourcetable_fetch_args *p = newdyn->sourcetable_fetchers[i];
+		if (p) {
+			if (ntrip_task_get_state(p->task) == TASK_INIT) {
+				logfmt(&this->flog, LOG_INFO, "New fetcher %s:%d", config->proxy[i].host, config->proxy[i].port);
+				fetcher_sourcetable_start(p, 0);
+			} else {
+				fetcher_sourcetable_reload(p,
+					config->proxy[i].table_refresh_delay,
+					config->proxy[i].priority);
+				logfmt(&this->flog, LOG_INFO, "Reusing fetcher %s:%d", config->proxy[i].host, config->proxy[i].port);
+			}
+		} else {
+			logfmt(&this->flog, LOG_ERR, "Can't start fetcher %s:%d", config->proxy[i].host, config->proxy[i].port);
+			r = -1;
+		}
+	}
 	return r;
 }
 
