@@ -95,3 +95,107 @@ class ClientStream(object):
     self._thr.join(timeout)
   def stop(self):
     self._stop = True
+
+#
+# Send an API reload command and check reply
+#
+def API_reload(host, port):
+  s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+  s.connect((host, port))
+  print("Reload")
+  s.sendall(b'POST /adm/api/v1/reload HTTP/1.1\r\nContent-Length: 33\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nuser=admin&password=%3dadminpw...')
+  s.settimeout(2)
+  try:
+    d = s.recv(10240)
+  except TimeoutError:
+    return 1
+  s.close()
+  if not re.compile(b'^HTTP/1\.1 200 OK\r\nServer: NTRIP Millipede Server .*\r\nDate: .*\r\nNtrip-Version: Ntrip/2\.0\r\nContent-Length: \d+\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{"result": 0}').match(d):
+    return 1
+  return 0
+
+#
+# Fake HTTP server
+#
+class HttpServer(object):
+  def __init__(self, host, port, str_request, maxaccept, timeout=20):
+    self.err = 0
+    self.nr = 0
+    self.naccept = 0
+    self.host = host
+    self.port = port
+    self.str_request = str_request
+    self.re_request = re.compile(self.str_request)
+    self.maxaccept = maxaccept
+    self.timeout = timeout
+    self._stop = False
+  def start(self):
+    self._thr = threading.Thread(target=self.run, daemon=True, args=())
+    self._thr.start()
+  def stop(self):
+    self._stop = True
+  def is_alive(self):
+    return self._thr.is_alive()
+  def run(self):
+    self.nr = 0
+    self.naccept = 0
+    sl = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    sl.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sl.bind((self.host, self.port))
+    sl.listen(200)
+
+    for i in range(self.maxaccept):
+      (s, remote_addr) = sl.accept()
+      self.naccept += 1
+      ncurrent = 0
+      print("Accepted", i+1)
+      s.settimeout(self.timeout)
+
+      data = b''
+      d = s.recv(10240)
+      try:
+        while d != b'':
+          if self._stop:
+            return
+          ncurrent += 1
+          data += d
+          if b'\r\n\r\n' in data:
+            req, rest = data.split(b'\r\n\r\n', 1)
+            m = self.re_request.match(req)
+            if m is None:
+              print("FAIL: expected", str_request, "received", req)
+              self.err += 1
+              length = 0
+            else:
+              print(req)
+              print(".", end='')
+              length = int(m.groups(0)[0])
+            data = rest
+            while len(data) < length:
+              d = s.recv(10240)
+              data += d
+            reply = [ b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 4\r\n\r\nABCD',
+                      b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 0\r\n\r\n',
+                      b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nAB\r\n0\r\n\r\n',
+                      b'HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nABCD'
+                    ][self.nr % 4]
+            s.send(reply)
+            self.nr += 1
+            data = b''
+          d = s.recv(10240)
+        if ncurrent == 0:
+          print("FAIL: empty client request")
+          self.err += 1
+      except socket.timeout:
+        d = b''
+        self.err += 1
+        print("FAIL: timeout")
+
+
+def TestServerAlive(host, port):
+  s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+  try:
+    s.connect((host, port))
+  except ConnectionRefusedError:
+    return 1
+  return 0
