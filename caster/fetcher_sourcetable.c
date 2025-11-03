@@ -50,7 +50,7 @@ static void task_stop(struct sourcetable_fetch_args *this) {
 }
 
 void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
-	stack_replace_host(this->task->caster, &this->task->caster->sourcetablestack, this->task->host, this->task->port, NULL);
+	fetcher_sourcetable_stop(this);
 	ntrip_task_free(this->task);
 	free(this);
 }
