@@ -68,14 +68,16 @@ void syncer_queue_json(struct caster_state *caster, json_object *j) {
 	if (j == NULL)
 		return;
 
-	if (caster->config->dyn->syncers_count >= 1) {
+	struct config *config = caster_config_getref(caster);
+	if (config->dyn->syncers_count >= 1) {
 		char *s = mystrdup(json_object_to_json_string(j));
 		if (s != NULL) {
 			logfmt(&caster->flog, LOG_DEBUG, "livesource_send_json syncer %s", s);
-			syncer_queue(caster->config->dyn->syncers[0], s);
+			syncer_queue(config->dyn->syncers[0], s);
 			strfree(s);
 		}
 	}
+	config_decref(config);
 
 	json_object_put(j);
 }
