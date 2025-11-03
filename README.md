@@ -35,11 +35,13 @@ Dependencies
 ============
 
 FreeBSD: `sudo pkg install libevent libcyaml json-c`
+Debian: `sudo apt install libcyaml-dev libevent-dev libjson-c-dev libssl-dev`
 
 Building
 ========
 
-`cd caster; make clean depend all`
+FreeBSD: `cd caster; make clean depend all`
+Debian: `cd caster; make clean all`
 
 Installation (FreeBSD)
 ======================
