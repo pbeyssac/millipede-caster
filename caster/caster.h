@@ -118,12 +118,6 @@ struct caster_state {
 	/* Logs */
 	struct log flog, alog;
 	char hostname[128];
-	//struct graylog_sender **graylog;
-	//int graylog_count;	/* 0 or 1 */
-
-	/* Table synchronization */
-	//struct syncer **syncers;
-	//int syncers_count;
 
 	/* Thread id (thread-specific variable) for logs */
 	pthread_key_t thread_id;
@@ -133,14 +127,6 @@ struct caster_state {
 	struct event *signalterm_event;
 	struct event *signalhup_event;
 	struct caster_signal_cb_info sigint_info, sigterm_info;
-
-	/*
-	 * Sourcetable fetcher configuration.
-	 */
-	struct sourcetable_fetch_args **sourcetable_fetchers;
-	int sourcetable_fetchers_count;
-
-	struct caster_dynconfig *dyn;
 };
 
 void caster_log_error(struct caster_state *this, char *orig);
