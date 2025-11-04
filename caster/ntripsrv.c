@@ -342,7 +342,7 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 					if (packet_pos) {
 						st->rtcm_client_state = NTRIP_RTCM_POS_OK;
 						packet_send(packet_pos, st, time(NULL));
-						packet_free(packet_pos);
+						packet_decref(packet_pos);
 					} else
 						st->rtcm_client_state = NTRIP_RTCM_POS_WAIT;
 					st->tmp_pos = s->dist_array[0].pos;

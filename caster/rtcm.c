@@ -823,7 +823,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			if (livesource_send_subscribers(st->own_livesource, not_rtcmp, st->caster))
 				st->last_useful = time(NULL);
 			r = 1;
-			packet_free(not_rtcmp);
+			packet_decref(not_rtcmp);
 			max_len -= len;
 		}
 		if (max_len == 0)
@@ -864,7 +864,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 
 		if (livesource_send_subscribers(st->own_livesource, rtcmp, st->caster))
 			st->last_useful = time(NULL);
-		packet_free(rtcmp);
+		packet_decref(rtcmp);
 		r = 1;
 	}
 }

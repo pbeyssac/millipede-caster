@@ -349,7 +349,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 
 	assert(n == this->nsubs);
 	if (pconv)
-		packet_free(pconv);
+		packet_decref(pconv);
 
 	assert(packet->refcnt > 0);
 

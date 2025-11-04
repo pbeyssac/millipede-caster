@@ -14,14 +14,6 @@ struct packet *packet_new(size_t len_raw, struct caster_state *caster) {
 	return this;
 }
 
-/*
- * Packet freeing function
- */
-void packet_free(struct packet *packet) {
-	if (atomic_fetch_add_explicit(&packet->refcnt, -1, memory_order_relaxed) == 1)
-		free((void *)packet);
-}
-
 void packet_incref(struct packet *packet) {
 	atomic_fetch_add(&packet->refcnt, 1);
 }
@@ -36,7 +28,7 @@ void packet_decref(struct packet *packet) {
  */
 static void raw_free_callback(const void *data, size_t datalen, void *extra) {
 	struct packet *packet = (struct packet *)extra;
-	packet_free(packet);
+	packet_decref(packet);
 }
 
 /*
@@ -75,7 +67,7 @@ int packet_handle_raw(struct ntrip_state *st) {
 		//ntrip_log(st, LOG_DEBUG, "Raw: packet source %s size %d", st->mountpoint, len_raw);
 		if (livesource_send_subscribers(st->own_livesource, rawp, st->caster))
 			st->last_useful = time(NULL);
-		packet_free(rawp);
+		packet_decref(rawp);
 		return 1;
 	}
 }
