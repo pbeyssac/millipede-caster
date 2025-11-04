@@ -17,7 +17,7 @@ struct packet {
 };
 
 struct caster_state;
-struct packet *packet_new(size_t len_raw, struct caster_state *caster);
+struct packet *packet_new(size_t len_raw);
 void packet_incref(struct packet *packet);
 void packet_decref(struct packet *packet);
 void packet_send(struct packet *packet, struct ntrip_state *st, time_t t);

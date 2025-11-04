@@ -6,7 +6,7 @@
 #include "packet.h"
 #include "ntrip_common.h"
 
-struct packet *packet_new(size_t len_raw, struct caster_state *caster) {
+struct packet *packet_new(size_t len_raw) {
 	struct packet *this = (struct packet *)malloc(sizeof(struct packet) + len_raw);
 	this->datalen = len_raw;
 	atomic_init(&this->refcnt, 1);
@@ -55,7 +55,7 @@ int packet_handle_raw(struct ntrip_state *st) {
 			return 0;
 		if (len_raw > st->config->max_raw_packet)
 			len_raw = st->config->max_raw_packet;
-		struct packet *rawp = packet_new(len_raw, st->caster);
+		struct packet *rawp = packet_new(len_raw);
 		st->received_bytes += len_raw;
 		if (rawp == NULL) {
 			evbuffer_drain(input, len_raw);

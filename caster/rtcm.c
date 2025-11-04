@@ -452,7 +452,7 @@ static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p
 	if (len_out > 1023)
 		return NULL;
 
-	struct packet *packet = packet_new(len_out+6, st->caster);
+	struct packet *packet = packet_new(len_out+6);
 
 	if (packet == NULL)
 		return NULL;
@@ -816,7 +816,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 		int max_len = evbuffer_get_length(input);
 		int len = p.pos < 0 ? max_len : p.pos;
 		if (len) {
-			struct packet *not_rtcmp = packet_new(len, st->caster);
+			struct packet *not_rtcmp = packet_new(len);
 			evbuffer_remove(input, not_rtcmp->data, len);
 			st->received_bytes += len;
 			ntrip_log(st, LOG_INFO, "resending %zd bytes", len);
@@ -843,7 +843,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			return r;
 		}
 
-		struct packet *rtcmp = packet_new(len_rtcm, st->caster);
+		struct packet *rtcmp = packet_new(len_rtcm);
 		st->received_bytes += len_rtcm;
 		if (rtcmp == NULL) {
 			evbuffer_drain(input, len_rtcm);
