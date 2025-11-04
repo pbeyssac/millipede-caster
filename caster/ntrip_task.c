@@ -91,6 +91,18 @@ void ntrip_task_clear_st(struct ntrip_task *this) {
 	ntrip_task_clear_get_st(this, 0);
 }
 
+/*
+ * Return a counted reference to the ntrip_state, or NULL.
+ */
+static struct ntrip_state *ntrip_task_get_st_ref(struct ntrip_task *this) {
+	P_RWLOCK_RDLOCK(&this->st_lock);
+	struct ntrip_state *st = this->st;
+	if (st != NULL)
+		ntrip_incref(st, "ntrip_task_get_st_ref");
+	P_RWLOCK_UNLOCK(&this->st_lock);
+	return st;
+}
+
 enum task_state ntrip_task_get_state(struct ntrip_task *this) {
 	return atomic_load_explicit(&this->state, memory_order_relaxed);
 }
@@ -266,21 +278,16 @@ void ntrip_task_queue(struct ntrip_task *this, char *json) {
 
 	int first_sending = atomic_fetch_add_explicit(&this->restart_sending, 1, memory_order_relaxed) == 0;
 	if (first_sending) {
-		P_RWLOCK_RDLOCK(&this->st_lock);
-		struct ntrip_state *st = this->st;
+		struct ntrip_state *st = ntrip_task_get_st_ref(this);
 		if (st != NULL) {
 			struct bufferevent *bev = st->bev;
 			assert(bev != NULL);
-			ntrip_incref(st, "ntrip_task_queue");
-			P_RWLOCK_UNLOCK(&this->st_lock);
-
 			bufferevent_lock(bev);
 			if (st->state == NTRIP_IDLE_CLIENT)
 				ntrip_task_send_next_request(st);
 			ntrip_decref(st, "ntrip_task_queue");
 			bufferevent_unlock(bev);
-		} else
-			P_RWLOCK_UNLOCK(&this->st_lock);
+		}
 	}
 	atomic_fetch_sub_explicit(&this->restart_sending, -1, memory_order_relaxed);
 }
