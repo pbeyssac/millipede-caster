@@ -14,6 +14,19 @@ struct packet *packet_new(size_t len_raw) {
 	return this;
 }
 
+/*
+ * Create packet with a copy of a null-terminated string.
+ */
+struct packet *packet_new_from_string(const char *s) {
+	size_t len = strlen(s);
+	struct packet *p = packet_new(len);
+	if (p == NULL)
+		return NULL;
+	/* Don't store the final '\0' since we know the length */
+	memcpy(p->data, s, len);
+	return p;
+}
+
 void packet_incref(struct packet *packet) {
 	atomic_fetch_add(&packet->refcnt, 1);
 }
