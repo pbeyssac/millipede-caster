@@ -14,6 +14,7 @@
 
 #include "conf.h"
 #include "log.h"
+#include "packet.h"
 #include "util.h"
 
 /*
@@ -374,6 +375,23 @@ struct mime_content *mime_new(char *s, long long len, const char *mime_type, int
 	m->len = len >= 0 ? len : strlen(s);
 	m->mime_type = mime_type;
 	m->use_strfree = use_strfree;
+	m->packet = NULL;
+	return m;
+}
+
+/*
+ * Create a mime_content from a reference-counted packet.
+ */
+struct mime_content *mime_new_from_packet(const char *mime_type, struct packet *packet) {
+	struct mime_content *m = (struct mime_content *)malloc(sizeof(struct mime_content));
+	if (m == NULL)
+		return NULL;
+	packet_incref(packet);
+	m->s = (char *)packet->data;
+	m->len = packet->datalen;
+	m->mime_type = mime_type;
+	m->use_strfree = 0;
+	m->packet = packet;
 	return m;
 }
 
@@ -382,7 +400,9 @@ void mime_set_type(struct mime_content *this, const char *mime_type) {
 }
 
 void mime_free(struct mime_content *this) {
-	if (this->use_strfree)
+	if (this->packet)
+		packet_decref(this->packet);
+	else if (this->use_strfree)
 		strfree((char *)this->s);
 	else
 		free((void *)this->s);
@@ -391,6 +411,9 @@ void mime_free(struct mime_content *this) {
 
 void mime_append(struct mime_content *this, const char *s) {
 	int len = strlen(s);
+	if (this->packet)
+		// Not used in packet mode
+		return;
 	char *new = (char *)strrealloc(this->s, this->len + len + 1);
 	if (new) {
 		this->s = new;
