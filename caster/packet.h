@@ -11,7 +11,6 @@ struct ntrip_state;
  */
 struct packet {
 	_Atomic u_int refcnt;	// mostly for zero-copy mode
-	int zero_copy;		// zero copy mode
 	int is_rtcm;		// Checked to be a valid RTCM packet
 	size_t datalen;
 	unsigned char data[];

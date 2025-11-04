@@ -60,8 +60,6 @@ static struct config default_config = {
 	.log = "/var/log/millipede/caster.log",
 	.log_level = LOG_INFO,
 	.admin_user = "admin",
-	.disable_zero_copy = 0,
-	.zero_copy = 1
 };
 
 static struct config_bind default_config_bind = {
@@ -460,11 +458,6 @@ struct config *config_parse(const char *filename) {
 	DEFAULT_ASSIGN(this, sourcetable_fetch_timeout);
 	DEFAULT_ASSIGN(this, http_header_max_size);
 	DEFAULT_ASSIGN(this, http_content_length_max);
-
-	// Undocumented
-	DEFAULT_ASSIGN(this, disable_zero_copy);
-
-	this->zero_copy = !this->disable_zero_copy;
 
 	for (int i = 0; i < this->proxy_count; i++) {
 		DEFAULT_ASSIGN_ARRAY(this, i, proxy, default_config_proxy, table_refresh_delay);

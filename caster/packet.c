@@ -11,20 +11,13 @@ struct packet *packet_new(size_t len_raw, struct caster_state *caster) {
 	this->datalen = len_raw;
 	atomic_init(&this->refcnt, 1);
 	this->is_rtcm = 0;
-	this->zero_copy = caster->config->zero_copy;
 	return this;
 }
 
 /*
- * Packet freeing function with a reference count
- * for zero copy mode.
+ * Packet freeing function
  */
 void packet_free(struct packet *packet) {
-	if (!packet->zero_copy) {
-		free((void *)packet);
-		return;
-	}
-
 	if (atomic_fetch_add_explicit(&packet->refcnt, -1, memory_order_relaxed) == 1)
 		free((void *)packet);
 }
@@ -51,18 +44,11 @@ static void raw_free_callback(const void *data, size_t datalen, void *extra) {
  * Required lock: ntrip_state
  */
 void packet_send(struct packet *packet, struct ntrip_state *st, time_t t) {
-	if (packet->zero_copy) {
-		if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
-			ntrip_log(st, LOG_CRIT, "evbuffer_add_reference failed");
-			return;
-		}
-		packet_incref(packet);
-	} else {
-		if (evbuffer_add(bufferevent_get_output(st->bev), packet->data, packet->datalen) < 0) {
-			ntrip_log(st, LOG_CRIT, "evbuffer_add failed");
-			return;
-		}
+	if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
+		ntrip_log(st, LOG_CRIT, "evbuffer_add_reference failed");
+		return;
 	}
+	packet_incref(packet);
 	st->last_send = t;
 	st->sent_bytes += packet->datalen;
 }

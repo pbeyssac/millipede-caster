@@ -278,17 +278,6 @@ struct config {
 	const char *admin_user;
 
 	/*
-	 * Zero copy mode shares outgoing queued RTCM packets, saving memory, but incurring
-	 * some overhead.
-	 *
-	 * Useful if there are many subscribers per source, or a lot of backlog.
-	 */
-	int zero_copy;
-
-	/* Used only for YAML config reading as the CYAML default is 0 */
-	int disable_zero_copy;
-
-	/*
 	 * Web root file paths.
 	 */
 	struct config_webroots *webroots;
