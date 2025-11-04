@@ -21,7 +21,7 @@ struct packet *packet_new(size_t len_raw);
 struct packet *packet_new_from_string(const char *s);
 void packet_incref(struct packet *packet);
 void packet_decref(struct packet *packet);
-void packet_send(struct packet *packet, struct ntrip_state *st, time_t t);
+int packet_send(struct packet *packet, struct ntrip_state *st, time_t t);
 int packet_handle_raw(struct ntrip_state *st);
 int packet_handle_rtcm(struct ntrip_state *st);
 

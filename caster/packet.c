@@ -48,14 +48,15 @@ static void raw_free_callback(const void *data, size_t datalen, void *extra) {
  * Send a packet
  * Required lock: ntrip_state
  */
-void packet_send(struct packet *packet, struct ntrip_state *st, time_t t) {
+int packet_send(struct packet *packet, struct ntrip_state *st, time_t t) {
 	if (evbuffer_add_reference(bufferevent_get_output(st->bev), packet->data, packet->datalen, raw_free_callback, packet) < 0) {
 		ntrip_log(st, LOG_CRIT, "evbuffer_add_reference failed");
-		return;
+		return -1;
 	}
 	packet_incref(packet);
 	st->last_send = t;
 	st->sent_bytes += packet->datalen;
+	return 0;
 }
 
 int packet_handle_raw(struct ntrip_state *st) {
