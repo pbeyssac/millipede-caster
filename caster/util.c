@@ -409,7 +409,7 @@ void mime_free(struct mime_content *this) {
 	free(this);
 }
 
-void mime_append(struct mime_content *this, const char *s) {
+static void mime_append(struct mime_content *this, const char *s) {
 	int len = strlen(s);
 	if (this->packet)
 		// Not used in packet mode

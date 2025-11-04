@@ -70,7 +70,6 @@ struct mime_content *mime_new(char *s, long long len, const char *mime_type, int
 struct mime_content *mime_new_from_packet(const char *mime_type, struct packet *packet);
 void mime_set_type(struct mime_content *this, const char *mime_type);
 void mime_free(struct mime_content *this);
-void mime_append(struct mime_content *this, const char *s);
 char *joinpath(const char *dir, const char *path);
 FILE *fopen_absolute(const char *dir, const char *filename, const char *mode);
 
