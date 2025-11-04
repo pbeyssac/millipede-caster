@@ -18,14 +18,14 @@
  */
 static void queue_json(struct syncer *this, int n, json_object *j) {
 	struct ntrip_task *task = this->task[n];
-	char *s = mystrdup(json_object_get_string(j));
+	struct packet *packet = packet_new_from_string(json_object_get_string(j));
 	json_object_put(j);
-	if (s == NULL) {
+	if (packet == NULL) {
 		logfmt(&task->caster->flog, LOG_CRIT, "out of memory in queue_json");
 		return;
 	}
-	ntrip_task_queue(this->task[n], s);
-	strfree(s);
+	ntrip_task_queue(this->task[n], packet);
+	packet_decref(packet);
 }
 
 /*
@@ -52,13 +52,20 @@ static void queue_checkserial(struct syncer *this, int n) {
  * Queue a JSON update provided as a char *, to all nodes.
  */
 void syncer_queue(struct syncer *this, char *json) {
+	struct packet *packet = packet_new_from_string(json);
+	if (packet == NULL) {
+		logfmt(&this->caster->flog, LOG_CRIT, "Out of memory when allocating syncer output, dropping");
+		return;
+	}
+
 	for (int i = 0; i < this->ntask; i++) {
 		if (this->task[i]->st)
 			ntrip_log(this->task[i]->st, LOG_DEBUG, "syncer %d queueing %s", i, json);
 		else
 			logfmt(&this->caster->flog, LOG_DEBUG, "syncer %d queueing %s (not running)", i, json);
-		ntrip_task_queue(this->task[i], json);
+		ntrip_task_queue(this->task[i], packet);
 	}
+	packet_decref(packet);
 }
 
 /*

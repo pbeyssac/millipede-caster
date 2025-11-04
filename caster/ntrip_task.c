@@ -3,6 +3,8 @@
 #include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+
 #include <event2/http.h>
 #include <event2/buffer.h>
 
@@ -233,7 +235,7 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
 	while ((m = STAILQ_FIRST(&tmp_mimeq))) {
 		STAILQ_REMOVE_HEAD(&tmp_mimeq, next);
 		if (f != NULL) {
-			fputs(m->s, f);
+			fwrite(m->packet->data, m->packet->datalen, 1, f);
 			fputs("\n", f);
 		}
 		mime_free(m);
@@ -246,11 +248,10 @@ static size_t ntrip_task_drain_queue(struct ntrip_task *this) {
 /*
  * Insert a new item in the queue, checking accepted size.
  */
-void ntrip_task_queue(struct ntrip_task *this, char *json) {
+void ntrip_task_queue(struct ntrip_task *this, struct packet *packet) {
 	if (atomic_load_explicit(&this->state, memory_order_relaxed) == TASK_END)
 		return;
-	char *s = mystrdup(json);
-	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	struct mime_content *m = mime_new_from_packet("application/json", packet);
 	if (m == NULL) {
 		logfmt(&this->caster->flog, LOG_CRIT, "Out of memory when allocating log output, dropping");
 		return;
@@ -339,7 +340,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 		STAILQ_FOREACH(m, &task->mimeq, next) {
 			if (n == 0)
 				break;
-			if (evbuffer_add_reference(output, m->s, m->len, NULL, NULL) < 0
+			if (packet_send(m->packet, st, time(NULL)) < 0
 			 || evbuffer_add_reference(output, "\n", 1, NULL, NULL) < 0) {
 				P_RWLOCK_UNLOCK(&task->mimeq_lock);
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
@@ -355,7 +356,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 		m = STAILQ_FIRST(&task->mimeq);
 		if (m) {
 			ntripcli_send_request(st, m, 0);
-			if (evbuffer_add_reference(output, m->s, m->len, NULL, NULL) < 0) {
+			if (packet_send(m->packet, st, time(NULL)) < 0) {
 				P_RWLOCK_UNLOCK(&task->mimeq_lock);
 				ntrip_log(st, LOG_CRIT, "Not enough memory, dropping connection to %s:%d", st->host, st->port);
 				ntrip_task_clear_st(task);

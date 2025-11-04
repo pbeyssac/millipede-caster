@@ -122,7 +122,7 @@ enum task_state ntrip_task_get_state(struct ntrip_task *this);
 int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent);
 void ntrip_task_stop(struct ntrip_task *this);
 void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb);
-void ntrip_task_queue(struct ntrip_task *this, char *json);
+void ntrip_task_queue(struct ntrip_task *this, struct packet *packet);
 void ntrip_task_send_next_request(struct ntrip_state *st);
 
 void ntrip_task_reload(struct ntrip_task *this,

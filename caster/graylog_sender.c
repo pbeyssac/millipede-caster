@@ -13,7 +13,13 @@
  * Queue a GELF/JSON log entry.
  */
 void graylog_sender_queue(struct graylog_sender *this, char *json) {
-	ntrip_task_queue(this->task, json);
+	struct packet *packet = packet_new_from_string(json);
+	if (packet == NULL){
+		logfmt(&this->task->caster->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
+		return;
+	}
+	ntrip_task_queue(this->task, packet);
+	packet_decref(packet);
 }
 
 /*
