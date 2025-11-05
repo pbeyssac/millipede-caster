@@ -80,6 +80,7 @@ static struct config_node default_config_node = {
 	.port = 2443,
 	.tls = 0,
 	.queue_max_size = 4000000,
+	.status_timeout = 20,
 	.retry_delay = 30
 };
 
@@ -90,6 +91,7 @@ static struct config_endpoint default_config_endpoint = {
 static struct config_graylog default_config_graylog = {
 	.bulk_max_size = 62000,
 	.queue_max_size = 4000000,
+	.status_timeout = 20,
 	.retry_delay = 30,
 	.port = 7777
 };

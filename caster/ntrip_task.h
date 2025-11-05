@@ -34,6 +34,9 @@ struct ntrip_task {
 	/* How often to runs, in seconds. 0 = one shot. */
 	int refresh_delay;
 
+	// HTTP status timeout only used with mimeq/task_send_next_request()
+	int status_timeout;
+
 	struct caster_state *caster;
 
 	/* Additional headers */

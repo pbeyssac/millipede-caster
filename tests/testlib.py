@@ -118,7 +118,7 @@ def API_reload(host, port):
 # Fake HTTP server
 #
 class HttpServer(object):
-  def __init__(self, host, port, str_request, maxaccept, timeout=20):
+  def __init__(self, host, port, str_request, maxaccept, timeout=20, keepalive=False):
     self.err = 0
     self.nr = 0
     self.naccept = 0
@@ -129,6 +129,13 @@ class HttpServer(object):
     self.maxaccept = maxaccept
     self.timeout = timeout
     self._stop = False
+    self.replies = [
+      b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 4\r\n\r\nABCD',
+      b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 0\r\n\r\n',
+      b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nAB\r\n0\r\n\r\n'
+    ]
+    if not keepalive:
+      self.replies.append(b'HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nABCD')
   def start(self):
     self._thr = threading.Thread(target=self.run, daemon=True, args=())
     self._thr.start()
@@ -174,12 +181,7 @@ class HttpServer(object):
             while len(data) < length:
               d = s.recv(10240)
               data += d
-            reply = [ b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 4\r\n\r\nABCD',
-                      b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 0\r\n\r\n',
-                      b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nAB\r\n0\r\n\r\n',
-                      b'HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nABCD'
-                    ][self.nr % 4]
-            s.send(reply)
+            s.send(self.replies[self.nr % len(self.replies)])
             self.nr += 1
             data = b''
           d = s.recv(10240)

@@ -55,6 +55,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	}
 	memset(&this->start, 0, sizeof(this->start));
 	this->port = port;
+	this->status_timeout = 0;		// only used with mimeq/task_send_next_request()
 	this->refresh_delay = refresh_delay;
 	this->end_cb = NULL;
 	this->line_cb = NULL;
@@ -378,6 +379,14 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 		}
 	}
 	P_RWLOCK_UNLOCK(&task->mimeq_lock);
+
+	/*
+	 * Only expect a reply from the server if we sent a HTTP request.
+	 * Will close if it times out.
+	 * In other cases, just keep the connection idle.
+	 */
+	struct timeval read_timeout = { st->task->pending ? st->task->status_timeout : 0 };
+	bufferevent_set_timeouts(st->bev, &read_timeout, NULL);
 }
 
 /*

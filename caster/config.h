@@ -67,6 +67,9 @@ struct config_node {
 	/* Maximum queue size for memory backlog */
 	size_t queue_max_size;
 
+	/* How many seconds to wait for a HTTP status in a reply */
+	int status_timeout;
+
 	int retry_delay;
 };
 
@@ -92,6 +95,9 @@ struct config_graylog {
 
 	/* Token for Authorization: HTTP header */
 	const char *authorization;
+
+	/* How many seconds to wait for a HTTP status in a reply */
+	int status_timeout;
 
 	/* How many seconds to wait before restarting a failed connection */
 	int retry_delay;
