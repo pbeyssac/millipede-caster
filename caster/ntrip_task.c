@@ -25,6 +25,16 @@ _ntrip_task_restart_cb(int fd, short what, void *arg) {
 }
 
 /*
+ * Called on a successful connection.
+ */
+static void connect_cb(struct ntrip_state *st){
+	if (st->task->use_mimeq) {
+		st->state = NTRIP_IDLE_CLIENT;
+		ntrip_task_send_next_request(st);
+	}
+}
+
+/*
  * Create a new task, with periodic rescheduling if refresh_delay is not 0.
  * Don't start it.
  */
@@ -49,6 +59,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	this->end_cb = NULL;
 	this->line_cb = NULL;
 	this->status_cb = NULL;
+	this->connect_cb = connect_cb;
 	this->st = NULL;
 	this->caster = caster;
 	this->ev = NULL;

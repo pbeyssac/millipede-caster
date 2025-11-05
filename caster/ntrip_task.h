@@ -59,6 +59,8 @@ struct ntrip_task {
 	void (*status_cb)(void *arg, int status, int);
 	void *status_cb_arg;
 
+	void (*connect_cb)(struct ntrip_state *st);
+
 	/* Current ntrip_state, if any */
 	struct ntrip_state *st;
 	struct timeval start;

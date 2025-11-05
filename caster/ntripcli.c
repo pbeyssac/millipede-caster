@@ -407,10 +407,9 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		ntrip_set_peeraddr(st, NULL, 0);
 		ntrip_set_localaddr(st);
 		ntrip_log(st, LOG_INFO, "Connected to %s:%d for %s", st->host, st->port, st->uri);
-		if (st->task && st->task->use_mimeq) {
-			st->state = NTRIP_IDLE_CLIENT;
-			ntrip_task_send_next_request(st);
-		} else
+		if (st->task && st->task->connect_cb)
+			st->task->connect_cb(st);
+		else
 			ntripcli_send_request(st, NULL, 0);
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
