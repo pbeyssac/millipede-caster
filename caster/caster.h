@@ -133,7 +133,6 @@ void caster_log_error(struct caster_state *this, char *orig);
 int caster_tls_log_cb(const char *str, size_t len, void *u);
 int caster_main(char *config_file);
 void free_callback(const void *data, size_t datalen, void *extra);
-json_object *caster_endpoints_json(struct caster_state *caster);
 int caster_reload(struct caster_state *this);
 
 static inline struct config *caster_config_getref(struct caster_state *caster) {
