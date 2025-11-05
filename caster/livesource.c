@@ -594,8 +594,7 @@ static json_object *livesource_list_local_json(struct caster_state *caster, stru
 
 	jmain = _livesource_list_base_json(this);
 	struct config *config = caster_config_getref(caster);
-	json_object_get(config->endpoints_json);
-	json_object_object_add_ex(jmain, "endpoints", config->endpoints_json, JSON_C_CONSTANT_NEW);
+	json_object_object_add_ex(jmain, "endpoints", json_object_get(config->endpoints_json), JSON_C_CONSTANT_NEW);
 	config_decref(config);
 
 	new_list = json_object_new_object();
