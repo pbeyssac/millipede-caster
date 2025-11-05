@@ -1,5 +1,5 @@
-#ifndef _RTCM_H_
-#define _RTCM_H_
+#ifndef __RTCM_H__
+#define __RTCM_H__
 
 #include <sys/time.h>
 

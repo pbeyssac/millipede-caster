@@ -1,5 +1,5 @@
-#ifndef _GELF_ENTRY_H
-#define _GELF_ENTRY_H
+#ifndef __GELF_ENTRY_H__
+#define __GELF_ENTRY_H__
 
 #include <sys/time.h>
 

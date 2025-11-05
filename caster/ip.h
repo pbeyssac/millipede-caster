@@ -1,5 +1,5 @@
-#ifndef _IP_H_
-#define _IP_H_
+#ifndef __IP_H__
+#define __IP_H__
 
 #include <arpa/inet.h>
 #include <netinet/in.h>

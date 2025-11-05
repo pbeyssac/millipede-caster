@@ -1,5 +1,5 @@
-#ifndef _AUTH_H_
-#define _AUTH_H_
+#ifndef __AUTH_H__
+#define __AUTH_H__
 
 /*
  * Entry for host (as a client) or source (as a server) authorization

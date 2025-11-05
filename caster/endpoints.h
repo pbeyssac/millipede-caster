@@ -1,5 +1,5 @@
-#ifndef _ENDPOINTS_H_
-#define _ENDPOINTS_H_
+#ifndef __ENDPOINTS_H__
+#define __ENDPOINTS_H__
 
 #include <json-c/json_object.h>
 

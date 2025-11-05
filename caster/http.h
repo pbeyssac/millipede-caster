@@ -1,5 +1,5 @@
-#ifndef __HTTP_H_
-#define __HTTP_H_
+#ifndef __HTTP_H__
+#define __HTTP_H__
 
 #include <event2/http.h>
 

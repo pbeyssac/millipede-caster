@@ -1,5 +1,5 @@
-#ifndef _BITFIELD_H_
-#define _BITFIELD_H_
+#ifndef __BITFIELD_H__
+#define __BITFIELD_H__
 
 #include <sys/types.h>
 #include <stdint.h>

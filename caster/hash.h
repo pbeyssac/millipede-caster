@@ -1,5 +1,5 @@
-#ifndef _HASH_C
-#define _HASH_C
+#ifndef __HASH_H__
+#define __HASH_H__
 
 /*
  * Handle a key-value store
