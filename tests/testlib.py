@@ -47,10 +47,11 @@ class SourceStream(object):
 # Client stream to server on a given mountpoint: wait for n samples
 #
 class ClientStream(object):
-  def __init__(self, host, mountpoint, n, firstline=''):
+  def __init__(self, host, mountpoint, n, firstline='', req=None):
+    self.mountpoint = mountpoint
+    self.req = req or b'GET /%s HTTP/1.1\r\nUser-Agent: NTRIP test\r\n\r\n' % self.mountpoint.encode('ascii')
     self.host = host
     self.n = n
-    self.mountpoint = mountpoint
     self.err = 0
     self.firstline = firstline.encode('ascii')
     self._stop = False
@@ -63,8 +64,7 @@ class ClientStream(object):
   def _run(self):
     sclient = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     sclient.connect(self.host)
-    sclient.sendall(b'GET /%s HTTP/1.1\r\nUser-Agent: NTRIP test\r\n\r\n'
-        % self.mountpoint.encode('ascii'))
+    sclient.sendall(self.req)
 
     if self.firstline:
       sclient.send(self.firstline)

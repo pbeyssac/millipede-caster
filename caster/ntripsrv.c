@@ -686,6 +686,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 								break;
 							}
 							st->state = NTRIP_WAIT_CLIENT_CONTENT;
+							struct timeval adm_read_timeout = { 0, 0 };
+							bufferevent_set_timeouts(bev, &adm_read_timeout, NULL);
 							continue;
 						}
 						if (!st->scheme_basic) {
