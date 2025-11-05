@@ -64,7 +64,7 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 	 * on the chosen caster when we start.
 	 */
 	this->task = ntrip_task_new(caster, NULL, 0, NULL, 0,
-		persistent?caster->config->reconnect_delay:0, 0, 0,
+		persistent?reconnect_delay:0, 0, 0,
 		"source_fetcher", NULL);
 
 	this->task->method = "GET";

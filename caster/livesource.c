@@ -319,7 +319,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			continue;
 		}
 		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(st->bev));
-		if (backlog_len > caster->config->backlog_evbuffer) {
+		if (backlog_len > st->config->backlog_evbuffer) {
 			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
@@ -593,8 +593,10 @@ static json_object *livesource_list_local_json(struct caster_state *caster, stru
 	json_object *new_list;
 
 	jmain = _livesource_list_base_json(this);
-	json_object_get(caster->config->endpoints_json);
-	json_object_object_add_ex(jmain, "endpoints", caster->config->endpoints_json, JSON_C_CONSTANT_NEW);
+	struct config *config = caster_config_getref(caster);
+	json_object_get(config->endpoints_json);
+	json_object_object_add_ex(jmain, "endpoints", config->endpoints_json, JSON_C_CONSTANT_NEW);
+	config_decref(config);
 
 	new_list = json_object_new_object();
 	struct hash_iterator hi;

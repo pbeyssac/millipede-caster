@@ -600,7 +600,7 @@ static void _stack_replace(struct caster_state *caster, sourcetable_stack_t *sta
 		 * Insert at the right place to keep the stack sorted by decreasing priority.
 		 */
 		if (local)
-			logfmt(&caster->flog, LOG_INFO, "Reloading %s", caster->config->sourcetable_filename);
+			logfmt(&caster->flog, LOG_INFO, "Reloading %s", new_sourcetable->filename);
 		TAILQ_FOREACH(s, &stack->list, next) {
 			if (new_sourcetable->priority >= s->priority) {
 				TAILQ_INSERT_BEFORE(s, new_sourcetable, next);

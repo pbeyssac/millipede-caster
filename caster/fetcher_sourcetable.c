@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "conf.h"
+#include "caster.h"
 #include "ntrip_task.h"
 #include "ntripcli.h"
 #include "fetcher_sourcetable.h"
@@ -30,8 +31,10 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 	this->task->line_cb_arg = this;
 	this->task->restart_cb = fetcher_sourcetable_start;
 	this->task->restart_cb_arg = this;
-	this->task->read_timeout = caster->config->sourcetable_fetch_timeout;
-	this->task->write_timeout = caster->config->sourcetable_fetch_timeout;
+	struct config *config = caster_config_getref(caster);
+	this->task->read_timeout = config->sourcetable_fetch_timeout;
+	this->task->write_timeout = config->sourcetable_fetch_timeout;
+	config_decref(config);
 
 	this->sourcetable = NULL;
 	this->priority = priority;
