@@ -95,8 +95,11 @@ struct ntrip_state *ntrip_task_clear_get_st(struct ntrip_task *this, int getref)
 	struct ntrip_state *rst;
 	P_RWLOCK_WRLOCK(&this->st_lock);
 	rst = getref ? this->st : NULL;
-	if (this->st != NULL && !rst)
-		ntrip_decref(this->st ,"ntrip_task_clear_st");
+	if (this->st != NULL) {
+		this->st->task = NULL;
+		if (!rst)
+			ntrip_decref(this->st ,"ntrip_task_clear_st");
+	}
 	this->st = NULL;
 	P_RWLOCK_UNLOCK(&this->st_lock);
 	return rst;
