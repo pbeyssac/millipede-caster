@@ -395,6 +395,8 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_EDEBUG, "freeing bev %p", this->bev);
 	my_bufferevent_free(this, this->bev);
 	config_decref(this->config);
+	if (this->task)
+		ntrip_task_decref(this->task);
 	free(this);
 }
 
@@ -642,6 +644,8 @@ void ntrip_notify_close(struct ntrip_state *st) {
 	if (st->task != NULL) {
 		/* Notify the callback the transfer is over, and failed. */
 		st->task->end_cb(0, st->task->end_cb_arg, st->task->cb_arg2);
+		if (st->task != NULL)
+			ntrip_task_decref(st->task);
 		st->task = NULL;
 	}
 }

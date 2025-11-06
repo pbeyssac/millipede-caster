@@ -78,7 +78,7 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 		return NULL;
 	}
 	if (evhttp_add_header(&this->task->headers, "Authorization", authkey) < 0) {
-		ntrip_task_free(this->task);
+		ntrip_task_decref(this->task);
 		free(this);
 		return NULL;
 	}
@@ -86,7 +86,7 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 }
 
 void graylog_sender_free(struct graylog_sender *this) {
-	ntrip_task_free(this->task);
+	ntrip_task_decref(this->task);
 	free(this);
 }
 

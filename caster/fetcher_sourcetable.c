@@ -54,7 +54,7 @@ static void task_stop(struct sourcetable_fetch_args *this) {
 
 void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
 	fetcher_sourcetable_stop(this);
-	ntrip_task_free(this->task);
+	ntrip_task_decref(this->task);
 	free(this);
 }
 

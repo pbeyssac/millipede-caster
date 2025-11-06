@@ -171,7 +171,7 @@ struct syncer *syncer_new(struct caster_state *caster,
 	if (err) {
 		for (int i = 0; i < this->ntask; i++)
 			if (this->task[i] != NULL)
-				ntrip_task_free(this->task[i]);
+				ntrip_task_decref(this->task[i]);
 		free(this);
 		return NULL;
 	}
@@ -198,8 +198,10 @@ struct syncer *syncer_new(struct caster_state *caster,
 }
 
 void syncer_free(struct syncer *this) {
-	for (int i = 0; i < this->ntask; i++)
-		ntrip_task_free(this->task[i]);
+	for (int i = 0; i < this->ntask; i++) {
+		ntrip_task_decref(this->task[i]);
+		this->task[i] = NULL;
+	}
 	free(this->task);
 	free(this);
 }

@@ -55,6 +55,7 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 		return NULL;
 	}
 	memset(&this->start, 0, sizeof(this->start));
+	atomic_init(&this->refcnt, 1);
 	this->port = port;
 	this->status_timeout = 0;		// only used with mimeq/task_send_next_request()
 	this->refresh_delay = refresh_delay;
@@ -96,9 +97,11 @@ struct ntrip_state *ntrip_task_clear_get_st(struct ntrip_task *this, int getref)
 	P_RWLOCK_WRLOCK(&this->st_lock);
 	rst = getref ? this->st : NULL;
 	if (this->st != NULL) {
+		if (this->st->task)
+			ntrip_task_decref(this->st->task);
 		this->st->task = NULL;
 		if (!rst)
-			ntrip_decref(this->st ,"ntrip_task_clear_st");
+			ntrip_decref(this->st, "ntrip_task_clear_st");
 	}
 	this->st = NULL;
 	P_RWLOCK_UNLOCK(&this->st_lock);
@@ -414,7 +417,7 @@ void ntrip_task_ack_pending(struct ntrip_task *this) {
 	P_RWLOCK_UNLOCK(&this->mimeq_lock);
 }
 
-void ntrip_task_free(struct ntrip_task *this) {
+static void ntrip_task_free(struct ntrip_task *this) {
 	ntrip_task_stop(this);
 	ntrip_task_drain_queue(this);
 
@@ -431,6 +434,15 @@ void ntrip_task_free(struct ntrip_task *this) {
 	P_RWLOCK_DESTROY(&this->mimeq_lock);
 	P_RWLOCK_DESTROY(&this->st_lock);
 	free(this);
+}
+
+void ntrip_task_incref(struct ntrip_task *this) {
+	atomic_fetch_add(&this->refcnt, 1);
+}
+
+void ntrip_task_decref(struct ntrip_task *this) {
+	if (atomic_fetch_add_explicit(&this->refcnt, -1, memory_order_relaxed) == 1)
+		ntrip_task_free(this);
 }
 
 void ntrip_task_reload(struct ntrip_task *this,
