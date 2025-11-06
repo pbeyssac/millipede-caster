@@ -13,29 +13,29 @@
  * Module to synchronize our livesource table to other nodes.
  */
 
+static void syncer_start(void *arg_cb, int n);
+
 /*
  * Queue a JSON API request to 1 node.
  */
-static void queue_json(struct syncer *this, int n, json_object *j) {
-	struct ntrip_task *task = this->task[n];
+static void queue_json(struct syncer *this, struct ntrip_task *task, json_object *j) {
 	struct packet *packet = packet_new_from_string(json_object_get_string(j));
 	json_object_put(j);
 	if (packet == NULL) {
 		logfmt(&task->caster->flog, LOG_CRIT, "out of memory in queue_json");
 		return;
 	}
-	ntrip_task_queue(this->task[n], packet);
+	ntrip_task_queue(task, packet);
 	packet_decref(packet);
 }
 
 /*
  * Queue a full livesources table to 1 node.
  */
-static void queue_full(struct syncer *this, int n) {
-	struct ntrip_task *task = this->task[n];
+static void queue_full(struct syncer *this, struct ntrip_task *task) {
 	json_object *j = livesource_full_update_json(task->caster, task->caster->livesources);
 	logfmt(&task->caster->flog, LOG_DEBUG, "syncer queue full table, serial %lld", task->caster->livesources->serial);
-	queue_json(this, n, j);
+	queue_json(this, task, j);
 }
 
 /*
@@ -45,7 +45,7 @@ static void queue_checkserial(struct syncer *this, int n) {
 	struct ntrip_task *task = this->task[n];
 	json_object *j = livesource_checkserial_json(task->caster->livesources);
 	logfmt(&task->caster->flog, LOG_DEBUG, "syncer queue checkserial, serial %lld", task->caster->livesources->serial);
-	queue_json(this, n, j);
+	queue_json(this, task, j);
 }
 
 /*
@@ -121,7 +121,111 @@ status_cb(void *arg, int status, int n) {
 
 	/* If the call failed, requeue a full table */
 	if (a->task[n]->st->status_code != 200)
-		queue_full(a, n);
+		queue_full(a, a->task[n]);
+}
+
+/*
+ * Compare whether a current task applies to the provided node.
+ */
+static int compare_node_task(struct config_node *node, struct ntrip_task *task) {
+	return (strcasecmp(node->host, task->host)
+		|| node->port != task->port
+		|| node->tls != task->tls);
+}
+
+/*
+ * Create a syncer task
+ */
+static struct ntrip_task *syncer_task_new(struct caster_state *caster, struct syncer *syncer,
+	int i, struct config_node *node, const char *uri, int bulk_max_size) {
+	struct ntrip_task *task;
+	int err = 0;
+
+	int authkeylen = strlen(node->authorization) + 10;
+	char *authkey = (char *)malloc(authkeylen);
+	if (authkey == NULL)
+		return NULL;
+
+	snprintf(authkey, authkeylen, "internal %s", node->authorization);
+
+	task = ntrip_task_new(caster, node->host, node->port, uri,
+		node->tls, node->retry_delay, bulk_max_size, node->queue_max_size, "syncer", NULL);
+	if (task == NULL)
+		return NULL;
+
+	if (evhttp_add_header(&task->headers, "Authorization", authkey) < 0)
+		err = 1;
+	strfree(authkey);
+
+	if (err) {
+		ntrip_task_decref(task);
+		return NULL;
+	}
+
+	task->method = "POST";
+	task->status_cb = status_cb;
+	task->status_cb_arg = syncer;
+	task->end_cb = end_cb;
+	task->end_cb_arg = syncer;
+	task->restart_cb = syncer_start;
+	task->restart_cb_arg = syncer;
+	task->cb_arg2 = i;
+	task->connection_keepalive = 1;
+	task->bulk_content_type = "application/json";
+	task->bulk_max_size = bulk_max_size;
+	task->use_mimeq = 1;
+	return task;
+}
+
+/*
+ * Reload a syncer, reusing existing tasks, creating new tasks if necessary, and dropping unused tasks.
+ */
+int syncer_reload(struct syncer *this,
+	struct config_node *node, int node_count, const char *uri,
+	int bulk_max_size) {
+	struct ntrip_task **tasks = (struct ntrip_task **)calloc(sizeof(struct ntrip_task *)*node_count, 1);
+	int ntask = node_count;
+	int err = 0;
+	if (tasks == NULL)
+		return -1;
+
+	for (int i = 0; i < node_count; i++) {
+		struct ntrip_task *nt = NULL;
+		if (this->task != NULL) {
+			for (int j = 0; j < this->ntask; j++) {
+				if (!compare_node_task(&node[i], this->task[j])) {
+					nt = this->task[j];
+					ntrip_task_incref(nt);
+					break;
+				}
+			}
+		}
+		if (nt == NULL) {
+				nt = syncer_task_new(this->caster, this, i, &node[i], uri, bulk_max_size);
+				if (nt == NULL) {
+					err = 1;
+					break;
+				}
+				queue_full(this, nt);
+		}
+		tasks[i] = nt;
+	}
+
+	if (err) {
+		for (int i = 0; i < ntask; i++)
+			if (tasks[i] != NULL)
+				ntrip_task_decref(tasks[i]);
+		free(tasks);
+		return -1;
+	}
+
+	/* Drop former task references */
+	for (int i = 0; i < this->ntask; i++)
+		ntrip_task_decref(this->task[i]);
+	free(this->task);
+	this->task = tasks;
+	this->ntask = ntask;
+	return 0;
 }
 
 /*
@@ -142,57 +246,13 @@ struct syncer *syncer_new(struct caster_state *caster,
 	if (this == NULL)
 		return NULL;
 
-	this->task = (struct ntrip_task **)malloc(sizeof(struct ntrip_task *)*node_count);
-	this->ntask = node_count;
-	if (this->task == NULL) {
-		free(this);
-		return NULL;
-	}
-
-	int err = 0;
-
-	for (int i = 0; i < this->ntask; i++) {
-		int authkeylen = strlen(node[i].authorization) + 10;
-		char *authkey = (char *)malloc(authkeylen);
-		if (authkey == NULL) {
-			this->task[i] = NULL;
-			err = 1;
-			continue;
-		}
-		snprintf(authkey, authkeylen, "internal %s", node[i].authorization);
-
-		this->task[i] = ntrip_task_new(caster, node[i].host, node[i].port, uri,
-			node[i].tls, node[i].retry_delay, bulk_max_size, node[i].queue_max_size, "syncer", NULL);
-		if (evhttp_add_header(&this->task[i]->headers, "Authorization", authkey) < 0)
-			err = 1;
-		strfree(authkey);
-	}
-
-	if (err) {
-		for (int i = 0; i < this->ntask; i++)
-			if (this->task[i] != NULL)
-				ntrip_task_decref(this->task[i]);
-		free(this);
-		return NULL;
-	}
-
 	this->caster = caster;
+	this->task = NULL;
+	this->ntask = 0;
 
-	for (int i = 0; i < this->ntask; i++) {
-		struct ntrip_task *task = this->task[i];
-		task->method = "POST";
-		task->status_cb = status_cb;
-		task->status_cb_arg = this;
-		task->end_cb = end_cb;
-		task->end_cb_arg = this;
-		task->restart_cb = syncer_start;
-		task->restart_cb_arg = this;
-		task->cb_arg2 = i;
-		task->connection_keepalive = 1;
-		task->bulk_content_type = "application/json";
-		task->bulk_max_size = bulk_max_size;
-		task->use_mimeq = 1;
-		queue_full(this, i);
+	if (syncer_reload(this, node, node_count, uri, bulk_max_size) < 0) {
+		free(this);
+		return NULL;
 	}
 	return this;
 }
@@ -209,10 +269,17 @@ void syncer_free(struct syncer *this) {
 /*
  * Start a syncer.
  */
-void
+static void
 syncer_start(void *arg_cb, int n) {
 	struct syncer *a = (struct syncer *)arg_cb;
 	struct ntrip_task *task = a->task[n];
 
 	ntrip_task_start(task, a, NULL, 0);
+}
+
+void
+syncer_start_all(struct syncer *this) {
+	for (int i = 0; i < this->ntask; i++)
+		if (atomic_load(&this->task[i]->state) == TASK_INIT)
+			syncer_start(this, i);
 }

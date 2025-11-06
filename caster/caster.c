@@ -342,8 +342,7 @@ static int caster_start_syncers(struct caster_state *this, struct config *config
 	for (int i = 0; i < dyn->syncers_count; i++) {
 		dyn->syncers[i] = syncer_new(this,
 			config->node, config->node_count, "/adm/api/v1/sync", 0);
-		for (int j = 0; j < config->node_count; j++)
-			syncer_start(dyn->syncers[i], j);
+		syncer_start_all(dyn->syncers[i]);
 	}
 	return 0;
 }
