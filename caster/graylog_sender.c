@@ -53,13 +53,16 @@ status_cb(void *arg, int status, int n) {
  */
 struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	const char *host, unsigned short port, const char *uri, int tls,
-	int retry_delay, int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename) {
+	int status_timeout, int retry_delay, int max_retry_delay,
+	int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename) {
 
 	struct graylog_sender *this = (struct graylog_sender *)malloc(sizeof(struct graylog_sender));
 	if (this == NULL)
 		return NULL;
 	this->task = ntrip_task_new(caster, host, port, uri, tls, retry_delay, bulk_max_size, queue_max_size, "graylog_sender", drainfilename);
 	this->task->method = "POST";
+	this->task->status_timeout = status_timeout;
+	this->task->max_retry_delay = max_retry_delay;
 	this->task->status_cb = status_cb;
 	this->task->status_cb_arg = this;
 	this->task->end_cb = end_cb;

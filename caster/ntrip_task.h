@@ -35,6 +35,8 @@ struct ntrip_task {
 
 	/* How often to runs, in seconds. 0 = one shot. */
 	int refresh_delay;
+	int max_retry_delay;
+	int current_retry_delay;
 
 	// HTTP status timeout only used with mimeq/task_send_next_request()
 	int status_timeout;
@@ -119,7 +121,7 @@ struct ntrip_task {
 };
 
 struct ntrip_task *ntrip_task_new(struct caster_state *caster,
-	const char *host, unsigned short port, const char *uri, int tls, int retry_delay,
+	const char *host, unsigned short port, const char *uri, int tls, int refresh_delay,
 	size_t bulk_max_size, size_t queue_max_size, const char *type, const char *drainfilename);
 void ntrip_task_ack_pending(struct ntrip_task *this);
 void ntrip_task_incref(struct ntrip_task *this);
@@ -135,6 +137,6 @@ void ntrip_task_send_next_request(struct ntrip_state *st);
 
 void ntrip_task_reload(struct ntrip_task *this,
 	const char *host, unsigned short port, const char *uri, int tls,
-	int retry_delay, int bulk_max_size, int queue_max_size, const char *drainfilename);
+	int refresh_delay, int bulk_max_size, int queue_max_size, const char *drainfilename);
 
 #endif

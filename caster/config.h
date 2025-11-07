@@ -70,7 +70,7 @@ struct config_node {
 	/* How many seconds to wait for a HTTP status in a reply */
 	int status_timeout;
 
-	int retry_delay;
+	int retry_delay, max_retry_delay;
 };
 
 struct config_endpoint {
@@ -99,8 +99,11 @@ struct config_graylog {
 	/* How many seconds to wait for a HTTP status in a reply */
 	int status_timeout;
 
-	/* How many seconds to wait before restarting a failed connection */
+	/* How many seconds to initially wait before restarting a failed connection */
 	int retry_delay;
+
+	/* How many maximum seconds to wait beteen retries (exponential backoff from retry_delay) */
+	int max_retry_delay;
 
 	/* Maximum size for bulk mode, 0 to disable bulk mode */
 	size_t bulk_max_size;

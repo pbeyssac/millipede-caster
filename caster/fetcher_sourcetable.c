@@ -34,6 +34,7 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 	struct config *config = caster_config_getref(caster);
 	this->task->read_timeout = config->sourcetable_fetch_timeout;
 	this->task->write_timeout = config->sourcetable_fetch_timeout;
+	this->task->status_timeout = this->task->read_timeout;
 	config_decref(config);
 
 	this->sourcetable = NULL;
