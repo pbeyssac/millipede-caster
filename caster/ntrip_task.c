@@ -31,7 +31,8 @@ static void connect_cb(struct ntrip_state *st){
 	if (st->task->use_mimeq) {
 		st->state = NTRIP_IDLE_CLIENT;
 		ntrip_task_send_next_request(st);
-	}
+	} else
+		ntripcli_send_request(st, NULL, 0);
 }
 
 /*
