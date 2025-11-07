@@ -386,7 +386,7 @@ void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m, int s
 	char *s = ntripcli_http_request_str(st, st->task?st->task->method:"GET", st->host, st->port, st->uri, 2, NULL, m);
 	if (s) {
 		len = strlen(s);
-		st->sent_bytes += len + (m ? m->len : 0);
+		st->sent_bytes += len + ((m && send_mime) ? m->len : 0);
 	}
 	if (s == NULL
 	 || evbuffer_add_reference(output, s, len, strfree_callback, s) < 0
