@@ -317,7 +317,7 @@ void ntrip_task_queue(struct ntrip_task *this, struct packet *packet) {
 			bufferevent_unlock(bev);
 		}
 	}
-	atomic_fetch_sub_explicit(&this->restart_sending, -1, memory_order_relaxed);
+	atomic_fetch_sub_explicit(&this->restart_sending, 1, memory_order_relaxed);
 }
 
 /*
