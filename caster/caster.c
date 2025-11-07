@@ -344,18 +344,43 @@ caster_new(const char *config_file) {
 	return this;
 }
 
-static int caster_start_syncers(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
+static int caster_reload_syncers(struct caster_state *this, struct config *config, struct caster_dynconfig *olddyn, struct caster_dynconfig *newdyn) {
 	if (config->node_count == 0) {
-		dyn->syncers_count = 0;
+		newdyn->syncers = NULL;
+		newdyn->syncers_count = 0;
 		return 0;
 	}
-	dyn->syncers_count = 1;
-	dyn->syncers = (struct syncer **)malloc(sizeof(struct syncer *)*dyn->syncers_count);
-	for (int i = 0; i < dyn->syncers_count; i++) {
-		dyn->syncers[i] = syncer_new(this,
-			config->node, config->node_count, "/adm/api/v1/sync", 0);
-		syncer_start_all(dyn->syncers[i]);
+	newdyn->syncers_count = 1;
+	newdyn->syncers = (struct syncer **)calloc(sizeof(struct syncer *)*newdyn->syncers_count, 1);
+	if (newdyn->syncers == NULL)
+		return -1;
+
+	if (olddyn != NULL && olddyn->syncers != NULL && olddyn->syncers_count == newdyn->syncers_count) {
+		newdyn->syncers_count = olddyn->syncers_count;
+		for (int i = 0; i < newdyn->syncers_count; i++) {
+			newdyn->syncers[i] = olddyn->syncers[i];
+			olddyn->syncers[i] = NULL;
+		}
+	} else {
+		for (int i = 0; i < newdyn->syncers_count; i++) {
+			newdyn->syncers[i] = syncer_new(this, config->node, config->node_count, "/adm/api/v1/sync", 0);
+			if (newdyn->syncers[i] == NULL) {
+				for (int j = 0; j < i; j++)
+					syncer_free(newdyn->syncers[i]);
+				free(newdyn->syncers);
+				return -1;
+			}
+		}
 	}
+
+	for (int i = 0; i < newdyn->syncers_count; i++)
+		syncer_reload(newdyn->syncers[i], config->node, config->node_count, "/adm/api/v1/sync", 0);
+	return 0;
+}
+
+static int caster_start_syncers(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
+	for (int i = 0; i < dyn->syncers_count; i++)
+		syncer_start_all(dyn->syncers[i]);
 	return 0;
 }
 
@@ -885,9 +910,10 @@ static int caster_load(struct caster_state *this, int restart) {
 		r = -1;
 	if (caster_reload_fetchers(this, config, olddyn, newdyn) < 0)
 		r = -1;
+	if (caster_reload_syncers(this, config, olddyn, newdyn) < 0)
+		r = -1;
 	if (olddyn != NULL) {
 		dynconfig_free_fetchers(olddyn);
-		dynconfig_free_syncers(olddyn);
 		dynconfig_free_graylog(olddyn);
 	}
 
