@@ -475,7 +475,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			}
 			if (!line)
 				break;
-			st->received_bytes += len;
+			st->received_bytes += len + 2;
 			ntrip_log(st, LOG_EDEBUG, "Header \"%s\", %zd bytes", line, len);
 			if (len != 0) {
 				char *key, *value;
