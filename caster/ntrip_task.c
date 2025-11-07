@@ -416,7 +416,6 @@ void ntrip_task_ack_pending(struct ntrip_task *this) {
 	P_RWLOCK_WRLOCK(&this->mimeq_lock);
 	while (this->pending && (m = STAILQ_FIRST(&this->mimeq))) {
 		STAILQ_REMOVE_HEAD(&this->mimeq, next);
-		this->st->sent_bytes += m->len;
 		this->queue_size -= m->len;
 		this->pending--;
 		mime_free(m);
