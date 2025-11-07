@@ -86,6 +86,7 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 }
 
 void graylog_sender_free(struct graylog_sender *this) {
+	ntrip_task_stop(this->task);
 	ntrip_task_decref(this->task);
 	free(this);
 }

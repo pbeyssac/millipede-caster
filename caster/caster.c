@@ -359,11 +359,6 @@ static int caster_start_syncers(struct caster_state *this, struct config *config
 	return 0;
 }
 
-static int caster_reload_syncers(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
-	dynconfig_free_syncers(dyn);
-	return caster_start_syncers(this, config, dyn);
-}
-
 static int caster_reload_graylog(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
 	int r = 0;
 	int i;
@@ -377,6 +372,9 @@ static int caster_reload_graylog(struct caster_state *this, struct config *confi
 		if (new_graylog == NULL)
 			return -1;
 	}
+
+	for (i = 0; i < config->graylog_count; i++)
+		new_graylog[i] = NULL;
 
 	for (i = 0; i < config->graylog_count; i++) {
 		new_graylog[i] = graylog_sender_new(this,
@@ -393,17 +391,23 @@ static int caster_reload_graylog(struct caster_state *this, struct config *confi
 			r = -1;
 			break;
 		}
-		graylog_sender_start(new_graylog[i], 0);
 	}
 	if (r == -1) {
-		for (int j = 0; i < j; j++)
-			graylog_sender_free(new_graylog[j]);
+		for (i = 0; i < config->graylog_count; i++)
+			if (new_graylog[i] != NULL)
+				graylog_sender_free(new_graylog[i]);
 		free(new_graylog);
 	} else {
 		dyn->graylog = new_graylog;
 		dyn->graylog_count = config->graylog_count;
 	}
 	return r;
+}
+
+static int caster_start_graylog(struct caster_state *this, struct config *config, struct caster_dynconfig *dyn) {
+	for (int i = 0; i < dyn->graylog_count; i++)
+		graylog_sender_start(dyn->graylog[i], 0);
+	return 0;
 }
 
 void caster_free(struct caster_state *this) {
@@ -784,7 +788,7 @@ caster_reload_rtcm_filters(struct caster_state *caster, struct config *config, s
 	return 0;
 }
 
-static struct config *caster_reload_config(struct caster_state *this) {
+static struct config *caster_load_config(struct caster_state *this) {
 	struct config *config;
 	if (!(config = config_parse(this->config_file))) {
 		if (this->config)
@@ -806,7 +810,26 @@ signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	event_base_loopexit(info->caster->base, &delay);
 }
 
-int caster_reload(struct caster_state *this) {
+static int caster_start(struct caster_state *this, struct config *config, int lock) {
+	int r = 0;
+	if (lock)
+		P_MUTEX_LOCK(&this->configreload);
+
+	if (caster_start_fetchers(this, config, config->dyn) < 0)
+		r = -1;
+	if (caster_start_syncers(this, config, config->dyn) < 0)
+		r = -1;
+	if (caster_start_graylog(this, config, config->dyn) < 0)
+		r = -1;
+	else
+		this->graylog_log_level = config->graylog_count > 0 ? config->graylog[0].log_level : -1;
+
+	if (lock)
+		P_MUTEX_UNLOCK(&this->configreload);
+	return r;
+}
+
+static int caster_load(struct caster_state *this, int restart) {
 	struct config *config, *old_config;
 	struct caster_dynconfig *olddyn;
 
@@ -816,7 +839,7 @@ int caster_reload(struct caster_state *this) {
 	if (newdyn == NULL)
 		return -1;
 
-	config = caster_reload_config(this);
+	config = caster_load_config(this);
 
 	P_MUTEX_LOCK(&this->configreload);
 
@@ -854,27 +877,30 @@ int caster_reload(struct caster_state *this) {
 		r = -1;
 	if (caster_reload_rtcm_filters(this, config, newdyn) < 0)
 		r = -1;
-
 	if (caster_reload_graylog(this, config, newdyn) < 0)
 		r = -1;
-	else
-		this->graylog_log_level = config->graylog_count > 0 ? config->graylog[0].log_level : -1;
-
 	if (caster_reload_listeners(this, config, olddyn, newdyn) < 0)
 		r = -1;
 	if (caster_reload_fetchers(this, config, olddyn, newdyn) < 0)
 		r = -1;
-	if (caster_reload_syncers(this, config, newdyn) < 0)
-		r = -1;
+	if (olddyn != NULL) {
+		dynconfig_free_fetchers(olddyn);
+		dynconfig_free_syncers(olddyn);
+		dynconfig_free_graylog(olddyn);
+	}
 
 	if (old_config)
 		config_decref(old_config);
 
-	if (caster_start_fetchers(this, config, newdyn) < 0)
+	if (restart && caster_start(this, config, 0) < 0)
 		r = -1;
 
 	P_MUTEX_UNLOCK(&this->configreload);
 	return r;
+}
+
+int caster_reload(struct caster_state *this) {
+	return caster_load(this, 1);
 }
 
 static void
@@ -1011,18 +1037,27 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	if (caster_reload(caster) < 0) {
+	if (caster_set_signals(caster) < 0) {
 		caster_free(caster);
 		return 1;
 	}
 
-	if (caster_set_signals(caster) < 0) {
+	if (caster_load(caster, 0) < 0) {
 		caster_free(caster);
 		return 1;
 	}
 
 	if (threads && jobs_start_threads(caster->joblist, nthreads) < 0) {
 		logfmt(&caster->flog, LOG_CRIT, "Could not create threads!");
+		caster_free(caster);
+		return 1;
+	}
+
+	/*
+	 * Needs to be done after starting the threads, else caster_free()/ntrip_drop_by_id()
+	 * may end up in an infinite loop.
+	 */
+	if (caster_start(caster, caster->config ,1)) {
 		caster_free(caster);
 		return 1;
 	}
