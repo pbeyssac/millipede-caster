@@ -182,6 +182,8 @@ dynconfig_free_rtcm_filters(struct caster_dynconfig *dyn) {
 
 static void
 dynconfig_free_listeners(struct caster_dynconfig *dyn) {
+	if (dyn->listeners == NULL)
+		return;
 	for (int i = 0; i < dyn->listeners_count; i++)
 		listener_decref(dyn->listeners[i]);
 	free(dyn->listeners);
@@ -191,8 +193,14 @@ dynconfig_free_listeners(struct caster_dynconfig *dyn) {
 
 static void
 dynconfig_free_graylog(struct caster_dynconfig *this) {
-	for (int i = 0; i < this->graylog_count; i++)
-		graylog_sender_free(this->graylog[i]);
+	if (this->graylog == NULL)
+		return;
+	for (int i = 0; i < this->graylog_count; i++) {
+		if (this->graylog[i] != NULL) {
+			graylog_sender_free(this->graylog[i]);
+			this->graylog[i] = NULL;
+		}
+	}
 	free(this->graylog);
 	this->graylog = NULL;
 	this->graylog_count = 0;
@@ -202,8 +210,12 @@ static void
 dynconfig_free_syncers(struct caster_dynconfig *dyn) {
 	if (dyn->syncers == NULL)
 		return;
-	for (int i = 0; i < dyn->syncers_count; i++)
-		syncer_free(dyn->syncers[i]);
+	for (int i = 0; i < dyn->syncers_count; i++) {
+		if (dyn->syncers[i] != NULL) {
+			syncer_free(dyn->syncers[i]);
+			dyn->syncers[i] = NULL;
+		}
+	}
 	free(dyn->syncers);
 	dyn->syncers_count = 0;
 	dyn->syncers = NULL;
