@@ -388,7 +388,7 @@ static int caster_reload_graylog(struct caster_state *this, struct config *confi
 	int r = 0;
 	int i;
 
-	/* The log system is currently hardocoded for graylog_count == 0 or 1 */
+	/* The log system is currently hardcoded for graylog_count == 0 or 1 */
 
 	struct graylog_sender **new_graylog = NULL;
 

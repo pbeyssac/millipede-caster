@@ -79,7 +79,7 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 
 	int hlen = 0;
 	TAILQ_FOREACH(np, &headers, next) {
-		// lengths of key + value + " " + "\r\n"
+		// lengths of key + value + ": " + "\r\n"
 		hlen += strlen(np->key) + strlen(np->value) + 4;
 	}
 	if (st->task)
