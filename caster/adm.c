@@ -22,6 +22,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		*err = 503;
 		return -1;
 	}
+	req->st = st;
 
 	st->client_version = 0;		// force a straight HTTP reply regardless of client headers
 

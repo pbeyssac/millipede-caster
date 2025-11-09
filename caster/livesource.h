@@ -119,7 +119,7 @@ struct mime_content *livesource_list_json(struct caster_state *caster, struct re
 
 json_object *livesource_full_update_json(struct caster_state *caster, struct livesources *this);
 json_object *livesource_checkserial_json(struct livesources *this);
-int livesource_update_execute(struct caster_state *caster, struct livesources *this, json_object *j);
 void livesources_remote_replace(struct caster_state *caster, const char *hostname, struct livesources_remote *new_remote);
+int livesource_update_execute(struct caster_state *caster, struct livesources *this, struct request *req);
 
 #endif /* __LIVESOURCE_H__ */

@@ -864,13 +864,17 @@ void livesources_remote_replace(struct caster_state *caster, const char *hostnam
 /*
  * Execute a full table update.
  */
-static int livesource_update_execute_fulltable(struct caster_state *caster, struct livesources *this, json_object *j, const char *hostname) {
+static int livesource_update_execute_fulltable(struct caster_state *caster, struct livesources *this, struct request *req, json_object *j, const char *hostname) {
 	struct livesources_remote *remote;
 	remote = livesource_process_fulltable(caster, this, j, hostname);
 	if (remote == NULL)
 		return 503;
 
 	livesources_remote_replace(caster, hostname, remote);
+
+	if (req->st->syncer_id != NULL)
+		strfree(req->st->syncer_id);
+	req->st->syncer_id = mystrdup(hostname);
 
 	logfmt(&caster->flog, LOG_EDEBUG, "reload table %s serial %ld done", hostname, remote->serial);
 	return 200;
@@ -879,7 +883,8 @@ static int livesource_update_execute_fulltable(struct caster_state *caster, stru
 /*
  * Main routine to execute a received update.
  */
-int livesource_update_execute(struct caster_state *caster, struct livesources *this, json_object *j) {
+int livesource_update_execute(struct caster_state *caster, struct livesources *this, struct request *req) {
+	json_object *j = req->json;
 	const char *type = json_object_get_string(json_object_object_get(j, "type"));
 	const char *hostname = json_object_get_string(json_object_object_get(j, "hostname"));
 
@@ -888,7 +893,7 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 	}
 
 	if (!strcmp(type, "fulltable")) {
-		int r = livesource_update_execute_fulltable(caster, this, j, hostname);
+		int r = livesource_update_execute_fulltable(caster, this, req, j, hostname);
 		return r;
 	}
 

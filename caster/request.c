@@ -11,6 +11,7 @@ struct request *request_new() {
 		this->hash = NULL;
 		this->status = 200;
 		this->json = NULL;
+		this->st = NULL;
 	}
 	return this;
 }

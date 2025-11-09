@@ -189,6 +189,7 @@ struct ntrip_state {
 	struct subscriber *subscription;	// current source subscription
 	char *uri;				// URI for requests
 	time_t last_send;			// last time a packet was sent to this client
+	char *syncer_id;			// livesource table id from remote syncer
 
 	/*
 	 * NTRIP server state

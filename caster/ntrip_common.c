@@ -116,6 +116,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->client = 0;
 	this->rtcm_filter = 0;
 	this->rtcm_client_state = NTRIP_RTCM_POS_WAIT;
+	this->syncer_id = NULL;
 
 	this->tmpconfig = NULL;
 	this->config = caster_config_getref(this->caster);
@@ -388,6 +389,7 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 		P_RWLOCK_UNLOCK(&this->caster->quotalock);
 	}
 
+	strfree(this->syncer_id);
 	/*
 	 * This will prevent any further locking on the ntrip_state, so we do
 	 * it only once it is removed from ntrips.queue.

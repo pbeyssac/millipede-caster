@@ -907,6 +907,14 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 	}
 
 	ntrip_log(st, LOG_EDEBUG, "ntrip_free srv_eventcb bev %p", bev);
+
+	if (st->syncer_id) {
+		ntrip_log(st, LOG_DEBUG, "Destroying liveosource list %s", st->syncer_id);
+		livesources_remote_replace(st->caster, st->syncer_id, NULL);
+		strfree(st->syncer_id);
+		st->syncer_id = NULL;
+	}
+
 	ntrip_decref_end(st, "ntripsrv_eventcb");
 }
 

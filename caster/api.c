@@ -174,7 +174,7 @@ struct mime_content *api_sync_json(struct caster_state *caster, struct request *
 	} else if (!strcmp(type, "sourcetable")) {
 		req->status = sourcetable_update_execute(caster, req->json);
 	} else
-		req->status = livesource_update_execute(caster, caster->livesources, req->json);
+		req->status = livesource_update_execute(caster, caster->livesources, req);
 	char *s = mystrdup("");
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	return m;
