@@ -79,6 +79,7 @@ void hash_table_free(struct hash_table *this) {
 /*
  * Find an element.
  * Return its pointer if found, else NULL.
+ * Remove from the hash table if del is not 0.
  */
 static struct element *hash_table_find(struct hash_table *this, const char *key, unsigned int *hk, int del) {
 	unsigned int h = hash_key(this, key);
@@ -167,6 +168,16 @@ int hash_table_del(struct hash_table *this, const char *key) {
 		return -1;
 	_hash_table_free_element(this, e);
 	return 0;
+}
+
+/*
+ * Remove and return an element.
+ * Return pointer if found, NULL if not.
+ */
+void *hash_table_get_del(struct hash_table *this, const char *key) {
+	unsigned int h;
+	struct element *e = hash_table_find(this, key, &h, 1);
+	return e != NULL ? e->value : NULL;
 }
 
 /*
