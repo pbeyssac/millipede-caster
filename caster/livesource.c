@@ -724,81 +724,17 @@ static enum livesource_type convert_type(const char *type) {
 }
 
 /*
- * Execute a full table update.
+ * Execute a differential update.
  */
-static int livesource_update_execute_fulltable(struct caster_state *caster, struct livesources *this, json_object *j, const char *hostname) {
-	struct json_object *lslist = json_object_object_get(j, "livesources");
-	struct json_object *jserial = json_object_object_get(j, "serial");
-	struct json_object *jendpoints = json_object_object_get(j, "endpoints");
-	const char *start_date = json_object_get_string(json_object_object_get(j, "start_date"));
-
-	if (lslist == NULL || jserial == NULL || start_date == NULL || hostname == NULL || jendpoints == NULL)
-		return 503;
-
-	int endpoint_count;
-
-	struct endpoint *pe = endpoints_from_json(jendpoints, &endpoint_count);
-	if (pe == NULL)
-		return 503;
-
-	unsigned long serial = json_object_get_int64(jserial);
-	struct livesources_remote *remote = livesources_remote_new(hostname, start_date, serial);
-	remote->endpoints = pe;
-	remote->endpoint_count = endpoint_count;
-
-	struct json_object_iterator it;
-	struct json_object_iterator itEnd;
-
-	it = json_object_iter_begin(lslist);
-	itEnd = json_object_iter_end(lslist);
-
-	while (!json_object_iter_equal(&it, &itEnd)) {
-		const char *mountpoint = json_object_iter_peek_name(&it);
-		struct json_object *ls = json_object_iter_peek_value(&it);
-		const char *lstype = json_object_get_string(json_object_object_get(ls, "type"));
-		const char *lsstate = json_object_get_string(json_object_object_get(ls, "state"));
-
-		struct livesource_remote *lr = livesource_remote_new(mountpoint);
-		lr->state = convert_state(lsstate);
-		lr->type = convert_type(lstype);
-
-		hash_table_add(remote->hash, mountpoint, lr);
-
-		json_object_iter_next(&it);
-	}
-
-	hash_table_del(this->remote, hostname);
-	hash_table_add(this->remote, hostname, remote);
-	logfmt(&caster->flog, LOG_EDEBUG, "reload table %s serial %ld done", hostname, serial);
-
-	return 200;
-}
-
-/*
- * Main routine to execute a received update.
- */
-int livesource_update_execute(struct caster_state *caster, struct livesources *this, json_object *j) {
-	const char *type = json_object_get_string(json_object_object_get(j, "type"));
-	const char *hostname = json_object_get_string(json_object_object_get(j, "hostname"));
-
-	if (type == NULL || hostname == NULL) {
-		return 503;
-	}
-
-	if (!strcmp(type, "fulltable")) {
-		int r = livesource_update_execute_fulltable(caster, this, j, hostname);
-		return r;
-	}
-
+static int livesource_update_execute_diff(struct caster_state *caster, struct livesources *this, json_object *j, const char *hostname) {
 	struct json_object *jserial = json_object_object_get(j, "serial");
 	struct json_object *jstart_date = json_object_object_get(j, "start_date");
+	const char *type = json_object_get_string(json_object_object_get(j, "type"));
 
-	if (jserial == NULL || jstart_date == NULL) {
+	if (type == NULL || jserial == NULL || jstart_date == NULL)
 		return 503;
-	}
 
 	unsigned long long serial = json_object_get_int64(jserial);
-
 	struct livesources_remote *lrlist = (struct livesources_remote *)hash_table_get(this->remote, hostname);
 
 	if (lrlist == NULL) {
@@ -862,4 +798,102 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 
 	lrlist->serial++;
 	return 200;
+}
+
+/*
+ * Convert a full table update.
+ */
+static struct livesources_remote *livesource_process_fulltable(struct caster_state *caster,
+	struct livesources *this, json_object *j, const char *hostname) {
+	struct json_object *lslist = json_object_object_get(j, "livesources");
+	struct json_object *jserial = json_object_object_get(j, "serial");
+	struct json_object *jendpoints = json_object_object_get(j, "endpoints");
+	const char *start_date = json_object_get_string(json_object_object_get(j, "start_date"));
+
+	if (lslist == NULL || jserial == NULL || start_date == NULL || hostname == NULL || jendpoints == NULL)
+		return NULL;
+
+	int endpoint_count;
+
+	struct endpoint *pe = endpoints_from_json(jendpoints, &endpoint_count);
+	if (pe == NULL)
+		return NULL;
+
+	unsigned long serial = json_object_get_int64(jserial);
+	struct livesources_remote *remote = livesources_remote_new(hostname, start_date, serial);
+	remote->endpoints = pe;
+	remote->endpoint_count = endpoint_count;
+
+	struct json_object_iterator it;
+	struct json_object_iterator itEnd;
+
+	it = json_object_iter_begin(lslist);
+	itEnd = json_object_iter_end(lslist);
+
+	while (!json_object_iter_equal(&it, &itEnd)) {
+		const char *mountpoint = json_object_iter_peek_name(&it);
+		struct json_object *ls = json_object_iter_peek_value(&it);
+		const char *lstype = json_object_get_string(json_object_object_get(ls, "type"));
+		const char *lsstate = json_object_get_string(json_object_object_get(ls, "state"));
+
+		struct livesource_remote *lr = livesource_remote_new(mountpoint);
+		lr->state = convert_state(lsstate);
+		lr->type = convert_type(lstype);
+
+		hash_table_add(remote->hash, mountpoint, lr);
+
+		json_object_iter_next(&it);
+	}
+	return remote;
+}
+
+/*
+ * Replace a livesources_remote table, or remove if new_remote == NULL.
+ */
+void livesources_remote_replace(struct caster_state *caster, const char *hostname, struct livesources_remote *new_remote) {
+	P_RWLOCK_WRLOCK(&caster->livesources->lock);
+	struct livesources_remote *e = (struct livesources_remote *)hash_table_get_del(caster->livesources->remote, hostname);
+	if (new_remote != NULL)
+		hash_table_add(caster->livesources->remote, hostname, new_remote);
+	P_RWLOCK_UNLOCK(&caster->livesources->lock);
+	if (e != NULL)
+		/* Do this here to reduce locking time */
+		livesources_remote_free(e);
+}
+
+/*
+ * Execute a full table update.
+ */
+static int livesource_update_execute_fulltable(struct caster_state *caster, struct livesources *this, json_object *j, const char *hostname) {
+	struct livesources_remote *remote;
+	remote = livesource_process_fulltable(caster, this, j, hostname);
+	if (remote == NULL)
+		return 503;
+
+	livesources_remote_replace(caster, hostname, remote);
+
+	logfmt(&caster->flog, LOG_EDEBUG, "reload table %s serial %ld done", hostname, remote->serial);
+	return 200;
+}
+
+/*
+ * Main routine to execute a received update.
+ */
+int livesource_update_execute(struct caster_state *caster, struct livesources *this, json_object *j) {
+	const char *type = json_object_get_string(json_object_object_get(j, "type"));
+	const char *hostname = json_object_get_string(json_object_object_get(j, "hostname"));
+
+	if (type == NULL || hostname == NULL) {
+		return 503;
+	}
+
+	if (!strcmp(type, "fulltable")) {
+		int r = livesource_update_execute_fulltable(caster, this, j, hostname);
+		return r;
+	}
+
+	P_RWLOCK_WRLOCK(&this->lock);
+	int r = livesource_update_execute_diff(caster, this, j, hostname);
+	P_RWLOCK_UNLOCK(&this->lock);
+	return r;
 }
