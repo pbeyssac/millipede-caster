@@ -457,6 +457,15 @@ void timeval_from_iso_date(struct timeval *t, const char *iso_date) {
 	t->tv_usec = tv_usec;
 }
 
+/*
+ * Convert timeval to ISO date and insert in a JSON object.
+ */
+void timeval_to_json(struct timeval *t, json_object *json, const char *json_key) {
+	char iso_date[30];
+	iso_date_from_timeval(iso_date, sizeof iso_date, t);
+	json_object_object_add_ex(json, json_key, json_object_new_string(iso_date), JSON_C_CONSTANT_NEW);
+}
+
 #if DEBUG
 int str_alloc = 0;
 

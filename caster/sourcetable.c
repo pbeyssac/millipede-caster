@@ -219,11 +219,8 @@ json_object *sourcetable_json(struct sourcetable *this) {
 	json_object_object_add_ex(jmain, "pullable", json_object_new_boolean(this->pullable), JSON_C_CONSTANT_NEW);
 	json_object_object_add_ex(jmain, "priority", json_object_new_int(this->priority), JSON_C_CONSTANT_NEW);
 
-	if (strcmp(this->caster, "LOCAL")) {
-		char iso_date[40];
-		iso_date_from_timeval(iso_date, sizeof iso_date, &this->fetch_time);
-		json_object_object_add_ex(jmain, "fetch_time", json_object_new_string(iso_date), JSON_C_CONSTANT_NEW);
-	}
+	if (strcmp(this->caster, "LOCAL"))
+		timeval_to_json(&this->fetch_time, jmain, "fetch_time");
 
 	json_object *jmnt = json_object_new_object();
 

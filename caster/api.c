@@ -71,9 +71,7 @@ static json_object *api_ntrip_json(struct ntrip_state *st) {
 		json_object_object_add_ex(new_obj, "tcp_info", tcpi_obj, JSON_C_CONSTANT_NEW);
 	}
 
-	char iso_date[30];
-	iso_date_from_timeval(iso_date, sizeof iso_date, &st->start);
-	json_object_object_add_ex(new_obj, "start", json_object_new_string(iso_date), JSON_C_CONSTANT_NEW);
+	timeval_to_json(&st->start, new_obj, "start");
 
 	bufferevent_unlock(st->bev);
 	return new_obj;
