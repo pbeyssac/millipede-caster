@@ -102,8 +102,6 @@ struct ntrip_state *ntrip_task_clear_get_st(struct ntrip_task *this, int getref)
 	P_RWLOCK_WRLOCK(&this->st_lock);
 	rst = getref ? this->st : NULL;
 	if (this->st != NULL) {
-		if (this->st->task)
-			ntrip_task_decref(this->st->task);
 		this->st->task = NULL;
 		if (!rst)
 			ntrip_decref(this->st, "ntrip_task_clear_st");
