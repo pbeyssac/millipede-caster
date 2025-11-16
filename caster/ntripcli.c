@@ -288,8 +288,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			st->received_bytes += len + 1;
 
 			if (st->task && st->task->line_cb(st, st->task->line_cb_arg, line, st->task->cb_arg2)) {
-				if (st->task != NULL)
-					ntrip_task_decref(st->task);
 				st->task = NULL;
 				end = 1;
 			}
@@ -493,7 +491,6 @@ ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int t
 		livesource_incref(livesource);
 	st->persistent = persistent;
 	if (task) {
-		ntrip_task_incref(task);
 		st->task = task;
 		task->start = st->start;
 	}
