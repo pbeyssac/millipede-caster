@@ -14,6 +14,7 @@
 #include "endpoints.h"
 #include "jobs.h"
 #include "livesource.h"
+#include "nodes.h"
 #include "ntrip_common.h"
 #include "ntripsrv.h"
 #include "packet.h"
@@ -859,6 +860,10 @@ void livesources_remote_replace(struct caster_state *caster, const char *hostnam
 	if (e != NULL)
 		/* Do this here to reduce locking time */
 		livesources_remote_free(e);
+	if (new_remote != NULL)
+		node_set_state(caster->nodes, hostname, NODE_UP);
+	else
+		node_set_state(caster->nodes, hostname, NODE_DOWN);
 }
 
 /*
@@ -871,6 +876,11 @@ static int livesource_update_execute_fulltable(struct caster_state *caster, stru
 		return 503;
 
 	livesources_remote_replace(caster, hostname, remote);
+
+	struct json_object *jendpoints = json_object_object_get(j, "endpoints");
+	if (req->st->node != NULL)
+		json_object_put(req->st->node);
+	req->st->node = json_object_get(jendpoints);
 
 	if (req->st->syncer_id != NULL)
 		strfree(req->st->syncer_id);
@@ -891,6 +901,9 @@ int livesource_update_execute(struct caster_state *caster, struct livesources *t
 	if (type == NULL || hostname == NULL) {
 		return 503;
 	}
+
+	struct json_object *jendpoints = json_object_get(json_object_object_get(j, "endpoints"));
+	nodes_add_node(caster->nodes, hostname, jendpoints);
 
 	if (!strcmp(type, "fulltable")) {
 		int r = livesource_update_execute_fulltable(caster, this, req, j, hostname);

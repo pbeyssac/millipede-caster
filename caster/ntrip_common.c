@@ -116,6 +116,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->client = 0;
 	this->rtcm_filter = 0;
 	this->rtcm_client_state = NTRIP_RTCM_POS_WAIT;
+	this->node = NULL;
 	this->syncer_id = NULL;
 
 	this->tmpconfig = NULL;
@@ -390,6 +391,9 @@ static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	}
 
 	strfree(this->syncer_id);
+	if (this->node)
+		json_object_put(this->node);
+
 	/*
 	 * This will prevent any further locking on the ntrip_state, so we do
 	 * it only once it is removed from ntrips.queue.

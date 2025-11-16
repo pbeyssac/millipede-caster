@@ -16,6 +16,7 @@
 #include "jobs.h"
 #include "livesource.h"
 #include "log.h"
+#include "nodes.h"
 #include "queue.h"
 #include "rtcm.h"
 #include "sourcetable.h"
@@ -112,6 +113,11 @@ struct caster_state {
 	 * Live sources, local and remote
 	 */
 	struct livesources *livesources;
+
+	/*
+	 * Node table
+	 */
+	struct nodes *nodes;
 
 	sourcetable_stack_t sourcetablestack;
 

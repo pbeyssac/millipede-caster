@@ -5,6 +5,7 @@
 
 #include "conf.h"
 #include "livesource.h"
+#include "nodes.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
 #include "sourcetable.h"
@@ -131,6 +132,17 @@ struct mime_content *api_rtcm_json(struct caster_state *caster, struct request *
  */
 struct mime_content *api_mem_json(struct caster_state *caster, struct request *req) {
 	struct mime_content *m = malloc_stats_dump(1);
+	return m;
+}
+
+/*
+ * Return the node table.
+ */
+struct mime_content *api_nodes_json(struct caster_state *caster, struct request *req) {
+	struct json_object *jlist = nodes_json(caster->nodes);
+	char *s = mystrdup(json_object_to_json_string(jlist));
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	json_object_put(jlist);
 	return m;
 }
 

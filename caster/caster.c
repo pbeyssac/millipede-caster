@@ -273,6 +273,7 @@ caster_new(const char *config_file) {
 
 	gethostname(this->hostname, sizeof(this->hostname));
 	this->livesources = livesource_table_new(this->hostname, &this->start_date);
+	this->nodes = nodes_new();
 
 	P_RWLOCK_INIT(&this->ntrips.lock, NULL);
 	P_RWLOCK_INIT(&this->ntrips.free_lock, NULL);
@@ -321,12 +322,14 @@ caster_new(const char *config_file) {
 	if (err || r1 < 0 || r2 < 0 || !this->config_dir
 	    || (threads && this->joblist == NULL)
 	    || this->ntrips.ipcount == NULL
-	    || this->livesources == NULL) {
+	    || this->livesources == NULL
+		|| this->nodes == NULL) {
 		if (this->joblist) joblist_free(this->joblist);
 		if (r1 < 0) log_free(&this->flog);
 		if (r2 < 0) log_free(&this->alog);
 		if (this->ntrips.ipcount) hash_table_free(this->ntrips.ipcount);
 		if (this->livesources) livesource_table_free(this->livesources);
+		if (this->nodes) nodes_free(this->nodes);
 		strfree(this->config_dir);
 		free(this);
 		return NULL;
@@ -466,6 +469,7 @@ void caster_free(struct caster_state *this) {
 
 	if (this->joblist) joblist_free(this->joblist);
 	livesource_table_free(this->livesources);
+	nodes_free(this->nodes);
 
 	hash_table_free(this->ntrips.ipcount);
 	hash_table_free(this->rtcm_cache);
