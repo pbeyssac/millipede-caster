@@ -177,7 +177,9 @@ int hash_table_del(struct hash_table *this, const char *key) {
 void *hash_table_get_del(struct hash_table *this, const char *key) {
 	unsigned int h;
 	struct element *e = hash_table_find(this, key, &h, 1);
-	return e != NULL ? e->value : NULL;
+	void *value = e != NULL ? e->value : NULL;
+	free(e);
+	return value;
 }
 
 /*
