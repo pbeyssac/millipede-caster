@@ -46,9 +46,10 @@ struct hash_table *hash_table_new(int n_buckets, void free_callback(void *)) {
 /*
  * Free an element.
  */
-static void _hash_table_free_element(struct hash_table *this, struct element *e) {
+static void _hash_table_free_element(struct hash_table *this, struct element *e, int callback) {
 	strfree((char *)(e->key));
-	this->free_callback(e->value);
+	if (callback)
+		this->free_callback(e->value);
 	free(e);
 }
 
@@ -66,7 +67,7 @@ void hash_table_free(struct hash_table *this) {
 		struct elementlisthead *t = &this->element_lists[h];
 		while ((e = SLIST_FIRST(t))) {
 			SLIST_REMOVE_HEAD(t, next);
-			_hash_table_free_element(this, e);
+			_hash_table_free_element(this, e, 1);
 			n++;
 		}
 	}
@@ -166,7 +167,7 @@ int hash_table_del(struct hash_table *this, const char *key) {
 	struct element *e = hash_table_find(this, key, &h, 1);
 	if (e == NULL)
 		return -1;
-	_hash_table_free_element(this, e);
+	_hash_table_free_element(this, e, 1);
 	return 0;
 }
 
@@ -178,7 +179,8 @@ void *hash_table_get_del(struct hash_table *this, const char *key) {
 	unsigned int h;
 	struct element *e = hash_table_find(this, key, &h, 1);
 	void *value = e != NULL ? e->value : NULL;
-	free(e);
+	if (e != NULL)
+		_hash_table_free_element(this, e, 0);
 	return value;
 }
 
