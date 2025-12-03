@@ -23,6 +23,7 @@ source_server.start()
 time.sleep(6)
 
 err = 0
+print("Test 1: ", end='')
 
 for j in range(2):
   print("Starting client")
@@ -42,5 +43,23 @@ if err:
 else:
   print()
 
+source_server.err = 0
+err2 = 0
+print("Test 2: ", end='')
 
-sys.exit(err)
+print("Starting client+source")
+source_stream = testlib.SourceStream((HOST, PORT), "C63", "test1:testpw!", 2000)
+client_stream = testlib.ClientStream((HOST, PORT), "C63", 1, '')
+client_stream.start()
+source_stream.start()
+client_stream.stop()
+source_stream.stop()
+
+err2 += client_stream.err
+err2 += testlib.TestServerAlive(HOST, PORT)
+if err2:
+  print("FAILED")
+else:
+  print()
+
+sys.exit(err + err2)

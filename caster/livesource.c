@@ -30,7 +30,8 @@ static void livesource_end(struct livesource *this);
 static void _livesource_del_subscriber_unlocked(struct ntrip_state *st);
 static json_object *livesource_update_json(struct livesource *this,
 	struct caster_state *caster, enum livesource_update_type utype);
-static struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand, enum livesource_state *new_state, json_object **jp);
+static struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos,
+	int find_on_demand, int create_on_demand, int sourceline_on_demand, enum livesource_state *new_state, json_object **jp);
 
 /*
  * Create a remote livesource record
@@ -407,7 +408,7 @@ int livesource_connected(struct ntrip_state *st, char *mountpoint) {
 	 * since we are not a source subscriber.
 	 */
 	P_RWLOCK_WRLOCK(&st->caster->livesources->lock);
-	existing_livesource = livesource_find_unlocked(st->caster, st, mountpoint, NULL, 0, 0, NULL, NULL);
+	existing_livesource = livesource_find_unlocked(st->caster, st, mountpoint, NULL, 1, 0, 0, NULL, NULL);
 	if (existing_livesource) {
 		/* Here, we should perphaps destroy & replace any existing source fetcher. */
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
@@ -421,9 +422,10 @@ int livesource_connected(struct ntrip_state *st, char *mountpoint) {
 	}
 	int e = hash_table_add(st->caster->livesources->hash, mountpoint, np);
 	if (e != 0) {
+		assert(e != -1);
 		P_RWLOCK_UNLOCK(&st->caster->livesources->lock);
 		livesource_decref(np);
-		ntrip_log(st, LOG_ERR, "Can't register livesource %s: already found", st->mountpoint);
+		ntrip_log(st, LOG_ERR, "Can't register livesource %s: out of memory", st->mountpoint);
 		return -1;
 	}
 	// count 1 reference for the hash table above, in addition
@@ -467,7 +469,8 @@ static int livesource_find_remote_endpoint(struct caster_state *this, struct ntr
  * Required lock (read): livesource list.
  */
 static struct livesource *livesource_find_unlocked(struct caster_state *this, struct ntrip_state *st,
-		char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand, enum livesource_state *new_state, json_object **jp) {
+		char *mountpoint, pos_t *mountpoint_pos, int find_on_demand, int create_on_demand, int sourceline_on_demand,
+		enum livesource_state *new_state, json_object **jp) {
 	struct livesource *np;
 	struct livesource *result = NULL;
 
@@ -477,10 +480,10 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 	np = (struct livesource *)hash_table_get(this->livesources->hash, mountpoint);
 
 	if (np && (np->state == LIVESOURCE_RUNNING
-			    || (on_demand && np->state == LIVESOURCE_FETCH_PENDING)))
+			    || (find_on_demand && np->state == LIVESOURCE_FETCH_PENDING)))
 		result = np;
 
-	if (result == NULL && on_demand && st) {
+	if (result == NULL && find_on_demand && create_on_demand && st) {
 		int re = 0;
 		struct endpoint e;
 		endpoint_init(&e, NULL, 0, 0);
@@ -492,7 +495,13 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 		if (np == NULL) {
 			return NULL;
 		}
-		hash_table_add(this->livesources->hash, mountpoint, np);
+		int r = hash_table_add(this->livesources->hash, mountpoint, np);
+		if (r == -2) {
+			/* Out of memory */
+			livesource_free(np);
+			return NULL;
+		}
+		assert(r != -1);
 		if (*jp)
 			*jp = livesource_update_json(np, this, LIVESOURCE_UPDATE_ADD);
 		this->livesources->serial++;
@@ -518,9 +527,16 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
  */
 struct livesource *livesource_find_on_demand(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand, enum livesource_state *new_state) {
 	json_object *j;
-	P_RWLOCK_RDLOCK(&this->livesources->lock);
-	struct livesource *result = livesource_find_unlocked(this, st, mountpoint, mountpoint_pos, on_demand, sourceline_on_demand, new_state, &j);
+
+	if (on_demand) {
+		/* Get a write lock as we may have to create a new entry */
+		P_RWLOCK_WRLOCK(&this->livesources->lock);
+	} else {
+		P_RWLOCK_RDLOCK(&this->livesources->lock);
+	}
+	struct livesource *result = livesource_find_unlocked(this, st, mountpoint, mountpoint_pos, on_demand, on_demand, sourceline_on_demand, new_state, &j);
 	P_RWLOCK_UNLOCK(&this->livesources->lock);
+
 	syncer_queue_json(this, j);
 	return result;
 }
