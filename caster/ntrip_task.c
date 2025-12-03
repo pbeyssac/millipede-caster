@@ -199,7 +199,7 @@ void ntrip_task_reschedule(struct ntrip_task *this, void *arg_cb) {
 		struct timeval timeout_interval = { this->current_retry_delay, 0 };
 		if (this->ev != NULL)
 			event_free(this->ev);
-		this->ev = event_new(this->caster->base, -1, 0, _ntrip_task_restart_cb, this);
+		this->ev = event_new(caster_get_eventbase(this->caster), -1, 0, _ntrip_task_restart_cb, this);
 		if (this->ev) {
 			event_add(this->ev, &timeout_interval);
 			this->current_retry_delay = (this->current_retry_delay?this->current_retry_delay:1)*2;

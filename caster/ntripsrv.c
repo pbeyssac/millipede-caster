@@ -942,7 +942,7 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 {
 	struct listener *listener_conf = arg;
 	struct caster_state *caster = listener_conf->caster;
-	struct event_base *base = caster->base;
+	struct event_base *base = caster_get_eventbase(caster);
 	struct bufferevent *bev;
 	SSL *ssl = NULL;
 
@@ -955,9 +955,9 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		}
 
 		if (threads)
-			bev = bufferevent_openssl_socket_new(caster->base, fd, ssl, BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+			bev = bufferevent_openssl_socket_new(caster_get_eventbase(caster), fd, ssl, BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
 		else
-			bev = bufferevent_openssl_socket_new(caster->base, fd, ssl, BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE);
+			bev = bufferevent_openssl_socket_new(caster_get_eventbase(caster), fd, ssl, BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE);
 	} else {
 		if (threads)
 			bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);

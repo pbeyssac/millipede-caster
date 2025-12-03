@@ -141,6 +141,10 @@ int caster_main(char *config_file);
 void free_callback(const void *data, size_t datalen, void *extra);
 int caster_reload(struct caster_state *this);
 
+static inline struct event_base *caster_get_eventbase(struct caster_state *this) {
+	return this->base;
+}
+
 static inline struct config *caster_config_getref(struct caster_state *caster) {
 	P_RWLOCK_RDLOCK(&caster->configlock);
 	struct config *config = atomic_load(&caster->config);

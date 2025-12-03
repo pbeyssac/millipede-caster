@@ -588,7 +588,7 @@ static struct listener *listener_new(struct caster_state *this, struct config_bi
 		}
 	}
 
-	listener->listener = evconnlistener_new_bind(this->base, ntripsrv_listener_cb, listener,
+	listener->listener = evconnlistener_new_bind(caster_get_eventbase(this), ntripsrv_listener_cb, listener,
 		LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, config->queue_size,
 		(struct sockaddr *)sin, sin->generic.sa_family == AF_INET ? sizeof(sin->v4) : sizeof(sin->v6));
 	if (!listener->listener) {
@@ -957,13 +957,13 @@ static int caster_set_signals(struct caster_state *this) {
 	this->sigint_info.signame = "SIGINT";
 	this->sigterm_info.signame = "SIGTERM";
 	this->sigterm_info.caster = this;
-	this->signalint_event = evsignal_new(this->base, SIGINT, signal_cb, (void *)&this->sigint_info);
+	this->signalint_event = evsignal_new(caster_get_eventbase(this), SIGINT, signal_cb, (void *)&this->sigint_info);
 	if (!this->signalint_event || event_add(this->signalint_event, NULL) < 0) {
 		fprintf(stderr, "Could not create/add SIGINT signal event!\n");
 		return -1;
 	}
 
-	this->signalterm_event = evsignal_new(this->base, SIGTERM, signal_cb, (void *)&this->sigterm_info);
+	this->signalterm_event = evsignal_new(caster_get_eventbase(this), SIGTERM, signal_cb, (void *)&this->sigterm_info);
 	if (!this->signalterm_event || event_add(this->signalterm_event, NULL) < 0) {
 		fprintf(stderr, "Could not create/add SIGTERM signal event!\n");
 		return -1;
@@ -971,7 +971,7 @@ static int caster_set_signals(struct caster_state *this) {
 
 	signal(SIGPIPE, SIG_IGN);
 
-	this->signalhup_event = evsignal_new(this->base, SIGHUP, signalhup_cb, (void *)this);
+	this->signalhup_event = evsignal_new(caster_get_eventbase(this), SIGHUP, signalhup_cb, (void *)this);
 	if (!this->signalhup_event || event_add(this->signalhup_event, 0) < 0) {
 		fprintf(stderr, "Could not create/add SIGHUP signal event!\n");
 		return -1;
