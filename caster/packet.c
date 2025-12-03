@@ -1,5 +1,3 @@
-#include <stdatomic.h>
-
 #include <event2/buffer.h>
 #include "conf.h"
 #include "caster.h"
@@ -25,15 +23,6 @@ struct packet *packet_new_from_string(const char *s) {
 	/* Don't store the final '\0' since we know the length */
 	memcpy(p->data, s, len);
 	return p;
-}
-
-void packet_incref(struct packet *packet) {
-	atomic_fetch_add(&packet->refcnt, 1);
-}
-
-void packet_decref(struct packet *packet) {
-	if (atomic_fetch_add_explicit(&packet->refcnt, -1, memory_order_relaxed) == 1)
-		free((void *)packet);
 }
 
 /*
