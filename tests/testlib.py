@@ -96,6 +96,76 @@ class ClientStream(object):
   def stop(self):
     self._stop = True
 
+
+sourcetable = b"""CAS;castera.ntrip.eu.org;2101;NTRIP-Caster-2.0.45;INRAE;0;FRA;48.82;2.34;0.0.0.0;0;http://caster.centipede.fr/home\r
+NET;CENTIPEDE-RTK;INRAE;B;N;https://centipede.fr;https://docs.centipede.fr;contact@centipede.fr;none\r
+STR;TEST1;TEST1;RTCM3;1004,1005(10),1006,1008(10),1012,1019,1020,1033(10),1042,1045,1046,1077,1087,1097,1107,1127,1230;;GPS+GLO+GAL+BDS+QZS;NONE;NONE;48.824;2.344;0;0;RTKBase_U-blox_ZED-F9P,2.5.0;NONE;N;N;;\r
+STR;C63;C63;RTCM3;1004,1005,1006,1008,1012,1019,1020,1033,1042,1045,1046,1077,1087,1097,1107,1127,1230;;GPS+GLO+GAL+BDS+QZS;NONE;NONE;45.77;3.1;0;0;Test 63,0;NONE;N;N;;\r
+"""
+
+class SourceServer(object):
+  def __init__(self, host, mountpoint):
+    self.err = 0
+    self.host = host
+    self.mountpoint = mountpoint.encode('ascii')
+
+  def start(self):
+    self._thr = threading.Thread(target=self._run, daemon=True, args=())
+    self._thr.start()
+  def _run(self):
+    nr = 0
+
+    sl = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    sl.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sl.bind(self.host)
+    sl.listen(200)
+
+    str_request = b'^GET (/.*) HTTP/1\.[01]'
+    self.re_request = re.compile(str_request)
+
+    for i in range(1000):
+      (s, remote_addr) = sl.accept()
+      print("Fake server accepted connection")
+      thr = threading.Thread(target=self._handle_req, daemon=True, args=(s,))
+      thr.start()
+
+  def _handle_req(self, s):
+      s.settimeout(20)
+      data = b''
+      d = s.recv(10240)
+      try:
+        while d != b'':
+          data += d
+          if b'\r\n\r\n' in data:
+            req, rest = data.split(b'\r\n\r\n', 1)
+            m = self.re_request.match(req)
+            if m is None:
+              print("expected", str_request, "received", req)
+              self.err += 1
+              print("FAIL")
+              return -1
+            uri = m.groups(0)[0]
+            print("URI", uri)
+            try:
+              if uri == b'/':
+                s.send(b'HTTP/1.0 200 OK\r\nConnection: close\r\n\r\n%sENDSOURCETABLE\r\n' % sourcetable)
+              elif uri == b'/' + self.mountpoint:
+                s.send(b'HTTP/1.0 200 OK\r\n\r\n')
+                for j in range(500):
+                  s.send(b'%d\r\n' % j)
+                  time.sleep(1)
+            except BrokenPipeError:
+              s.close()
+              return 0
+            s.close()
+            return 0
+          else:
+            d = s.recv(10240)
+      except socket.timeout:
+        d = b''
+        self.err += 1
+        print("FAIL")
+
 #
 # Send an API reload command and check reply
 #

@@ -21,7 +21,7 @@ graylog:
     authorization:      	'29daf8491eaec44418e4f898cefa17d581964943f423b023c0d47a2e475beb65'
 
 proxy:
-  - table_refresh_delay:	10
+  - table_refresh_delay:	5
     host:			::1
     port:			2163
 
