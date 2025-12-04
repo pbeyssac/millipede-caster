@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 
 #include <json-c/json_object.h>
@@ -58,14 +59,20 @@ void nodes_add_node(struct nodes *this, const char *hostname, json_object *j) {
 		gettimeofday(&n->last_update, NULL);
 	} else {
 		n = (struct node *)malloc(sizeof(struct node));
-		if (n == NULL)
-			json_object_put(j);
-		else {
+		if (n != NULL) {
 			gettimeofday(&n->last_update, NULL);
 			n->j = j;
 			n->state = NODE_UP;
-			hash_table_add(this->nodes, hostname, n);
+			int e = hash_table_add(this->nodes, hostname, n);
+			assert(e != -1);
+			if (e == -2) {
+				/* Out of memory */
+				free(n);
+				n = NULL;
+			}
 		}
+		if (n == NULL)
+			json_object_put(j);
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
 }

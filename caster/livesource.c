@@ -747,6 +747,7 @@ static int livesource_update_execute_diff(struct caster_state *caster, struct li
 	struct json_object *jserial = json_object_object_get(j, "serial");
 	struct json_object *jstart_date = json_object_object_get(j, "start_date");
 	const char *type = json_object_get_string(json_object_object_get(j, "type"));
+	int r;
 
 	if (type == NULL || jserial == NULL || jstart_date == NULL)
 		return 503;
@@ -792,7 +793,14 @@ static int livesource_update_execute_diff(struct caster_state *caster, struct li
 		const char *lsstate = json_object_get_string(json_object_object_get(ls, "state"));
 		lr->state = convert_state(lsstate);
 		lr->type = convert_type(lstype);
-		hash_table_add(lrlist->hash, mountpoint, lr);
+		r = hash_table_add(lrlist->hash, mountpoint, lr);
+		assert(r != -1);
+		if (r == -2) {
+			/* Out of memory */
+			livesource_remote_free(lr);
+			logfmt(&caster->flog, LOG_CRIT, "update failed on mountpoint %s: out of memory", mountpoint);
+			return 503;
+		}
 	} else if (!strcmp(type, "del")) {
 		if (!lr) {
 			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s does not exist", mountpoint);
@@ -857,8 +865,12 @@ static struct livesources_remote *livesource_process_fulltable(struct caster_sta
 		lr->state = convert_state(lsstate);
 		lr->type = convert_type(lstype);
 
-		hash_table_add(remote->hash, mountpoint, lr);
-
+		int r = hash_table_add(remote->hash, mountpoint, lr);
+		assert(r != -1);
+		if (r == -2) {
+			logfmt(&caster->flog, LOG_WARNING, "duplicate mountpoint %s in livesource table, ignoring", mountpoint);
+			livesource_remote_free(lr);
+		}
 		json_object_iter_next(&it);
 	}
 	return remote;
@@ -868,18 +880,25 @@ static struct livesources_remote *livesource_process_fulltable(struct caster_sta
  * Replace a livesources_remote table, or remove if new_remote == NULL.
  */
 void livesources_remote_replace(struct caster_state *caster, const char *hostname, struct livesources_remote *new_remote) {
+	int r = 0;
 	P_RWLOCK_WRLOCK(&caster->livesources->lock);
 	struct livesources_remote *e = (struct livesources_remote *)hash_table_get_del(caster->livesources->remote, hostname);
 	if (new_remote != NULL)
-		hash_table_add(caster->livesources->remote, hostname, new_remote);
+		r = hash_table_add(caster->livesources->remote, hostname, new_remote);
 	P_RWLOCK_UNLOCK(&caster->livesources->lock);
 	if (e != NULL)
 		/* Do this here to reduce locking time */
 		livesources_remote_free(e);
+	assert(r != -1);
 	if (new_remote != NULL)
 		node_set_state(caster->nodes, hostname, NODE_UP);
 	else
 		node_set_state(caster->nodes, hostname, NODE_DOWN);
+	if (r == -2 && new_remote != NULL) {
+		/* Out of memory */
+		logfmt(&caster->flog, LOG_CRIT, "update failed on hostname %s: out of memory", hostname);
+		livesources_remote_free(new_remote);
+	}
 }
 
 /*

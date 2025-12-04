@@ -862,7 +862,12 @@ void ntrip_set_rtcm_cache(struct ntrip_state *st) {
 	rp = hash_table_get(st->caster->rtcm_cache, st->mountpoint);
 	if (rp == NULL) {
 		rp = rtcm_info_new();
-		hash_table_add(st->caster->rtcm_cache, st->mountpoint, rp);
+		int e = hash_table_add(st->caster->rtcm_cache, st->mountpoint, rp);
+		assert(e != -1);
+		if (e == -2) {
+			/* Out of memory */
+			rtcm_info_free(rp);
+		}
 	}
 	st->rtcm_info = rp;
 	P_RWLOCK_UNLOCK(&st->caster->rtcm_lock);

@@ -675,8 +675,14 @@ struct hash_table *rtcm_filter_dict_parse(struct rtcm_filter *this, const char *
 		}
 		memcpy(dupkey, key, len);
 		dupkey[len] = '\0';
-		hash_table_add(h, dupkey, NULL);
+		int e = hash_table_add(h, dupkey, NULL);
 		strfree(dupkey);
+		if (e == -2) {
+			/* Out of memory */
+			err = 1;
+			break;
+		}
+		/* Duplicate key if e == -1: silently ignore */
 	} while (*p);
 
 	if (err) {

@@ -248,7 +248,7 @@ json_object *sourcetable_json(struct sourcetable *this) {
 static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
 	int r;
 	r = hash_table_add(this->key_val, s->key, s);
-	if (s->virtual)
+	if (r >= 0 && s->virtual)
 		this->nvirtual++;
 	return r;
 }
@@ -265,7 +265,9 @@ static int _sourcetable_add_unlocked(struct sourcetable *this, const char *sourc
 		}
 		r = _sourcetable_add_direct(this, n1);
 		if (r < 0) {
-			logfmt(&caster->flog, LOG_ERR, "Can't add sourcetable line (possibly duplicate key): %s", sourcetable_entry);
+			logfmt(&caster->flog, LOG_ERR, "Can't add sourcetable line (%s): %s",
+				(r == -1)?"duplicate key":"out of memory",
+				sourcetable_entry);
 			sourceline_free(n1);
 		}
 	} else {
