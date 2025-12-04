@@ -107,6 +107,6 @@ int filesrv(struct ntrip_state *st, const char *uri, int *err, struct evkeyvalq 
 
 	struct mime_content *m = mime_new(file_content, sb.st_size, NULL, 0);
 	ntripsrv_send_result_ok(st, output, m, NULL);
-	st->state = NTRIP_WAIT_CLOSE;
+	ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 	return 0;
 }

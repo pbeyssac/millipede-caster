@@ -47,7 +47,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->sent_bytes = 0;
 
 	this->caster = caster;
-	this->state = NTRIP_INIT;
+	ntrip_set_state(this, NTRIP_INIT);
 	this->chunk_state = CHUNK_NONE;
 	this->chunk_buf = NULL;
 	this->port = port;
@@ -448,7 +448,7 @@ void ntrip_incref(struct ntrip_state *this, char *orig) {
  */
 void ntrip_decref(struct ntrip_state *this, char *orig) {
 	if (atomic_fetch_sub(&this->refcnt, 1) == 1) {
-		assert(this->state == NTRIP_END);
+		assert(ntrip_get_state(this) == NTRIP_END);
 		ntrip_deferred_free(this, orig);
 	}
 }
@@ -459,11 +459,11 @@ void ntrip_decref(struct ntrip_state *this, char *orig) {
  * Required lock: ntrip_state
  */
 void ntrip_decref_end(struct ntrip_state *this, char *orig) {
-	if (this->state == NTRIP_END) {
+	if (ntrip_get_state(this) == NTRIP_END) {
 		ntrip_log(this, LOG_EDEBUG, "double call to ntrip_deferred_free from %s", orig);
 		return;
 	}
-	this->state = NTRIP_END;
+	ntrip_set_state(this, NTRIP_END);
 
 	/*
 	 * Unregister all we can right now.
@@ -779,7 +779,7 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 			if (sscanf(line, "%zx", &chunk_len) != 1) {
 				ntrip_log(st, LOG_NOTICE, "failed chunk_len: \"%s\"", line);
 				free(line);
-				st->state = NTRIP_FORCE_CLOSE;
+				ntrip_set_state(st, NTRIP_FORCE_CLOSE);
 				st->chunk_state = CHUNK_NONE;
 				ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode OK/ERROR done %d", len_done);
 				return len_done?BEV_OK:BEV_ERROR;

@@ -174,7 +174,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 			evbuffer_add_reference(output, "Out of memory :(\n", 17, NULL, NULL);
 			return -1;
 		}
-		st->state = NTRIP_WAIT_CLOSE;
+		ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 		return 0;
 	} else if (!strcmp(uri, "/net")) {
 		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, api_ntrip_list_json, req);

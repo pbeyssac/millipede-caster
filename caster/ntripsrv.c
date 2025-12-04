@@ -163,14 +163,14 @@ void ntripsrv_deferred_output(
 	bufferevent_lock(st->bev);
 
 	/* Check for NTRIP_END, as we should never get back from this state */
-	if (st->state != NTRIP_END) {
+	if (ntrip_get_state(st) != NTRIP_END) {
 		struct evbuffer *output = bufferevent_get_output(st->bev);
 		send_server_reply(st, output, req->status, NULL, NULL, m);
 
 		if (st->connection_keepalive && st->received_keepalive)
-			st->state = NTRIP_WAIT_HTTP_METHOD;
+			ntrip_set_state(st, NTRIP_WAIT_HTTP_METHOD);
 		else
-			st->state = NTRIP_WAIT_CLOSE;
+			ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 	} else
 		mime_free(m);
 	bufferevent_unlock(st->bev);
@@ -411,18 +411,18 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 	struct config *config = ntrip_refresh_config(st);
 
-	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
+	ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb state %d len %d", ntrip_get_state(st), evbuffer_get_length(st->filter.raw_input));
 
 	if (ntrip_filter_run_input(st) < 0)
 		return;
 
 	if (st->chunk_state == CHUNK_END && evbuffer_get_length(st->input) == 0) {
-		st->state = NTRIP_FORCE_CLOSE;
+		ntrip_set_state(st, NTRIP_FORCE_CLOSE);
 		err = 1;
 	}
 
-	while (!err && st->state != NTRIP_WAIT_CLOSE && (waiting_len = evbuffer_get_length(st->input)) > 0) {
-		if (st->state == NTRIP_WAIT_HTTP_METHOD) {
+	while (!err && ntrip_get_state(st) != NTRIP_WAIT_CLOSE && (waiting_len = evbuffer_get_length(st->input)) > 0) {
+		if (ntrip_get_state(st) == NTRIP_WAIT_HTTP_METHOD) {
 			char *token;
 
 			ntrip_clear_request(st);
@@ -465,9 +465,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					break;
 				}
 			}
-			st->state = NTRIP_WAIT_HTTP_HEADER;
+			ntrip_set_state(st, NTRIP_WAIT_HTTP_HEADER);
 			st->received_keepalive = 0;
-		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
+		} else if (ntrip_get_state(st) == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if ((line?len:waiting_len) > config->http_header_max_size) {
 				err = 431;
@@ -612,12 +612,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = ntripsrv_send_sourcetable(st, output);
 						if (st->connection_keepalive && st->received_keepalive) {
 							if (st->content_length)
-								st->state = NTRIP_WAIT_CLIENT_CONTENT;
+								ntrip_set_state(st, NTRIP_WAIT_CLIENT_CONTENT);
 							else
-								st->state = NTRIP_WAIT_HTTP_METHOD;
+								ntrip_set_state(st, NTRIP_WAIT_HTTP_METHOD);
 							continue;
 						} else {
-							st->state = NTRIP_WAIT_CLOSE;
+							ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 							break;
 						}
 					}
@@ -645,7 +645,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						if (!l) {
 							if (st->client_version == 1) {
 								err = ntripsrv_send_sourcetable(st, output);
-								st->state = NTRIP_WAIT_CLOSE;
+								ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 							} else
 								err = 404;
 							break;
@@ -659,7 +659,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						break;
 					}
 					ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
-					st->state = NTRIP_WAIT_CLIENT_INPUT;
+					ntrip_set_state(st, NTRIP_WAIT_CLIENT_INPUT);
 					st->rtcm_client_state = st->source_virtual ? NTRIP_RTCM_POS_WAIT : NTRIP_RTCM_POS_OK;
 
 					/* If we have a position (Ntrip-gga header), use it */
@@ -685,7 +685,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 								err = 400;
 								break;
 							}
-							st->state = NTRIP_WAIT_CLIENT_CONTENT;
+							ntrip_set_state(st, NTRIP_WAIT_CLIENT_CONTENT);
 							struct timeval adm_read_timeout = { 0, 0 };
 							bufferevent_set_timeouts(bev, &adm_read_timeout, NULL);
 							continue;
@@ -762,7 +762,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					else
 						ntripsrv_send_stream_result_ok(st, output, NULL, NULL);
 					struct timeval read_timeout = { config->source_read_timeout, 0 };
-					st->state = NTRIP_WAIT_STREAM_SOURCE;
+					ntrip_set_state(st, NTRIP_WAIT_STREAM_SOURCE);
 					joblist_append_ntrip_locked(st->caster->joblist, st, ntrip_set_rtcm_cache);
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				} else {
@@ -770,7 +770,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					break;
 				}
 			}
-		} else if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
+		} else if (ntrip_get_state(st) == NTRIP_WAIT_CLIENT_INPUT) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
@@ -783,7 +783,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos_limited);
 			} else
 				ntrip_log(st, LOG_DEBUG, "BAD GGA \"%s\", %zd bytes", line, len);
-		} else if (st->state == NTRIP_WAIT_CLIENT_CONTENT) {
+		} else if (ntrip_get_state(st) == NTRIP_WAIT_CLIENT_CONTENT) {
 			int len;
 			len = evbuffer_remove(st->input, st->content+st->content_done, st->content_length-st->content_done);
 			if (len <= 0)
@@ -796,23 +796,23 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					st->type = "adm";
 					admsrv(st, st->http_args[0], "/adm", st->http_args[1] + 4, &err, &opt_headers);
 				}
-				st->state = NTRIP_WAIT_HTTP_METHOD;
+				ntrip_set_state(st, NTRIP_WAIT_HTTP_METHOD);
 			}
-		} else if (st->state == NTRIP_WAIT_STREAM_SOURCE) {
+		} else if (ntrip_get_state(st) == NTRIP_WAIT_STREAM_SOURCE) {
 			if (st->chunk_state == CHUNK_END) {
-				st->state = NTRIP_FORCE_CLOSE;
+				ntrip_set_state(st, NTRIP_FORCE_CLOSE);
 				err = 1;
 				break;
 			}
 			// will increment st->received_bytes itself
 			rtcm_packet_handle(st);
 			break;
-		} else if (st->state == NTRIP_FORCE_CLOSE) {
+		} else if (ntrip_get_state(st) == NTRIP_FORCE_CLOSE) {
 			err = 1;
 			break;
 		} else {
 			/* Catchall for unknown states */
-			st->state = NTRIP_FORCE_CLOSE;
+			ntrip_set_state(st, NTRIP_FORCE_CLOSE);
 			err = 1;
 			break;
 		}
@@ -835,10 +835,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		else if (err >= 100)
 			send_server_reply(st, output, err, &opt_headers, NULL, NULL);
 		ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb err %d", err);
-		st->state = NTRIP_WAIT_CLOSE;
+		ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 	}
 	evhttp_clear_headers(&opt_headers);
-	if (st->state == NTRIP_FORCE_CLOSE)
+	if (ntrip_get_state(st) == NTRIP_FORCE_CLOSE)
 		ntrip_decref_end(st, "ntripsrv_readcb");
 }
 
@@ -851,7 +851,7 @@ void ntripsrv_writecb(struct bufferevent *bev, void *arg)
 {
 	struct ntrip_state *st = (struct ntrip_state *)arg;
 
-	if (st->state == NTRIP_WAIT_CLOSE) {
+	if (ntrip_get_state(st) == NTRIP_WAIT_CLOSE) {
 		size_t len;
 		struct evbuffer *output;
 		output = bufferevent_get_output(bev);
@@ -890,7 +890,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			 * Special case for NTRIP clients: in case of a read timeout, check whether we have been
 			 * recently sending data.
 			 */
-			if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
+			if (ntrip_get_state(st) == NTRIP_WAIT_CLIENT_INPUT) {
 				int idle_time = time(NULL) - st->last_send;
 				if (idle_time <= config->idle_max_delay) {
 					/* Re-enable read */
@@ -985,7 +985,7 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	ntrip_set_peeraddr(st, sa, socklen);
 	ntrip_set_localaddr(st);
 
-	st->state = NTRIP_WAIT_HTTP_METHOD;
+	ntrip_set_state(st, NTRIP_WAIT_HTTP_METHOD);
 
 	if (ntrip_register_check(st) < 0) {
 		ntrip_decref_end(st, "ntripsrv_listener_cb");

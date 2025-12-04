@@ -80,7 +80,7 @@ struct ntrip_state {
 	 */
 
 	struct caster_state *caster;
-	enum ntrip_session_state state;
+	_Atomic enum ntrip_session_state state;
 	long long id;		// Unique id for external reference; must not wrap
 	const char *type;
 	struct timeval start;	// time the connection was established
@@ -276,5 +276,15 @@ int ntrip_handle_raw_chunk(struct ntrip_state *st);
 int ntrip_chunk_decode_init(struct ntrip_state *st);
 void ntrip_set_rtcm_cache(struct ntrip_state *st);
 struct packet *ntrip_get_rtcm_pos(struct ntrip_state *st, const char *mountpoint);
+
+/* wrapper functions for session state access */
+
+static inline enum ntrip_session_state ntrip_get_state(struct ntrip_state *this) {
+	return atomic_load(&this->state);
+}
+
+static inline void ntrip_set_state(struct ntrip_state *this, enum ntrip_session_state state) {
+	atomic_store(&this->state, state);
+}
 
 #endif

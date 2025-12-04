@@ -141,16 +141,18 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 	size_t len;
 	size_t waiting_len;
 	struct config *config;
+	enum ntrip_session_state state;
 
-	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d", st->state, evbuffer_get_length(st->filter.raw_input));
+	ntrip_log(st, LOG_EDEBUG, "ntripcli_readcb state %d len %d", ntrip_get_state(st), evbuffer_get_length(st->filter.raw_input));
 
 	config = ntrip_refresh_config(st);
 
 	if (ntrip_filter_run_input(st) < 0)
 		return;
 
-	while (!end && st->state != NTRIP_WAIT_CLOSE && (waiting_len = evbuffer_get_length(st->input)) > 0) {
-		if (st->state == NTRIP_WAIT_HTTP_STATUS) {
+	while (!end && ntrip_get_state(st) != NTRIP_WAIT_CLOSE && (waiting_len = evbuffer_get_length(st->input)) > 0) {
+		state = ntrip_get_state(st);
+		if (state == NTRIP_WAIT_HTTP_STATUS) {
 			char *token, *status, **arg;
 
 			ntrip_clear_request(st);
@@ -196,7 +198,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 			if (!strcmp(st->http_args[0], "ICY") && !strcmp(st->mountpoint, "") && status_code == 200) {
 				// NTRIP1 connection, don't look for headers
-				st->state = NTRIP_REGISTER_SOURCE;
+				ntrip_set_state(st, NTRIP_REGISTER_SOURCE);
 				struct timeval read_timeout = { config->source_read_timeout, 0 };
 				bufferevent_set_timeouts(bev, &read_timeout, NULL);
 			}
@@ -205,13 +207,13 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				st->task->status_cb(st->task->status_cb_arg, status_code, st->task->cb_arg2);
 
 			if (st->status_code == 200)
-				st->state = NTRIP_WAIT_HTTP_HEADER;
+				ntrip_set_state(st, NTRIP_WAIT_HTTP_HEADER);
 			else {
 				ntrip_log(st, LOG_NOTICE, "failed request on %s, status_code %d", st->uri, st->status_code);
 				end = 1;
 			}
 
-		} else if (st->state == NTRIP_WAIT_HTTP_HEADER) {
+		} else if (state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if ((line?len:waiting_len) > config->http_header_max_size) {
 				free(line);
@@ -226,17 +228,17 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
 					end = 1;
 				} else if (strlen(st->mountpoint)) {
-					st->state = NTRIP_REGISTER_SOURCE;
+					ntrip_set_state(st, NTRIP_REGISTER_SOURCE);
 					struct timeval read_timeout = { config->source_read_timeout, 0 };
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 				} else if (st->task && st->task->line_cb)
-					st->state = NTRIP_WAIT_CALLBACK_LINE;
+					ntrip_set_state(st, NTRIP_WAIT_CALLBACK_LINE);
 				else if (st->content_length)
-					st->state = NTRIP_WAIT_SERVER_CONTENT;
+					ntrip_set_state(st, NTRIP_WAIT_SERVER_CONTENT);
 				else if (st->chunk_state != CHUNK_NONE && st->chunk_state != CHUNK_END)
-					st->state = NTRIP_WAIT_CHUNKED_CONTENT;
+					ntrip_set_state(st, NTRIP_WAIT_CHUNKED_CONTENT);
 				else if (st->connection_keepalive && st->received_keepalive) {
-					st->state = NTRIP_IDLE_CLIENT;
+					ntrip_set_state(st, NTRIP_IDLE_CLIENT);
 					if (st->task)
 						ntrip_task_send_next_request(st);
 				} else {
@@ -280,7 +282,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				}
 			}
 			free(line);
-		} else if (st->state == NTRIP_WAIT_CALLBACK_LINE) {
+		} else if (state == NTRIP_WAIT_CALLBACK_LINE) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
 			if (!line)
 				break;
@@ -292,7 +294,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				end = 1;
 			}
 			free(line);
-		} else if (st->state == NTRIP_WAIT_SERVER_CONTENT) {
+		} else if (state == NTRIP_WAIT_SERVER_CONTENT) {
 			len = waiting_len;
 			if (len > st->content_length - st->content_done)
 				len = st->content_length - st->content_done;
@@ -302,15 +304,15 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				st->content_done += len;
 			}
 			if (st->content_length == st->content_done && st->connection_keepalive && st->received_keepalive) {
-				st->state = NTRIP_IDLE_CLIENT;
+				ntrip_set_state(st, NTRIP_IDLE_CLIENT);
 				if (st->task)
 					ntrip_task_send_next_request(st);
 			} else
 				end = 1;
-		} else if (st->state == NTRIP_WAIT_CHUNKED_CONTENT) {
+		} else if (state == NTRIP_WAIT_CHUNKED_CONTENT) {
 			if (st->chunk_state == CHUNK_END) {
 				if (st->connection_keepalive && st->received_keepalive) {
-					st->state = NTRIP_IDLE_CLIENT;
+					ntrip_set_state(st, NTRIP_IDLE_CLIENT);
 					if (st->task)
 						ntrip_task_send_next_request(st);
 				} else
@@ -323,7 +325,7 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 					st->content_done += len;
 				}
 			}
-		} else if (st->state == NTRIP_IDLE_CLIENT) {
+		} else if (state == NTRIP_IDLE_CLIENT) {
 			len = waiting_len;
 			if (len) {
 				st->received_bytes += len;
@@ -336,14 +338,14 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				ntrip_log(st, LOG_INFO, "Data (truncated to 64 bytes): \"%s\"", data);
 				end = 1;
 			}
-		} else if (st->state == NTRIP_REGISTER_SOURCE) {
+		} else if (state == NTRIP_REGISTER_SOURCE) {
 			if (st->own_livesource) {
 				livesource_set_state(st->own_livesource, st->caster, LIVESOURCE_RUNNING);
 				ntrip_log(st, LOG_INFO, "starting redistribute for %s", st->mountpoint);
 			}
-			st->state = NTRIP_WAIT_STREAM_GET;
+			ntrip_set_state(st, NTRIP_WAIT_STREAM_GET);
 			joblist_append_ntrip_locked(st->caster->joblist, st, ntrip_set_rtcm_cache);
-		} else if (st->state == NTRIP_WAIT_STREAM_GET) {
+		} else if (state == NTRIP_WAIT_STREAM_GET) {
 			int r = rtcm_packet_handle(st);
 			if (st->persistent || r == 0)
 				break;
@@ -352,11 +354,11 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 				ntrip_log(st, LOG_NOTICE, "last_useful %s: %d seconds ago, dropping", st->mountpoint, idle_time);
 				end = 1;
 			}
-		} else if (st->state == NTRIP_FORCE_CLOSE)
+		} else if (state == NTRIP_FORCE_CLOSE)
 			end = 1;
 		else {
 			/* Catchall for unknown states */
-			st->state = NTRIP_FORCE_CLOSE;
+			ntrip_set_state(st, NTRIP_FORCE_CLOSE);
 			end = 1;
 		}
 	}
@@ -394,7 +396,7 @@ void ntripcli_send_request(struct ntrip_state *st, struct mime_content *m, int s
 		ntrip_decref_end(st, "ntripcli_send_request");
 		return;
 	}
-	st->state = NTRIP_WAIT_HTTP_STATUS;
+	ntrip_set_state(st, NTRIP_WAIT_HTTP_STATUS);
 }
 
 void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {

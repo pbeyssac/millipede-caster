@@ -228,7 +228,7 @@ void livesource_add_subscriber(struct ntrip_state *st, struct livesource *this, 
 		sub->backlogged = 0;
 
 		bufferevent_lock(st->bev);
-		int cancel = (st->state == NTRIP_END);
+		int cancel = (ntrip_get_state(st) == NTRIP_END);
 		if (!cancel) {
 			int *virtual = (int *)arg1;
 			assert(st->subscription == NULL);
@@ -313,9 +313,9 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		struct ntrip_state *st = np->ntrip_state;
 		struct bufferevent *bev = st->bev;
 		bufferevent_lock(bev);
-		if (st->state == NTRIP_END) {
+		if (ntrip_get_state(st) == NTRIP_END) {
 			/* Subscriber currently closing, skip */
-			ntrip_log(st, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d", st->state);
+			ntrip_log(st, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d", ntrip_get_state(st));
 			bufferevent_unlock(bev);
 			n++;
 			continue;

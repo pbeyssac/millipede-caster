@@ -32,7 +32,7 @@ static void connect_cb(struct ntrip_state *st){
 	st->task->current_retry_delay = st->task->refresh_delay;
 
 	if (st->task->use_mimeq) {
-		st->state = NTRIP_IDLE_CLIENT;
+		ntrip_set_state(st, NTRIP_IDLE_CLIENT);
 		ntrip_task_send_next_request(st);
 	} else
 		ntripcli_send_request(st, NULL, 0);
@@ -309,7 +309,7 @@ void ntrip_task_queue(struct ntrip_task *this, struct packet *packet) {
 			struct bufferevent *bev = st->bev;
 			assert(bev != NULL);
 			bufferevent_lock(bev);
-			if (st->state == NTRIP_IDLE_CLIENT)
+			if (ntrip_get_state(st) == NTRIP_IDLE_CLIENT)
 				ntrip_task_send_next_request(st);
 			ntrip_decref(st, "ntrip_task_queue");
 			bufferevent_unlock(bev);
@@ -328,7 +328,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
 	struct mime_content *m;
 	struct ntrip_task *task = st->task;
-	assert(st->state == NTRIP_IDLE_CLIENT);
+	assert(ntrip_get_state(st) == NTRIP_IDLE_CLIENT);
 	assert(task->pending == 0);
 	size_t size = 0;
 

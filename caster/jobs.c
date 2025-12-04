@@ -253,7 +253,7 @@ void joblist_run(struct joblist *this) {
 			st->njobs--;
 			if (st->newjobs > 0)
 				st->newjobs--;
-			if (st->state != NTRIP_END) {
+			if (ntrip_get_state(st) != NTRIP_END) {
 				switch (j->type) {
 				case JOB_LIBEVENT_RW:
 					j->rw.cb(bev, (void *)st);
@@ -336,7 +336,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	P_MUTEX_LOCK(&this->append_mutex);
 
 	/* Drop callback if ntrip_state is waiting for deletion */
-	if (st->state == NTRIP_END) {
+	if (ntrip_get_state(st) == NTRIP_END) {
 		P_MUTEX_UNLOCK(&this->append_mutex);
 		return;
 	}
