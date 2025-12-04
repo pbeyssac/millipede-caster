@@ -134,9 +134,13 @@ int hash_table_add(struct hash_table *this, const char *key, void *value) {
 		return -1;
 	e = (struct element *)malloc(sizeof(struct element));
 	if (e == NULL)
-		return -1;
-	e->value = value;
+		return -2;
 	e->key = mystrdup(key);
+	if (e->key == NULL) {
+		free(e);
+		return -2;
+	}
+	e->value = value;
 	SLIST_INSERT_HEAD(&this->element_lists[h], e, next);
 	this->nentries++;
 	return 0;
