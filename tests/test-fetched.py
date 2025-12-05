@@ -70,10 +70,29 @@ for i in range(3):
   time.sleep(1)
   source_server.set_endevent(None)
 
+source_server.stop()
+
+err4 = 0
+print("Test 4: ", end='')
+for i in range(5):
+  print("Restart fake server")
+  source_server = testlib.SourceServer((HOST, FAKE_SERVER_PORT), 'C63')
+  source_server.start()
+  na1 = source_server.naccept
+  time.sleep(5.5)
+  na2 = source_server.naccept
+  print("Stop fake server")
+  source_server.stop()
+  if na1 == na2:
+    err4 = 1
+    print("FAILED")
+    break
+  time.sleep(5.5)
+
 err3 = testlib.TestServerAlive(HOST, PORT)
 if err3:
   print("FAILED")
 else:
   print()
 
-sys.exit(err + err2 + err3)
+sys.exit(err+err2+err3+err4)

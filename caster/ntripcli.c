@@ -416,10 +416,7 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 		return;
 	} else if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
 		if (events & BEV_EVENT_ERROR) {
-			if (errno == EINPROGRESS)
-				/* Ignore */
-				return;
-			ntrip_log(st, LOG_NOTICE, "Error: %s", strerror(errno));
+			ntrip_log(st, LOG_NOTICE, "Error in ntripcli_eventcb: flags %d", events);
 		} else {
 			ntrip_log(st, LOG_INFO, "Server EOF");
 		}
@@ -428,7 +425,8 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg) {
 			ntrip_log(st, LOG_NOTICE, "ntripcli read timeout");
 		if (events & BEV_EVENT_WRITING)
 			ntrip_log(st, LOG_NOTICE, "ntripcli write timeout");
-	}
+	} else
+		ntrip_log(st, LOG_CRIT, "ntripcli_eventcb unhandled event combination %d", events);
 
 	ntrip_notify_close(st);
 	ntripcli_log_close(st);

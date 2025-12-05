@@ -106,15 +106,19 @@ STR;C63;C63;RTCM3;1004,1005,1006,1008,1012,1019,1020,1033,1042,1045,1046,1077,10
 class SourceServer(object):
   def __init__(self, host, mountpoint):
     self.err = 0
+    self.naccept = 0
     self.host = host
     self.mountpoint = mountpoint.encode('ascii')
     self.endevent = None
-
+    self._stop = False
   def set_endevent(self, event):
     self.endevent = event;
   def start(self):
-    self._thr = threading.Thread(target=self._run, daemon=True, args=())
+    self._thr = threading.Thread(target=self._run, daemon=False, args=())
     self._thr.start()
+  def stop(self):
+    self._stop = True
+    time.sleep(.12)
   def _run(self):
     nr = 0
 
@@ -126,10 +130,25 @@ class SourceServer(object):
     str_request = b'^GET (/.*) HTTP/1\.[01]'
     self.re_request = re.compile(str_request)
 
+    sl.setblocking(False)
+
     for i in range(1000):
-      (s, remote_addr) = sl.accept()
+
+      ra = None
+      while ra is None:
+        if self._stop:
+          sl.close()
+          return
+        try:
+          ra = sl.accept()
+        except BlockingIOError:
+          ra = None
+        time.sleep(.1)
+      (s, remote_addr) = ra
+
+      self.naccept += 1
       print("Fake server accepted connection")
-      thr = threading.Thread(target=self._handle_req, daemon=True, args=(s,))
+      thr = threading.Thread(target=self._handle_req, daemon=False, args=(s,))
       thr.start()
 
   def _handle_req(self, s):
