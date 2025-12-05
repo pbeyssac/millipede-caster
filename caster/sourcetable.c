@@ -56,7 +56,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 		if (_sourcetable_add_unlocked(tmp_sourcetable, line, 0, caster) < 0) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse line %d in sourcetable", nlines);
 			strfree(line);
-			sourcetable_free(tmp_sourcetable);
+			sourcetable_decref(tmp_sourcetable);
 			fclose(fp);
 			return NULL;
 		}
@@ -109,7 +109,7 @@ static struct sourcetable *sourcetable_from_json(json_object *j, struct caster_s
 		const char *str = json_object_get_string(json_object_object_get(source, "str"));
 
 		if (str == NULL || _sourcetable_add_unlocked(tmp_sourcetable, str, tmp_sourcetable->pullable, caster) < 0) {
-			sourcetable_free(tmp_sourcetable);
+			sourcetable_decref(tmp_sourcetable);
 			tmp_sourcetable = NULL;
 			break;
 		}
@@ -144,10 +144,11 @@ struct sourcetable *sourcetable_new(const char *host, unsigned short port, int t
 	this->fetch_time = t;
 	this->nvirtual = 0;
 	this->tls = tls;
+	atomic_store(&this->refcnt, 1);
 	return this;
 }
 
-void sourcetable_free(struct sourcetable *this) {
+static void sourcetable_free(struct sourcetable *this) {
 	strfree(this->header);
 	strfree(this->caster);
 	strfree((char *)this->filename);
@@ -156,6 +157,15 @@ void sourcetable_free(struct sourcetable *this) {
 
 	P_RWLOCK_DESTROY(&this->lock);
 	free(this);
+}
+
+void sourcetable_incref(struct sourcetable *this) {
+	atomic_fetch_add(&this->refcnt, 1);
+}
+
+void sourcetable_decref(struct sourcetable *this) {
+	if (atomic_fetch_add_explicit(&this->refcnt, -1, memory_order_relaxed) == 1)
+		sourcetable_free(this);
 }
 
 /*
@@ -585,11 +595,11 @@ static void _stack_replace(struct caster_state *caster, sourcetable_stack_t *sta
 			P_RWLOCK_UNLOCK(&r->lock);
 			if (new_sourcetable != NULL)
 				sourcetable_diff(caster, r, new_sourcetable);
-			sourcetable_free(r);
+			sourcetable_decref(r);
 		} else {
 			P_RWLOCK_UNLOCK(&r->lock);
 			if (new_sourcetable != NULL) {
-				sourcetable_free(new_sourcetable);
+				sourcetable_decref(new_sourcetable);
 				new_sourcetable = NULL;
 			}
 		}
@@ -600,6 +610,7 @@ static void _stack_replace(struct caster_state *caster, sourcetable_stack_t *sta
 		 */
 		if (local)
 			logfmt(&caster->flog, LOG_INFO, "Reloading %s", new_sourcetable->filename);
+		sourcetable_incref(new_sourcetable);
 		TAILQ_FOREACH(s, &stack->list, next) {
 			if (new_sourcetable->priority >= s->priority) {
 				TAILQ_INSERT_BEFORE(s, new_sourcetable, next);

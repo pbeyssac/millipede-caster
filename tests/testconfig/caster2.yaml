@@ -24,6 +24,12 @@ proxy:
   - table_refresh_delay:	5
     host:			::1
     port:			2163
+  - table_refresh_delay:	5
+    host:			::1
+    port:			2163
+  - table_refresh_delay:	5
+    host:			::1
+    port:			2163
 
 host_auth_file:		host.auth
 source_auth_file:	source-wildcard.auth

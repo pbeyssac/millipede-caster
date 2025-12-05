@@ -107,7 +107,7 @@ static int ntripsrv_send_sourcetable(struct ntrip_state *this, struct evbuffer *
 		return 503;
 
 	struct mime_content *m = sourcetable_get(sourcetable);
-	sourcetable_free(sourcetable);
+	sourcetable_decref(sourcetable);
 	if (m == NULL)
 		return 503;
 
@@ -277,7 +277,7 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 
 	struct dist_table *s = sourcetable_find_pos(pos_sourcetable, &st->last_pos);
 	if (s == NULL) {
-		sourcetable_free(pos_sourcetable);
+		sourcetable_decref(pos_sourcetable);
 		return;
 	}
 
@@ -294,7 +294,7 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 
 	if (s->size_dist_array == 0) {
 		dist_table_free(s);
-		sourcetable_free(pos_sourcetable);
+		sourcetable_decref(pos_sourcetable);
 		return;
 	}
 
@@ -353,7 +353,7 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 		}
 	}
 
-	sourcetable_free(pos_sourcetable);
+	sourcetable_decref(pos_sourcetable);
 	dist_table_free(s);
 }
 

@@ -48,7 +48,7 @@ static void task_stop(struct sourcetable_fetch_args *this) {
 	 * Needed in case a fetch is in progress right now
 	 */
 	if (this->sourcetable) {
-		sourcetable_free(this->sourcetable);
+		sourcetable_decref(this->sourcetable);
 		this->sourcetable = NULL;
 	}
 }
@@ -90,7 +90,7 @@ sourcetable_end_cb(int ok, void *arg, int n) {
 		gettimeofday(&t1, NULL);
 		timersub(&t1, &a->task->start, &t1);
 		if (a->sourcetable) {
-			sourcetable_free(a->sourcetable);
+			sourcetable_decref(a->sourcetable);
 			a->sourcetable = NULL;
 		}
 		logfmt(&a->task->caster->flog, LOG_NOTICE, "sourcetable load failed or canceled, %.3f ms",
@@ -129,6 +129,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 			syncer_queue_json(st->caster, j);
 		}
 
+		sourcetable_decref(a->sourcetable);
 		a->sourcetable = NULL;
 		sourcetable_end_cb(1, a, 0);
 		return 1;
@@ -136,7 +137,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 
 	if (sourcetable_add(a->sourcetable, line, 1, st->caster) < 0) {
 		ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d", a->sourcetable->caster, a->sourcetable->port);
-		sourcetable_free(a->sourcetable);
+		sourcetable_decref(a->sourcetable);
 		a->sourcetable = NULL;
 		sourcetable_end_cb(0, a, 0);
 		return 1;
@@ -155,7 +156,7 @@ fetcher_sourcetable_start(void *arg_cb, int n) {
 	a->sourcetable->priority = a->priority;
 
 	if (ntrip_task_start(a->task, a, NULL, 0) < 0) {
-		sourcetable_free(a->sourcetable);
+		sourcetable_decref(a->sourcetable);
 		a->sourcetable = NULL;
 	}
 }

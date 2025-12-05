@@ -108,7 +108,10 @@ class SourceServer(object):
     self.err = 0
     self.host = host
     self.mountpoint = mountpoint.encode('ascii')
+    self.endevent = None
 
+  def set_endevent(self, event):
+    self.endevent = event;
   def start(self):
     self._thr = threading.Thread(target=self._run, daemon=True, args=())
     self._thr.start()
@@ -148,7 +151,10 @@ class SourceServer(object):
             print("URI", uri)
             try:
               if uri == b'/':
-                s.send(b'HTTP/1.0 200 OK\r\nConnection: close\r\n\r\n%sENDSOURCETABLE\r\n' % sourcetable)
+                s.send(b'HTTP/1.0 200 OK\r\nConnection: close\r\n\r\n%s' % sourcetable)
+                if self.endevent:
+                  self.endevent.wait()
+                s.send(b'ENDSOURCETABLE\r\n')
               elif uri == b'/' + self.mountpoint:
                 s.send(b'HTTP/1.0 200 OK\r\n\r\n')
                 for j in range(500):

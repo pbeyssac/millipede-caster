@@ -56,10 +56,24 @@ client_stream.stop()
 source_stream.stop()
 
 err2 += client_stream.err
-err2 += testlib.TestServerAlive(HOST, PORT)
 if err2:
   print("FAILED")
 else:
   print()
 
-sys.exit(err + err2)
+print("Test 3: ", end='')
+for i in range(3):
+  e = threading.Event()
+  source_server.set_endevent(e)
+  time.sleep(6)
+  e.set()
+  time.sleep(1)
+  source_server.set_endevent(None)
+
+err3 = testlib.TestServerAlive(HOST, PORT)
+if err3:
+  print("FAILED")
+else:
+  print()
+
+sys.exit(err + err2 + err3)

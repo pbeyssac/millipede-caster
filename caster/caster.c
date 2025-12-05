@@ -482,7 +482,7 @@ void caster_free(struct caster_state *this) {
 	struct sourcetable *s;
 	while ((s = TAILQ_FIRST(&this->sourcetablestack.list))) {
 		TAILQ_REMOVE_HEAD(&this->sourcetablestack.list, next);
-		sourcetable_free(s);
+		sourcetable_decref(s);
 	}
 	P_RWLOCK_UNLOCK(&this->sourcetablestack.lock);
 
@@ -721,6 +721,7 @@ caster_reload_sourcetables(struct caster_state *caster, struct config *config) {
 		return -1;
 
 	stack_replace_local(caster, &caster->sourcetablestack, local_table);
+	sourcetable_decref(local_table);
 	return 0;
 }
 
