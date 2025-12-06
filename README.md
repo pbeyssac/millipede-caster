@@ -2,7 +2,7 @@ Millipede 0.8.1
 ===============
 
 
-Millipede is a high-performance NTRIP caster written in C for the [CentipedeRTK](https://github.com/CentipedeRTK) project, a network of [RTK](https://en.wikipedia.org/wiki/Real-time_kinematic_positioning) bases based in France (see https://centipede.fr).
+Millipede is a high-performance NTRIP caster written in C for the [Centipede-RTK](https://github.com/CentipedeRTK) project, a network of [RTK](https://en.wikipedia.org/wiki/Real-time_kinematic_positioning) bases based in France (see https://centipede-rtk.org).
 
 
 Millipede uses libevent2 for minimal memory footprint.
