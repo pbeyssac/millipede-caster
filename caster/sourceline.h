@@ -26,7 +26,6 @@ TAILQ_HEAD (sourcelineq, sourceline);
 
 struct sourceline *sourceline_new(const char *host, unsigned short port, int tls, const char *key, const char *value);
 struct sourceline *sourceline_new_parse(const char *entry, const char *caster, unsigned short port, int tls, int priority, int on_demand);
-struct sourceline *sourceline_copy(struct sourceline *orig);
 
 static inline void sourceline_incref(struct sourceline *this) {
 	atomic_fetch_add(&this->refcnt, 1);

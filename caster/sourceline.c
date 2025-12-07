@@ -101,19 +101,6 @@ struct sourceline *sourceline_new_parse(const char *entry, const char *caster, u
 	return r;
 }
 
-/*
- * Return a deep copy of a struct sourceline
- */
-struct sourceline *sourceline_copy(struct sourceline *orig) {
-	struct sourceline *this = sourceline_new(orig->host, orig->port, orig->tls, orig->key, orig->value);
-	if (this == NULL)
-		return NULL;
-	this->pos = orig->pos;
-	this->on_demand = orig->on_demand;
-	this->virtual = orig->virtual;
-	return this;
-}
-
 static void sourceline_free(struct sourceline *this) {
 	strfree(this->host);
 	strfree(this->key);

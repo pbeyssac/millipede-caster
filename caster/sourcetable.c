@@ -690,7 +690,6 @@ struct sourcetable *stack_flatten_dist(struct caster_state *caster, sourcetable_
 				continue;
 
 			struct element *e = hash_table_get_element(r->key_val, sp->key);
-			struct sourceline *mp;
 
 			if (e == NULL) {
 				/*
@@ -698,13 +697,11 @@ struct sourcetable *stack_flatten_dist(struct caster_state *caster, sourcetable_
 				 * add it if within maximum distance.
 				 */
 				if (!pos || distance(&sp->pos, pos) < max_dist) {
-					mp = sourceline_copy(sp);
-					if (mp == NULL) {
+					if (_sourcetable_add_direct(r, sp) < 0) {
 						P_RWLOCK_UNLOCK(&s->lock);
 						P_RWLOCK_UNLOCK(&this->lock);
 						goto cancel;
 					}
-					_sourcetable_add_direct(r, mp);
 				}
 			}
 		}
