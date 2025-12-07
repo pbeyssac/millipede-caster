@@ -561,7 +561,10 @@ struct sourceline *stack_find_pullable(sourcetable_stack_t *stack, char *mountpo
 		if (s->pullable) {
 			struct sourceline *np = sourcetable_find_mountpoint(s, mountpoint);
 			if (np) {
-				if (sourcetable) *sourcetable = s;
+				if (sourcetable) {
+					sourcetable_incref(s);
+					*sourcetable = s;
+				}
 				r = np;
 				break;
 			}
@@ -604,10 +607,8 @@ static void _stack_replace(struct caster_state *caster, sourcetable_stack_t *sta
 			sourcetable_decref(r);
 		} else {
 			P_RWLOCK_UNLOCK(&r->lock);
-			if (new_sourcetable != NULL) {
-				sourcetable_decref(new_sourcetable);
+			if (new_sourcetable != NULL)
 				new_sourcetable = NULL;
-			}
 		}
 	}
 	if (new_sourcetable != NULL) {
@@ -760,6 +761,7 @@ int sourcetable_update_execute(struct caster_state *caster, json_object *j) {
 	if (s != NULL) {
 		logfmt(&caster->flog, LOG_DEBUG, "received sourcetable for %s", s->caster);
 		_stack_replace(caster, &caster->sourcetablestack, s->caster, s->port, s, 1, 0);
+		sourcetable_decref(s);
 	}
 	return 200;
 }
