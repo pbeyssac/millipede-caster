@@ -122,7 +122,7 @@ struct sourcetable *sourcetable_new(const char *host, unsigned short port, int t
 	struct sourcetable *this = (struct sourcetable *)malloc(sizeof(struct sourcetable));
 	char *duphost = (host == NULL) ? NULL : mystrdup(host);
 	char *header = mystrdup("");
-	struct hash_table *kv = hash_table_new(509, (void (*)(void *))sourceline_free);
+	struct hash_table *kv = hash_table_new(509, (void (*)(void *))sourceline_decref);
 	if ((host != NULL && duphost == NULL) || header == NULL || this == NULL || kv == NULL) {
 		strfree(duphost);
 		strfree(header);
@@ -258,8 +258,11 @@ json_object *sourcetable_json(struct sourcetable *this) {
 static int _sourcetable_add_direct(struct sourcetable *this, struct sourceline *s) {
 	int r;
 	r = hash_table_add(this->key_val, s->key, s);
-	if (r >= 0 && s->virtual)
-		this->nvirtual++;
+	if (r >= 0) {
+		sourceline_incref(s);
+		if (s->virtual)
+			this->nvirtual++;
+	}
 	return r;
 }
 
@@ -274,11 +277,11 @@ static int _sourcetable_add_unlocked(struct sourcetable *this, const char *sourc
 			return -1;
 		}
 		r = _sourcetable_add_direct(this, n1);
+		sourceline_decref(n1);
 		if (r < 0) {
 			logfmt(&caster->flog, LOG_ERR, "Can't add sourcetable line (%s): %s",
 				(r == -1)?"duplicate key":"out of memory",
 				sourcetable_entry);
-			sourceline_free(n1);
 		}
 	} else {
 		int new_len = strlen(this->header) + strlen(sourcetable_entry) + 3;
@@ -463,6 +466,8 @@ struct sourceline *sourcetable_find_mountpoint(struct sourcetable *this, char *m
 
 	P_RWLOCK_RDLOCK(&this->lock);
 	result = (struct sourceline *)hash_table_get(this->key_val, mountpoint);
+	if (result != NULL)
+		sourceline_incref(result);
 	P_RWLOCK_UNLOCK(&this->lock);
 
 	return result;
@@ -523,6 +528,7 @@ static struct sourceline *_stack_find_mountpoint(struct caster_state *caster, so
 			r = np;
 			break;
 		}
+		sourceline_decref(np);
 	}
 
 	P_RWLOCK_UNLOCK(&stack->lock);

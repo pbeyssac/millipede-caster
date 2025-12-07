@@ -122,6 +122,7 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
 			redistribute_args_free(this);
 			return;
 		}
+		sourceline_decref(s);
 		host = sp->caster;
 		port = sp->port;
 		tls = sp->tls;

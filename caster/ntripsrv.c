@@ -630,11 +630,11 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					if (sourceline) {
 						st->source_virtual = sourceline->virtual;
 						st->source_on_demand = sourceline->on_demand;
+						sourceline_decref(sourceline);
 					} else {
 						st->source_virtual = 0;
 						st->source_on_demand = 1;
 					}
-
 					st->type = "client";
 
 					/* Regular NTRIP stream client: set a read timeout to check for data sent */
@@ -724,7 +724,6 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							mountpoint++;
 						st->client_version = 1;
 					}
-					struct sourceline *sourceline = stack_find_local_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
 					if (st->client_version == 2 && (!st->scheme_basic || !st->user || !st->password)) {
 						err = 401;
 						break;
@@ -735,7 +734,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						err = 401;
 						break;
 					}
-					if (!sourceline && r != CHECKPW_MOUNTPOINT_WILDCARD) {
+					struct sourceline *sourceline = stack_find_local_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
+					if (sourceline != NULL) {
+						sourceline_decref(sourceline);
+					} else if (r != CHECKPW_MOUNTPOINT_WILDCARD) {
 						err = 404;
 						break;
 					}
