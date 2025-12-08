@@ -597,6 +597,7 @@ void config_free(struct config *this) {
 	free((char *)this->sourcetable_filename);
 	free((char *)this->log);
 	free((char *)this->access_log);
+	free((char *)this->admin_user);
 	if (this->host_auth)
 		auth_free(this->host_auth);
 	if (this->source_auth)

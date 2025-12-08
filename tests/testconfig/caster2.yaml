@@ -48,3 +48,4 @@ trusted_http_proxy:	[ "127.0.0.1", "::1" ]
 idle_max_delay:		5
 
 log_level:		EDEBUG
+admin_user:		admin

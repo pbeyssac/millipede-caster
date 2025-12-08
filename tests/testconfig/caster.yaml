@@ -36,3 +36,5 @@ rtcm_filter:
     convert:
       - types:		1077,1087,1097,1107,1117,1127
         conversion:	msm7_4
+
+admin_user:		admin
