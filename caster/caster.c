@@ -284,6 +284,7 @@ caster_new(const char *config_file) {
 	this->ntrips.ipcount = hash_table_new(509, NULL);
 
 	// Used for access to config and reload serializing
+	atomic_store(&this->config_gen, 1);
 	P_RWLOCK_INIT(&this->configlock, NULL);
 	P_MUTEX_INIT(&this->configreload, NULL);
 
@@ -822,7 +823,7 @@ caster_reload_rtcm_filters(struct caster_state *caster, struct config *new_confi
 
 static struct config *caster_load_config(struct caster_state *this) {
 	struct config *new_config;
-	if (!(new_config = config_parse(this->config_file))) {
+	if (!(new_config = config_parse(this->config_file, atomic_fetch_add(&this->config_gen, 1)))) {
 		if (this->config)
 			logfmt(&this->flog, LOG_ERR, "Can't parse configuration from %s", this->config_file);
 		else

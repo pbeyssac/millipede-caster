@@ -132,7 +132,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
  */
 struct config *ntrip_refresh_config(struct ntrip_state *this) {
 	struct config *config = this->tmpconfig?this->tmpconfig:this->config;
-	if (this->tmpconfig && this->tmpconfig != this->config) {
+	if (this->tmpconfig && this->tmpconfig != this->config && this->tmpconfig->gen > this->config->gen) {
 		config_incref(this->tmpconfig);
 		config_decref(this->config);
 		this->config = config;

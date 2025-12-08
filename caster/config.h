@@ -315,13 +315,15 @@ struct config {
 
 	/* Pointer to callback function for housekeeping tasks at config_free() */
 	void (*free_callback)(struct config *config);
+
+	long long gen;
 };
 
 extern int backlog_delay;
 extern size_t backlog_socket;
 extern size_t backlog_evbuffer;
 
-struct config *config_parse(const char *filename);
+struct config *config_parse(const char *filename, long long config_gen);
 void config_free(struct config *this);
 
 static inline void config_incref(struct config *this) {

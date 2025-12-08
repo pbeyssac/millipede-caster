@@ -415,7 +415,7 @@ static json_object *_endpoints_json(struct config *config) {
 	return jmain;
 }
 
-struct config *config_parse(const char *filename) {
+struct config *config_parse(const char *filename, long long config_gen) {
 	struct config *this;
 	cyaml_err_t err;
 
@@ -430,7 +430,7 @@ struct config *config_parse(const char *filename) {
 		fprintf(stderr, "ERROR: empty config on %s\n", filename);
 		return NULL;
 	}
-
+	this->gen = config_gen;
 	atomic_init(&this->refcnt, 1);
 
 #define	DEFAULT_ASSIGN(this, field)		{if (!(this)->field) {(this)->field = default_config.field;}}

@@ -87,6 +87,8 @@ struct caster_state {
 	} ntrips;
 	P_RWLOCK_T quotalock;
 
+	/* Config file generation number, to discriminate after reload */
+	_Atomic long long config_gen;
 	_Atomic (struct config *)config;
 
 	// cached from config to avoid locking
