@@ -893,7 +893,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 			if (st->state == NTRIP_WAIT_CLIENT_INPUT) {
 				int idle_time = time(NULL) - st->last_send;
 				if (idle_time <= config->idle_max_delay) {
-					/* Reenable read */
+					/* Re-enable read */
 					bufferevent_enable(bev, EV_READ);
 					return;
 				}
@@ -919,7 +919,7 @@ void ntripsrv_eventcb(struct bufferevent *bev, short events, void *arg)
 }
 
 /*
- * Stub fonctions needed in threaded mode to send jobs to a worker queue,
+ * Stub functions needed in threaded mode to send jobs to a worker queue,
  * as the main libevent loop can't be multithreaded.
  */
 void ntripsrv_workers_readcb(struct bufferevent *bev, void *arg) {

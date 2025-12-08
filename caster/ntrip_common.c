@@ -482,7 +482,7 @@ void ntrip_decref_end(struct ntrip_state *this, char *orig) {
 
 	size_t remain = evbuffer_get_length(bufferevent_get_output(bev));
 	if (remain) {
-		ntrip_log(this, LOG_DEBUG, "Warning: potentiel evbuffer leak, %ld bytes remaining", remain);
+		ntrip_log(this, LOG_DEBUG, "Warning: potential evbuffer leak, %ld bytes remaining", remain);
 		evbuffer_drain(bufferevent_get_output(bev), remain);
 	}
 	ntrip_decref(this, orig);

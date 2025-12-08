@@ -37,7 +37,7 @@ float distance(pos_t *p1, pos_t *p2) {
 /*
  * Join path elements in list.
  * list is any size, NULL-terminated.
- * abs is preprended to the result if the path is not absolute.
+ * abs is prepended to the result if the path is not absolute.
  * Returns a malloc'd result.
  */
 char *path_join(const char *abs, const char **list) {
@@ -523,7 +523,7 @@ void mime_free_callback(const void *data, size_t datalen, void *extra) {
 }
 
 /*
- * Return a malloc'd absolute file path with dir preprended.
+ * Return a malloc'd absolute file path with dir prepended.
  * If path is already absolute, return a copy of path.
  */
 char *joinpath(const char *dir, const char *path) {
