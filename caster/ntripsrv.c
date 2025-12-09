@@ -996,7 +996,7 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	ntrip_log(st, LOG_INFO, "New connection");
 
-	// evbuffer_defer_callbacks(bufferevent_get_output(bev), st->caster->base);
+	// evbuffer_defer_callbacks(bufferevent_get_output(bev), caster_get_eventbase(caster);
 
 	if (threads)
 		bufferevent_setcb(bev, ntripsrv_workers_readcb, ntripsrv_workers_writecb, ntripsrv_workers_eventcb, st);

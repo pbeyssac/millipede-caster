@@ -180,7 +180,7 @@ void joblist_append_ntrip_unlocked_content(
 void joblist_append_stop(struct joblist *this);
 void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);
-int jobs_start_threads(struct joblist *this, int nthreads);
+int jobs_start_threads(struct joblist *this, int nthreads, int neventloops);
 void jobs_stop_threads(struct joblist *this);
 
 #endif

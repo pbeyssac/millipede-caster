@@ -238,7 +238,7 @@ dynconfig_free_callback(struct config *config) {
 }
 
 static struct caster_state *
-caster_new(const char *config_file) {
+caster_new(const char *config_file, int nbase) {
 	int err = 0;
 	struct caster_state *this = (struct caster_state *)calloc(1, sizeof(struct caster_state));
 	if (this == NULL)
@@ -249,12 +249,32 @@ caster_new(const char *config_file) {
 	struct event_base *base;
 	struct evdns_base *dns_base;
 
-	base = event_base_new();
-	if (!base) {
-		fprintf(stderr, "Could not initialize libevent!\n");
+	this->base = (struct event_base **)calloc(nbase, sizeof(struct event_base *));
+	if (this->base == NULL) {
+		free(this);
 		return NULL;
 	}
-	dns_base = evdns_base_new(base, 1);
+	this->nbase = nbase;
+	atomic_store(&this->basecounter, 0);
+	for (int i = 0; i < this->nbase; i++) {
+		base = event_base_new();
+		if (!base) {
+			err = 1;
+			fprintf(stderr, "Could not initialize libevent!\n");
+			break;
+		}
+		this->base[i] = base;
+	}
+	if (err) {
+		for (int i = 0; i < this->nbase; i++)
+			if (this->base[i] != NULL)
+				event_base_free(this->base[i]);
+		free(this->base);
+		free(this);
+		return NULL;
+	}
+
+	dns_base = evdns_base_new(this->base[0], 1);
 	if (!dns_base) {
 		fprintf(stderr, "Could not initialize dns_base!\n");
 		return NULL;
@@ -336,7 +356,6 @@ caster_new(const char *config_file) {
 		return NULL;
 	}
 
-	this->base = base;
 	this->dns_base = dns_base;
 	TAILQ_INIT(&this->ntrips.queue);
 	TAILQ_INIT(&this->ntrips.free_queue);
@@ -476,7 +495,11 @@ void caster_free(struct caster_state *this) {
 	hash_table_free(this->rtcm_cache);
 
 	evdns_base_free(this->dns_base, 1);
-	event_base_free(this->base);
+
+	for (int i = 0; i < this->nbase; i++)
+		event_base_free(this->base[i]);
+	free(this->base);
+
 	SSL_CTX_free(this->ssl_client_ctx);
 
 	P_RWLOCK_WRLOCK(&this->sourcetablestack.lock);
@@ -840,7 +863,9 @@ signal_cb(evutil_socket_t sig, short events, void *user_data) {
 
 	printf("Caught %s signal; exiting.\n", info->signame);
 	logfmt(&info->caster->flog, LOG_INFO, "Caught %s signal; exiting.", info->signame);
-	event_base_loopexit(info->caster->base, &delay);
+
+	for (int i = 0; i < info->caster->nbase; i++)
+		event_base_loopexit(info->caster->base[i], &delay);
 }
 
 static int caster_start(struct caster_state *this, struct config *new_config, int lock) {
@@ -1066,7 +1091,12 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	caster = caster_new(config_file);
+	int nbase, neventloops;
+
+	nbase = (nthreads+3)/4;
+	neventloops = nbase-1;
+
+	caster = caster_new(config_file, nbase);
 	if (!caster) {
 		fprintf(stderr, "Can't allocate caster\n");
 		return 1;
@@ -1082,7 +1112,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	if (threads && jobs_start_threads(caster->joblist, nthreads) < 0) {
+	if (threads && jobs_start_threads(caster->joblist, nthreads, neventloops) < 0) {
 		logfmt(&caster->flog, LOG_CRIT, "Could not create threads!");
 		caster_free(caster);
 		return 1;
@@ -1097,7 +1127,7 @@ int caster_main(char *config_file) {
 		return 1;
 	}
 
-	event_base_dispatch(caster->base);
+	event_base_dispatch(caster->base[0]);
 
 	logfmt(&caster->flog, LOG_NOTICE, "Stopping caster");
 	caster_free(caster);

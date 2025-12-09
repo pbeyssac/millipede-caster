@@ -99,7 +99,8 @@ struct caster_state {
 	const char *config_file;
 	char *config_dir;
 	struct joblist *joblist;
-	struct event_base *base;
+	struct event_base **base;
+	_Atomic unsigned int nbase, basecounter;
 	struct evdns_base *dns_base;
 	struct hash_table *rtcm_cache;
 	P_RWLOCK_T rtcm_lock;
@@ -146,7 +147,7 @@ void free_callback(const void *data, size_t datalen, void *extra);
 int caster_reload(struct caster_state *this);
 
 static inline struct event_base *caster_get_eventbase(struct caster_state *this) {
-	return this->base;
+	return this->base[atomic_fetch_add(&this->basecounter, 1)%this->nbase];
 }
 
 static inline struct config *caster_config_getref(struct caster_state *caster) {

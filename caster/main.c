@@ -26,6 +26,7 @@ main(int argc, char **argv) {
 	int ch, nt;
 	char *endarg;
 
+	nthreads = 1;
 	while ((ch = getopt(argc, argv, "c:dt:")) != -1) {
 		switch (ch) {
 		case 'c':
