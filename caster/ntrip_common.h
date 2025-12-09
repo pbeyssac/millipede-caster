@@ -143,7 +143,7 @@ struct ntrip_state {
 	char *content_type;			// MIME type
 
 	struct rtcm_info *rtcm_info;			// Only for a source
-	enum ntrip_rtcm_state rtcm_client_state;	// Used for client packet filtering
+	_Atomic enum ntrip_rtcm_state rtcm_client_state;	// Used for client packet filtering
 
 	struct {
 		struct evbuffer *raw_input;

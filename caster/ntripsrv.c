@@ -340,11 +340,11 @@ void ntripsrv_redo_virtual_pos(struct ntrip_state *st) {
 				if (source_state == LIVESOURCE_RUNNING || (s->dist_array[0].on_demand && source_state == LIVESOURCE_FETCH_PENDING)) {
 					struct packet *packet_pos = ntrip_get_rtcm_pos(st, m);
 					if (packet_pos) {
-						st->rtcm_client_state = NTRIP_RTCM_POS_OK;
+						atomic_store(&st->rtcm_client_state, NTRIP_RTCM_POS_OK);
 						packet_send(packet_pos, st, time(NULL));
 						packet_decref(packet_pos);
 					} else
-						st->rtcm_client_state = NTRIP_RTCM_POS_WAIT;
+						atomic_store(&st->rtcm_client_state, NTRIP_RTCM_POS_WAIT);
 					st->tmp_pos = s->dist_array[0].pos;
 					joblist_append_ntrip_livesource(st->caster->joblist, redistribute_switch_source, st, l, NULL);
 				}
@@ -660,7 +660,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					}
 					ntripsrv_send_stream_result_ok(st, output, "gnss/data", NULL);
 					ntrip_set_state(st, NTRIP_WAIT_CLIENT_INPUT);
-					st->rtcm_client_state = st->source_virtual ? NTRIP_RTCM_POS_WAIT : NTRIP_RTCM_POS_OK;
+					atomic_store(&st->rtcm_client_state, st->source_virtual ? NTRIP_RTCM_POS_WAIT : NTRIP_RTCM_POS_OK);
 
 					/* If we have a position (Ntrip-gga header), use it */
 

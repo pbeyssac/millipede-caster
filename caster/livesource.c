@@ -329,13 +329,13 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			n++;
 			continue;
 		}
-		if (st->rtcm_client_state == NTRIP_RTCM_POS_WAIT) {
+		if (atomic_load(&st->rtcm_client_state) == NTRIP_RTCM_POS_WAIT) {
 			if (!is_pos) {
 				bufferevent_unlock(bev);
 				n++;
 				continue;
 			}
-			st->rtcm_client_state = NTRIP_RTCM_POS_OK;
+			atomic_store(&st->rtcm_client_state, NTRIP_RTCM_POS_OK);
 		}
 		p = packet;
 		if (st->rtcm_filter && !rtcm_filter_pass(st->config->dyn->rtcm_filter, packet)) {
