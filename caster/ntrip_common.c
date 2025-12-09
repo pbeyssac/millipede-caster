@@ -675,7 +675,7 @@ _ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt
 	gelf_init(&g, level, this->caster->hostname, thread_id);
 	g.connection_id = this->id;
 
-	if (this->caster->graylog_log_level == -1
+	if (atomic_load(&this->caster->graylog_log_level) == -1
 		|| (this->config->dyn->graylog && this->config->dyn->graylog[0] && this->task && this->task->nograylog))
 		g.nograylog = 1;
 

@@ -92,7 +92,8 @@ struct caster_state {
 	_Atomic (struct config *)config;
 
 	// cached from config to avoid locking
-	int log_level, graylog_log_level;
+	_Atomic int log_level;
+	_Atomic int graylog_log_level;
 
 	const char *config_file;
 	char *config_dir;

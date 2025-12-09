@@ -84,7 +84,7 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 	char *msg;
 	vasprintf(&msg, fmt, ap);
 
-	if (level <= caster->log_level) {
+	if (level <= atomic_load(&caster->log_level)) {
 		if (threads)
 			logfmt_direct(log, "%s [%lu] %s\n", date, (long)pthread_getspecific(caster->thread_id), msg);
 		else
@@ -96,7 +96,7 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 	else
 		free(msg);
 
-	if (level != -1 && !g->nograylog && level <= caster->graylog_log_level) {
+	if (level != -1 && !g->nograylog && level <= atomic_load(&caster->graylog_log_level)) {
 		json_object *j = gelf_json(g);
 		char *s = mystrdup(json_object_to_json_string(j));
 		json_object_put(j);
@@ -121,7 +121,7 @@ caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list
 static void
 caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	if (level <= this->log_level || level <= this->graylog_log_level)
+	if (level <= atomic_load(&this->log_level) || level <= atomic_load(&this->graylog_log_level))
 		_caster_log(this, g, &this->flog, level, fmt, ap);
 }
 
@@ -450,7 +450,7 @@ void caster_free(struct caster_state *this) {
 		dynconfig_free_fetchers(this->config->dyn);
 		dynconfig_free_syncers(this->config->dyn);
 
-		this->graylog_log_level = -1;
+		atomic_store(&this->graylog_log_level, -1);
 		dynconfig_free_graylog(this->config->dyn);
 	}
 
@@ -855,7 +855,7 @@ static int caster_start(struct caster_state *this, struct config *new_config, in
 	if (caster_start_graylog(this, new_config, new_config->dyn) < 0)
 		r = -1;
 	else
-		this->graylog_log_level = new_config->graylog_count > 0 ? new_config->graylog[0].log_level : -1;
+		atomic_store(&this->graylog_log_level, new_config->graylog_count > 0 ? new_config->graylog[0].log_level : -1);
 
 	if (lock)
 		P_MUTEX_UNLOCK(&this->configreload);
@@ -876,7 +876,7 @@ static int caster_load(struct caster_state *this, int restart) {
 
 	P_MUTEX_LOCK(&this->configreload);
 
-	this->graylog_log_level = -1;
+	atomic_store(&this->graylog_log_level, -1);
 	old_config = atomic_load(&this->config);
 	if (new_config == NULL) {
 		r = -1;
