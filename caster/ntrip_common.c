@@ -114,7 +114,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->query_string = NULL;
 	this->content_type = NULL;
 	this->client = 0;
-	this->rtcm_filter = 0;
+	this->use_rtcm_filter = 0;
 	atomic_store(&this->rtcm_client_state, NTRIP_RTCM_POS_WAIT);
 	this->node = NULL;
 	this->syncer_id = NULL;
