@@ -94,6 +94,7 @@ struct caster_state {
 	// cached from config to avoid locking
 	_Atomic int log_level;
 	_Atomic int graylog_log_level;
+	_Atomic size_t backlog_evbuffer;
 
 	const char *config_file;
 	char *config_dir;

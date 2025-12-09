@@ -900,6 +900,7 @@ static int caster_load(struct caster_state *this, int restart) {
 	P_RWLOCK_UNLOCK(&this->configlock);
 
 	this->log_level = new_config->log_level;
+	atomic_store(&this->backlog_evbuffer, new_config->backlog_evbuffer);
 	if (caster_reopen_logs(this, new_config) < 0)
 		r = -1;
 	if (caster_reload_sourcetables(this, new_config) < 0)

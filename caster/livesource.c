@@ -308,6 +308,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	this->npackets++;
 
 	int nbacklogged = 0;
+	size_t backlog_evbuffer = atomic_load(&caster->backlog_evbuffer);
 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
 		struct ntrip_state *st = np->ntrip_state;
@@ -321,7 +322,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			continue;
 		}
 		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(st->bev));
-		if (backlog_len > st->config->backlog_evbuffer) {
+		if (backlog_len > backlog_evbuffer) {
 			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s", backlog_len, this->mountpoint);
 			np->backlogged = 1;
 			nbacklogged++;
