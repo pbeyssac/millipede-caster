@@ -432,6 +432,8 @@ struct config *config_parse(const char *filename, long long config_gen) {
 	atomic_init(&this->refcnt, 1);
 
 #define	DEFAULT_ASSIGN(this, field)		{if (!(this)->field) {(this)->field = default_config.field;}}
+/* Special for string fields, to avoid a crash at free() */
+#define	DEFAULT_ASSIGN_DUP(this, field)		{if (!(this)->field) {(this)->field = strdup(default_config.field);}}
 #define	DEFAULT_ASSIGN_ARRAY(this, i, struct1, struct2, field)	{if (!(this)->struct1[i].field) {(this)->struct1[i].field = struct2.field;}}
 
 	DEFAULT_ASSIGN(this, hysteresis_m);
@@ -452,15 +454,23 @@ struct config *config_parse(const char *filename, long long config_gen) {
 	DEFAULT_ASSIGN(this, ntripcli_default_write_timeout);
 	DEFAULT_ASSIGN(this, ntripsrv_default_read_timeout);
 	DEFAULT_ASSIGN(this, ntripsrv_default_write_timeout);
-	DEFAULT_ASSIGN(this, access_log);
-	DEFAULT_ASSIGN(this, log);
 	DEFAULT_ASSIGN(this, log_level);
-	DEFAULT_ASSIGN(this, admin_user);
+	DEFAULT_ASSIGN_DUP(this, sourcetable_filename);
+	DEFAULT_ASSIGN_DUP(this, access_log);
+	DEFAULT_ASSIGN_DUP(this, log);
+	DEFAULT_ASSIGN_DUP(this, admin_user);
 	DEFAULT_ASSIGN(this, sourcetable_priority);
 	DEFAULT_ASSIGN(this, sourcetable_fetch_timeout);
 	DEFAULT_ASSIGN(this, http_header_max_size);
 	DEFAULT_ASSIGN(this, http_content_length_max);
 
+	if (this->sourcetable_filename == NULL
+		|| this->access_log == NULL
+		|| this->log == NULL
+		|| this->admin_user == NULL) {
+		config_free(this);
+		return NULL;
+	}
 	for (int i = 0; i < this->proxy_count; i++) {
 		DEFAULT_ASSIGN_ARRAY(this, i, proxy, default_config_proxy, table_refresh_delay);
 		DEFAULT_ASSIGN_ARRAY(this, i, proxy, default_config_proxy, port);
