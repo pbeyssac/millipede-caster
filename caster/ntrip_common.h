@@ -206,7 +206,7 @@ struct ntrip_state {
 	char wildcard;				// Flag: set for a source if the mountpoint is unregistered (wildcard entry)
 
 	char *query_string;			// HTTP GET query string, if any.
-	char use_rtcm_filter;			// Flag: filter outgoing packets by type
+	_Atomic char use_rtcm_filter;		// Flag: filter outgoing packets by type
 
 	/*
 	 * Relevant sourceline if the connection is from a source.

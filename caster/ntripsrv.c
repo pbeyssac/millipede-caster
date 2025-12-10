@@ -593,7 +593,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 					if (*mountpoint) {
 						if (config->dyn->rtcm_filter && rtcm_filter_check_mountpoint(config->dyn, mountpoint))
-							st->use_rtcm_filter = 1;
+							atomic_store(&st->use_rtcm_filter, 1);
 						/*
 						 * Find both a relevant source line and a live source (actually live or on-demand).
 						 */
