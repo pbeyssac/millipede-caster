@@ -501,7 +501,7 @@ int
 ntripcli_start(struct ntrip_state *st) {
 
 	struct bufferevent *bev = st->bev;
-
+	ntrip_incref(st, "ntripcli_start");
 	ntrip_register(st);
 	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d", st->type, st->host, st->port);
 	if (st->task) {
@@ -524,6 +524,7 @@ ntripcli_start(struct ntrip_state *st) {
 
 	bufferevent_socket_connect_hostname(bev, st->caster->dns_base, AF_UNSPEC, st->host, st->port);
 
+	ntrip_decref(st, "ntripcli_start");
 	return 0;
 }
 

@@ -989,7 +989,9 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 
 	ntrip_set_state(st, NTRIP_WAIT_HTTP_METHOD);
 
+	ntrip_incref(st, "ntripsrv_listener_cb");
 	if (ntrip_register_check(st) < 0) {
+		ntrip_decref(st, "ntripsrv_listener_cb");
 		ntrip_decref_end(st, "ntripsrv_listener_cb");
 		return;
 	}
@@ -1006,4 +1008,5 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 	struct timeval read_timeout = { st->config->ntripsrv_default_read_timeout, 0 };
 	struct timeval write_timeout = { st->config->ntripsrv_default_write_timeout, 0 };
 	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
+	ntrip_decref(st, "ntripsrv_listener_cb");
 }
