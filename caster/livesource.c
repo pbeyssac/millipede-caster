@@ -152,7 +152,7 @@ struct livesource *livesource_new(char *mountpoint, enum livesource_type type, e
  * If kill_backlogged is not 0:
  *	unsubscribe & kill subscribers flagged as backlogged
  */
-int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backlogged) {
+static int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backlogged, size_t backlog_evbuffer) {
 	struct subscriber *np, *tnp;
 	int killed = 0;
 	TAILQ_FOREACH_SAFE(np, &this->subscribers, next, tnp) {
@@ -160,12 +160,16 @@ int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backl
 		struct ntrip_state *st = np->ntrip_state;
 		struct bufferevent *bev = st->bev;
 		int virtual = np->virtual;
-		int backlogged = np->backlogged;
+		int backlogged = np->backlog_len > backlog_evbuffer;
 
 		bufferevent_lock(bev);
 
 		if (kill_backlogged ? backlogged : !virtual) {
-			ntrip_log(st, LOG_NOTICE, "dropping due to %s", kill_backlogged?"backlog":"closed source");
+			if (kill_backlogged && backlogged) {
+				size_t backlog_len = np->backlog_len;
+				ntrip_log(st, LOG_NOTICE, "dropping due to backlog len %ld (max %ld) on output for %s", backlog_len, backlog_evbuffer, this->mountpoint);
+			} else
+				ntrip_log(st, LOG_NOTICE, "dropping due to closed source");
 			killed++;
 		} else if (kill_backlogged == 0 && virtual) {
 			/*
@@ -192,7 +196,7 @@ static void livesource_free(struct livesource *this) {
 
 static void livesource_end(struct livesource *this) {
 	P_RWLOCK_WRLOCK(&this->lock);
-	livesource_kill_subscribers_unlocked(this, 0);
+	livesource_kill_subscribers_unlocked(this, 0, 0);
 	assert(this->nsubs == 0);
 	P_RWLOCK_UNLOCK(&this->lock);
 }
@@ -225,7 +229,7 @@ void livesource_add_subscriber(struct ntrip_state *st, struct livesource *this, 
 	struct subscriber *sub = (struct subscriber *)malloc(sizeof(struct subscriber));
 	if (sub != NULL) {
 		sub->livesource = this;
-		sub->backlogged = 0;
+		sub->backlog_len = 0;
 
 		bufferevent_lock(st->bev);
 		int cancel = (ntrip_get_state(st) == NTRIP_END);
@@ -321,10 +325,9 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 			n++;
 			continue;
 		}
-		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(st->bev));
+		size_t backlog_len = evbuffer_get_length(bufferevent_get_output(bev));
+		np->backlog_len = backlog_len;
 		if (backlog_len > backlog_evbuffer) {
-			ntrip_log(st, LOG_NOTICE, "RTCM: backlog len %ld on output for %s", backlog_len, this->mountpoint);
-			np->backlogged = 1;
 			nbacklogged++;
 			bufferevent_unlock(bev);
 			n++;
@@ -360,7 +363,7 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	 * Get rid of backlogged connections
 	 */
 	if (nbacklogged) {
-		int found_backlogs = livesource_kill_subscribers_unlocked(this, 1);
+		int found_backlogs = livesource_kill_subscribers_unlocked(this, 1, backlog_evbuffer);
 		if (found_backlogs == nbacklogged)
 			logfmt(&caster->flog, LOG_INFO, "RTCM: %d backlogged clients dropped from %s", nbacklogged, this->mountpoint);
 		else

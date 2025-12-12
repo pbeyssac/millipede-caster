@@ -33,9 +33,8 @@ struct subscriber {
 	struct livesource *livesource;
 	struct ntrip_state *ntrip_state;
 
-	// backlog overflow flag.
-	// if set, this subscriber structure is already off the livesource list
-	int backlogged;
+	// backlog len at last send
+	size_t backlog_len;
 	int virtual;
 };
 TAILQ_HEAD (subscribersq, subscriber);
@@ -106,7 +105,6 @@ int livesource_connected(struct ntrip_state *st, char *mountpoint);
 int livesource_exists(struct caster_state *this, char *mountpoint, pos_t *mountpoint_pos);
 struct livesource *livesource_find_on_demand(struct caster_state *this, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand, enum livesource_state *new_state);
 struct livesource *livesource_find_and_subscribe(struct caster_state *caster, struct ntrip_state *st, char *mountpoint, pos_t *mountpoint_pos, int on_demand, int sourceline_on_demand);
-int livesource_kill_subscribers_unlocked(struct livesource *this, int kill_backlogged);
 void livesource_decref(struct livesource *this);
 void livesource_incref(struct livesource *this);
 void livesource_set_state(struct livesource *this, struct caster_state *caster, enum livesource_state state);
