@@ -35,6 +35,7 @@ Dependencies
 ============
 
 FreeBSD: `sudo pkg install libevent libcyaml json-c`
+
 Debian: `sudo apt install libcyaml-dev libevent-dev libjson-c-dev libssl-dev`
 
 Building
