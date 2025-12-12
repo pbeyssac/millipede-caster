@@ -317,9 +317,9 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
 		struct ntrip_state *st = np->ntrip_state;
 		struct bufferevent *bev = st->bev;
-		bufferevent_lock(bev);
 		if (ntrip_get_state(st) == NTRIP_END) {
 			/* Subscriber currently closing, skip */
+			bufferevent_lock(bev);
 			ntrip_log(st, LOG_DEBUG, "livesource_send_subscribers: dropping, state=%d", ntrip_get_state(st));
 			bufferevent_unlock(bev);
 			n++;
@@ -329,27 +329,28 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		np->backlog_len = backlog_len;
 		if (backlog_len > backlog_evbuffer) {
 			nbacklogged++;
-			bufferevent_unlock(bev);
 			n++;
 			continue;
 		}
 		if (atomic_load(&st->rtcm_client_state) == NTRIP_RTCM_POS_WAIT) {
 			if (!is_pos) {
-				bufferevent_unlock(bev);
 				n++;
 				continue;
 			}
 			atomic_store(&st->rtcm_client_state, NTRIP_RTCM_POS_OK);
 		}
 		p = packet;
-		if (atomic_load(&st->use_rtcm_filter) && !rtcm_filter_pass(st->config->dyn->rtcm_filter, packet)) {
-			if (!pconv)
-				pconv = rtcm_filter_convert(st->config->dyn->rtcm_filter, st, packet);
-			p = pconv;
+		if (atomic_load(&st->use_rtcm_filter)) {
+			bufferevent_lock(bev);
+			if (!rtcm_filter_pass(st->config->dyn->rtcm_filter, packet)) {
+				if (!pconv)
+					pconv = rtcm_filter_convert(st->config->dyn->rtcm_filter, st, packet);
+				p = pconv;
+			}
+			bufferevent_unlock(bev);
 		}
 		if (p)
 			packet_send(p, st, t);
-		bufferevent_unlock(bev);
 		n++;
 	}
 
