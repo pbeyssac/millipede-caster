@@ -25,7 +25,7 @@ static void ntrip_deferred_free(struct ntrip_state *this, char *orig);
  * Create a NTRIP session state for a client or a server connection.
  */
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev,
-		char *host, unsigned short port, const char *uri, char *mountpoint) {
+		char *host, unsigned short port, const char *uri, char *mountpoint, struct config *new_config) {
 	struct ntrip_state *this = (struct ntrip_state *)malloc(sizeof(struct ntrip_state));
 	if (this == NULL) {
 		logfmt(&caster->flog, LOG_CRIT, "ntrip_new failed: out of memory");
@@ -120,7 +120,11 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->syncer_id = NULL;
 
 	this->tmpconfig = NULL;
-	this->config = caster_config_getref(this->caster);
+	if (new_config != NULL) {
+		config_incref(new_config);
+		this->config = new_config;
+	} else
+		this->config = caster_config_getref(this->caster);
 	this->lookup_dist = this->config->max_nearest_lookup_distance_m;
 	return this;
 }

@@ -403,7 +403,7 @@ static int caster_reload_syncers(struct caster_state *this, struct config *confi
 
 static int caster_start_syncers(struct caster_state *this, struct config *new_config, struct caster_dynconfig *dyn) {
 	for (int i = 0; i < dyn->syncers_count; i++)
-		syncer_start_all(dyn->syncers[i]);
+		syncer_start_all(dyn->syncers[i], new_config);
 	return 0;
 }
 
@@ -456,7 +456,7 @@ static int caster_reload_graylog(struct caster_state *this, struct config *new_c
 
 static int caster_start_graylog(struct caster_state *this, struct config *new_config, struct caster_dynconfig *dyn) {
 	for (int i = 0; i < dyn->graylog_count; i++)
-		graylog_sender_start(dyn->graylog[i], 0);
+		graylog_sender_start_with_config(dyn->graylog[i], 0, new_config);
 	return 0;
 }
 
@@ -902,30 +902,16 @@ static int caster_load(struct caster_state *this, int restart) {
 	P_MUTEX_LOCK(&this->configreload);
 
 	atomic_store(&this->graylog_log_level, -1);
-	old_config = atomic_load(&this->config);
 	if (new_config == NULL) {
-		r = -1;
-		if (old_config == NULL) {
-			// Incorrect new config and no former config:
-			// abort all because we can't log more errors anyway.
-			P_MUTEX_UNLOCK(&this->configreload);
-			dynconfig_free(newdyn);
-			return -1;
-		}
-		/* Keep the former config */
-		new_config = old_config;
-		old_config = NULL;
+		P_MUTEX_UNLOCK(&this->configreload);
+		dynconfig_free(newdyn);
+		return -1;
 	}
 	new_config->dyn = newdyn;
 	new_config->free_callback = dynconfig_free_callback;
+	old_config = atomic_load(&this->config);
 	olddyn = old_config?old_config->dyn:NULL;
 
-	P_RWLOCK_WRLOCK(&this->configlock);
-	atomic_store(&this->config, new_config);
-	P_RWLOCK_UNLOCK(&this->configlock);
-
-	this->log_level = new_config->log_level;
-	atomic_store(&this->backlog_evbuffer, new_config->backlog_evbuffer);
 	if (caster_reopen_logs(this, new_config) < 0)
 		r = -1;
 	if (caster_reload_sourcetables(this, new_config) < 0)
@@ -936,6 +922,13 @@ static int caster_load(struct caster_state *this, int restart) {
 		r = -1;
 	if (caster_reload_rtcm_filters(this, new_config, newdyn) < 0)
 		r = -1;
+
+	P_RWLOCK_WRLOCK(&this->configlock);
+	atomic_store(&this->config, new_config);
+	atomic_store(&this->log_level, new_config->log_level);
+	atomic_store(&this->backlog_evbuffer, new_config->backlog_evbuffer);
+	P_RWLOCK_UNLOCK(&this->configlock);
+
 	if (caster_reload_graylog(this, new_config, newdyn) < 0)
 		r = -1;
 	if (caster_reload_listeners(this, new_config, olddyn, newdyn) < 0)
@@ -944,10 +937,6 @@ static int caster_load(struct caster_state *this, int restart) {
 		r = -1;
 	if (caster_reload_syncers(this, new_config, olddyn, newdyn) < 0)
 		r = -1;
-	if (olddyn != NULL) {
-		dynconfig_free_fetchers(olddyn);
-		dynconfig_free_graylog(olddyn);
-	}
 
 	if (old_config)
 		config_decref(old_config);
@@ -1044,7 +1033,8 @@ static int caster_reload_fetchers(struct caster_state *this, struct config *new_
 				new_config->proxy[i].host, new_config->proxy[i].port,
 				new_config->proxy[i].tls,
 				new_config->proxy[i].table_refresh_delay,
-				new_config->proxy[i].priority);
+				new_config->proxy[i].priority,
+				new_config);
 		}
 		new_fetchers[i] = p;
 	}
@@ -1063,7 +1053,7 @@ static int caster_start_fetchers(struct caster_state *this, struct config *new_c
 		if (p) {
 			if (ntrip_task_get_state(p->task) == TASK_INIT) {
 				logfmt(&this->flog, LOG_INFO, "New fetcher %s:%d", new_config->proxy[i].host, new_config->proxy[i].port);
-				fetcher_sourcetable_start(p, 0);
+				fetcher_sourcetable_start_with_config(p, 0, new_config);
 			} else {
 				fetcher_sourcetable_reload(p,
 					new_config->proxy[i].table_refresh_delay,

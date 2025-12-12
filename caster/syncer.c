@@ -271,16 +271,21 @@ void syncer_free(struct syncer *this) {
  * Start a syncer.
  */
 static void
-syncer_start(void *arg_cb, int n) {
+syncer_start_config(void *arg_cb, int n, struct config *new_config) {
 	struct syncer *a = (struct syncer *)arg_cb;
 	struct ntrip_task *task = a->task[n];
 
-	ntrip_task_start(task, a, NULL, 0);
+	ntrip_task_start(task, a, NULL, 0, new_config);
+}
+
+static void
+syncer_start(void *arg_cb, int n) {
+	syncer_start_config(arg_cb, n, NULL);
 }
 
 void
-syncer_start_all(struct syncer *this) {
+syncer_start_all(struct syncer *this, struct config *new_config) {
 	for (int i = 0; i < this->ntask; i++)
 		if (atomic_load(&this->task[i]->state) == TASK_INIT)
-			syncer_start(this, i);
+			syncer_start_config(this, i, new_config);
 }

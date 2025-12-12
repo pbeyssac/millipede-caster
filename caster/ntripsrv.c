@@ -973,7 +973,7 @@ void ntripsrv_listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
 		return;
 	}
 
-	struct ntrip_state *st = ntrip_new(caster, bev, NULL, 0, NULL, NULL);
+	struct ntrip_state *st = ntrip_new(caster, bev, NULL, 0, NULL, NULL, NULL);
 	if (st == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state for a new connection!");
 		bufferevent_free(bev);

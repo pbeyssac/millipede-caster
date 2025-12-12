@@ -21,6 +21,6 @@ struct syncer *syncer_new(struct caster_state *caster,
 	int bulk_max_size);
 void syncer_free(struct syncer *this);
 void syncer_stop(struct syncer *this);
-void syncer_start_all(struct syncer *this);
+void syncer_start_all(struct syncer *this, struct config *new_config);
 
 #endif

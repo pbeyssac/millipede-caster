@@ -3,6 +3,7 @@
 
 #include <sys/time.h>
 
+#include "config.h"
 #include "endpoints.h"
 #include "livesource.h"
 #include "util.h"
@@ -30,4 +31,5 @@ void redistribute_args_free(struct redistribute_cb_args *this);
 int redistribute_schedule(struct caster_state *caster, struct ntrip_state *st, struct redistribute_cb_args *redis_args);
 void redistribute_cb(evutil_socket_t fd, short what, void *cbarg);
 void redistribute_source_stream(struct redistribute_cb_args *redis_args);
+void redistribute_source_stream_with_config(struct redistribute_cb_args *this, struct config *new_config);
 #endif

@@ -437,7 +437,8 @@ struct ntrip_state *
 ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri,
 	const char *type, struct ntrip_task *task,
 	struct livesource *livesource,
-	int persistent) {
+	int persistent,
+	struct config *new_config) {
 
 	struct bufferevent *bev;
 
@@ -477,7 +478,8 @@ ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int t
 		logfmt(&caster->flog, LOG_ERR, "Error constructing bufferevent in ntripcli_start!");
 		return NULL;
 	}
-	struct ntrip_state *st = ntrip_new(caster, bev, host, port, uri, livesource?livesource->mountpoint:NULL);
+	struct ntrip_state *st = ntrip_new(caster, bev, host, port, uri,
+		livesource?livesource->mountpoint:NULL, new_config);
 	if (st == NULL) {
 		bufferevent_free(bev);
 		logfmt(&caster->flog, LOG_ERR, "Error constructing ntrip_state in ntripcli_start!");

@@ -109,7 +109,7 @@ redistribute_args_free(struct redistribute_cb_args *this) {
  * Required lock: ntrip_state
  */
 void
-redistribute_source_stream(struct redistribute_cb_args *this) {
+redistribute_source_stream_with_config(struct redistribute_cb_args *this, struct config *new_config) {
 	struct sourcetable *sp = NULL;
 	const char *host;
 	unsigned short port;
@@ -153,8 +153,13 @@ redistribute_source_stream(struct redistribute_cb_args *this) {
 	this->task->read_timeout = this->on_demand_source_timeout;
 	this->task->write_timeout = this->on_demand_source_timeout;
 
-	if (ntrip_task_start(this->task, NULL, this->livesource, this->persistent) < 0)
+	if (ntrip_task_start(this->task, NULL, this->livesource, this->persistent, new_config) < 0)
 		logfmt(&this->caster->flog, LOG_CRIT, "ntrip_task_start failed, cannot redistribute %s", this->mountpoint);
+}
+
+void
+redistribute_source_stream(struct redistribute_cb_args *this) {
+	redistribute_source_stream_with_config(this, NULL);
 }
 
 /*

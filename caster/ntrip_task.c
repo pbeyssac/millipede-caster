@@ -138,13 +138,14 @@ static inline void ntrip_task_set_st(struct ntrip_task *this, struct ntrip_state
 	P_RWLOCK_UNLOCK(&this->st_lock);
 }
 
-int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent) {
+int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct livesource *livesource, int persistent,
+	struct config *new_config) {
 	int r = -1;
 	assert(this->st == NULL);
 	atomic_store_explicit(&this->state, TASK_RUNNING, memory_order_relaxed);
 	struct ntrip_state *st =
 		ntripcli_new(this->caster, this->host, this->port, this->tls, this->uri, this->type, this,
-		livesource, persistent);
+		livesource, persistent, new_config);
 
 	if (st == NULL) {
 		r = -1;

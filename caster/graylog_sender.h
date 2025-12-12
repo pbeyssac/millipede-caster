@@ -17,6 +17,6 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename);
 void graylog_sender_free(struct graylog_sender *this);
 void graylog_sender_stop(struct graylog_sender *this);
-void graylog_sender_start(void *arg_cb, int n);
+void graylog_sender_start_with_config(void *arg_cb, int n, struct config *new_config);
 
 #endif

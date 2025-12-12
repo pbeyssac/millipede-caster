@@ -12,7 +12,8 @@ void ntripcli_eventcb(struct bufferevent *bev, short events, void *arg);
 struct ntrip_state * ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int tls, const char *uri,
 	const char *type, struct ntrip_task *task,
 	struct livesource *livesource,
-	int persistent);
+	int persistent,
+	struct config *new_config);
 int ntripcli_start(struct ntrip_state *st);
 
 void ntripcli_workers_readcb(struct bufferevent *bev, void *arg);

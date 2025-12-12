@@ -9,6 +9,8 @@
  * Module to export GELF log data to Graylog, using its HTTP/POST API.
  */
 
+ static void graylog_sender_start(void *arg_cb, int n);
+
 /*
  * Queue a GELF/JSON log entry.
  */
@@ -98,8 +100,12 @@ void graylog_sender_free(struct graylog_sender *this) {
  * Start a graylog sender.
  */
 void
-graylog_sender_start(void *arg_cb, int n) {
+graylog_sender_start_with_config(void *arg_cb, int n, struct config *new_config) {
 	struct graylog_sender *a = (struct graylog_sender *)arg_cb;
 
-	ntrip_task_start(a->task, arg_cb, NULL, 0);
+	ntrip_task_start(a->task, arg_cb, NULL, 0, new_config);
+}
+
+static void graylog_sender_start(void *arg_cb, int n) {
+	graylog_sender_start_with_config(arg_cb, n, NULL);
 }

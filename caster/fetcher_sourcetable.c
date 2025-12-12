@@ -14,7 +14,8 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
  * Initialize, but don't start, a sourcetable fetcher.
  */
 struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *caster,
-	const char *host, unsigned short port, int tls, int refresh_delay, int priority) {
+	const char *host, unsigned short port, int tls, int refresh_delay, int priority,
+	struct config *config) {
 	struct sourcetable_fetch_args *this = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args));
 	if (this == NULL)
 		return NULL;
@@ -31,11 +32,9 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 	this->task->line_cb_arg = this;
 	this->task->restart_cb = fetcher_sourcetable_start;
 	this->task->restart_cb_arg = this;
-	struct config *config = caster_config_getref(caster);
 	this->task->read_timeout = config->sourcetable_fetch_timeout;
 	this->task->write_timeout = config->sourcetable_fetch_timeout;
 	this->task->status_timeout = this->task->read_timeout;
-	config_decref(config);
 
 	this->sourcetable = NULL;
 	this->priority = priority;
@@ -149,14 +148,19 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
  * Start a sourcetable fetcher.
  */
 void
-fetcher_sourcetable_start(void *arg_cb, int n) {
+fetcher_sourcetable_start_with_config(void *arg_cb, int n, struct config *new_config) {
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
 	assert(a->sourcetable == NULL);
 	a->sourcetable = sourcetable_new(a->task->host, a->task->port, a->task->tls);
 	a->sourcetable->priority = a->priority;
 
-	if (ntrip_task_start(a->task, a, NULL, 0) < 0) {
+	if (ntrip_task_start(a->task, a, NULL, 0, new_config) < 0) {
 		sourcetable_decref(a->sourcetable);
 		a->sourcetable = NULL;
 	}
+}
+
+void
+fetcher_sourcetable_start(void *arg_cb, int n) {
+	fetcher_sourcetable_start_with_config(arg_cb, n, NULL);
 }

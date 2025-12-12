@@ -246,7 +246,7 @@ struct ntrip_state {
 };
 
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev,
-	char *host, unsigned short port, const char *uri, char *mountpoint);
+	char *host, unsigned short port, const char *uri, char *mountpoint, struct config *new_config);
 struct config *ntrip_refresh_config(struct ntrip_state *this);
 int ntrip_quota_incr(struct ntrip_state *this);
 void ntrip_quota_decr(struct ntrip_state *this);
