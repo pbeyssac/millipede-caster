@@ -1,4 +1,4 @@
-Millipede 0.8.1
+Millipede 0.8.2
 ===============
 
 
@@ -9,7 +9,7 @@ Millipede uses libevent2 for minimal memory footprint.
 
 It can easily handle tens of thousands of NTRIP sessions on a minimal server.
 
-Currently runs on FreeBSD.
+Currently runs on FreeBSD and Linux.
 
 Features:
  * "Virtual" "near" base algorithm which picks the nearest base from the source table
@@ -24,6 +24,7 @@ Features:
  * GELF/Graylog export with bulk mode
  * JSON API for remote administration and monitoring
  * API tool `mapi`
+ * Multi-threaded mode
 
 The current version requires:
  * libcyaml
@@ -42,6 +43,7 @@ Building
 ========
 
 FreeBSD: `cd caster; make clean depend all`
+
 Debian: `cd caster; make clean all`
 
 Installation (FreeBSD)
