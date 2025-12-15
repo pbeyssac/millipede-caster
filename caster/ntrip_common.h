@@ -47,6 +47,7 @@ enum ntrip_chunk_state {
 	CHUNK_IN_PROGRESS,	// in chunk
 	CHUNK_WAITING_TRAILER,	// waiting for "\r\n" trailer
 	CHUNK_LAST,		// like CHUNK_WAITING_TRAILER, but last chunk
+	CHUNK_ERR,		// error or pending error
 	CHUNK_END		// finished, ready to be freed
 };
 

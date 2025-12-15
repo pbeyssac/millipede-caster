@@ -783,9 +783,10 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 			if (sscanf(line, "%zx", &chunk_len) != 1) {
 				ntrip_log(st, LOG_NOTICE, "failed chunk_len: \"%s\"", line);
 				free(line);
-				ntrip_set_state(st, NTRIP_FORCE_CLOSE);
-				st->chunk_state = CHUNK_NONE;
+				st->chunk_state = CHUNK_ERR;
 				ntrip_log(st, LOG_EDEBUG, "ntrip_chunk_decode OK/ERROR done %d", len_done);
+				if (len_done == 0)
+					ntrip_set_state(st, NTRIP_FORCE_CLOSE);
 				return len_done?BEV_OK:BEV_ERROR;
 			}
 			free(line);
@@ -795,6 +796,9 @@ static enum bufferevent_filter_result ntrip_chunk_decode(struct evbuffer *input,
 			} else
 				st->chunk_state = CHUNK_IN_PROGRESS;
 			st->chunk_len = chunk_len;
+		} else if (st->chunk_state == CHUNK_ERR) {
+			ntrip_set_state(st, NTRIP_FORCE_CLOSE);
+			return BEV_ERROR;
 		} else if (st->chunk_state == CHUNK_IN_PROGRESS) {
 			int len_used;
 			if (len_raw <= st->chunk_len) {
