@@ -430,13 +430,14 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			st->mountpoint = NULL;
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if (line)
+				st->received_bytes += len + 2;
 			if ((line?len:waiting_len) > config->http_header_max_size) {
 				err = 400;
 				break;
 			}
 			if (!line)
 				break;
-			st->received_bytes += len;
 			ntrip_log(st, LOG_DEBUG, "Method \"%s\", %zd bytes", line, len);
 			int i = 0;
 			char *septmp = line;
@@ -469,13 +470,14 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			st->received_keepalive = 0;
 		} else if (ntrip_get_state(st) == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if (line)
+				st->received_bytes += len + 2;
 			if ((line?len:waiting_len) > config->http_header_max_size) {
 				err = 431;
 				break;
 			}
 			if (!line)
 				break;
-			st->received_bytes += len + 2;
 			ntrip_log(st, LOG_EDEBUG, "Header \"%s\", %zd bytes", line, len);
 			if (len != 0) {
 				char *key, *value;
@@ -774,10 +776,10 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 			}
 		} else if (ntrip_get_state(st) == NTRIP_WAIT_CLIENT_INPUT) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if (line)
+				st->received_bytes += len + 2;
 			if (!line)
 				break;
-			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
-			st->received_bytes += len + 1;
 			pos_t pos;
 			if (parse_gga(line, &pos) >= 0) {
 				st->last_pos = pos;

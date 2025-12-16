@@ -158,6 +158,8 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			ntrip_clear_request(st);
 
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if (line)
+				st->received_bytes += len + 2;
 			if ((line?len:waiting_len) > config->http_header_max_size) {
 				end = 1;
 				break;
@@ -215,6 +217,8 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 
 		} else if (state == NTRIP_WAIT_HTTP_HEADER) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if (line)
+				st->received_bytes += len + 2;
 			if ((line?len:waiting_len) > config->http_header_max_size) {
 				free(line);
 				end = 1;
@@ -222,7 +226,6 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			}
 			if (!line)
 				break;
-			st->received_bytes += len + 2;
 			if (len == 0) {
 				ntrip_log(st, LOG_DEBUG, "[End headers]");
 				if (st->chunk_state == CHUNK_INIT && ntrip_chunk_decode_init(st) < 0) {
@@ -284,6 +287,8 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 			free(line);
 		} else if (state == NTRIP_WAIT_CALLBACK_LINE) {
 			line = evbuffer_readln(st->input, &len, EVBUFFER_EOL_CRLF);
+			if (line)
+				st->received_bytes += len + 2;
 			if (!line)
 				break;
 			/* Add 1 for the trailing LF or CR LF. We don't care for the exact count. */
