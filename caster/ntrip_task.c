@@ -150,6 +150,7 @@ int ntrip_task_start(struct ntrip_task *this, void *reschedule_arg, struct lives
 	if (st == NULL) {
 		r = -1;
 	} else {
+		st->nograylog = this->nograylog;
 		ntrip_task_set_st(this, st);
 		r = ntripcli_start(st);
 	}

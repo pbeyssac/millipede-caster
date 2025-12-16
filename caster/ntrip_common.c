@@ -118,6 +118,7 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	atomic_store(&this->rtcm_client_state, NTRIP_RTCM_POS_WAIT);
 	this->node = NULL;
 	this->syncer_id = NULL;
+	this->nograylog = 0;
 
 	this->tmpconfig = NULL;
 	if (new_config != NULL) {
@@ -680,7 +681,7 @@ _ntrip_log(struct log *log, struct ntrip_state *this, int level, const char *fmt
 	g.connection_id = this->id;
 
 	if (atomic_load(&this->caster->graylog_log_level) == -1
-		|| (this->config->dyn->graylog && this->config->dyn->graylog[0] && this->task && this->task->nograylog))
+		|| (this->config->dyn->graylog && this->config->dyn->graylog[0] && this->nograylog))
 		g.nograylog = 1;
 
 	if (this->remote) {

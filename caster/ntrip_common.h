@@ -138,6 +138,7 @@ struct ntrip_state {
 
 	char connection_keepalive;		// Flag: request that the connection stays open
 	char received_keepalive;		// Flag: received a keep-alive header from the other end
+	char nograylog;				// Flag: don't log on graylog [avoid log loops]
 	unsigned long content_length;		// Content-Length received from the other end, if any
 	unsigned long content_done;		// How many content bytes have been received
 	char *content;				// Received content
