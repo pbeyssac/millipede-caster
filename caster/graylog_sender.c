@@ -62,6 +62,10 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	if (this == NULL)
 		return NULL;
 	this->task = ntrip_task_new(caster, host, port, uri, tls, retry_delay, bulk_max_size, queue_max_size, "graylog_sender", drainfilename);
+	if (this->task == NULL) {
+		free(this);
+		return NULL;
+	}
 	this->task->method = "POST";
 	this->task->status_timeout = status_timeout;
 	this->task->max_retry_delay = max_retry_delay;
@@ -78,10 +82,6 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	this->task->use_mimeq = 1;
 	this->task->nograylog = 1;
 
-	if (this->task == NULL) {
-		free(this);
-		return NULL;
-	}
 	if (evhttp_add_header(&this->task->headers, "Authorization", authkey) < 0) {
 		ntrip_task_decref(this->task);
 		free(this);
