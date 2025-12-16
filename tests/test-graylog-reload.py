@@ -21,10 +21,11 @@ gr.start()
 
 time.sleep(6)
 
-err += testlib.API_reload(HOST, PORT)
-if err:
-  print("FAIL")
-  sys.exit(err)
+for i in range(100):
+  err += testlib.API_reload(HOST, PORT)
+  if err:
+    print("FAIL")
+    sys.exit(err)
 
 time.sleep(20)
 
