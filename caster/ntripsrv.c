@@ -79,10 +79,10 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 	}
 	if (this->connection_keepalive && this->received_keepalive) {
 		evbuffer_add_reference(ev, "Connection: keep-alive\r\n", 24, NULL, NULL);
-		len += 24;
+		sent += 24;
 	} else {
 		evbuffer_add_reference(ev, "Connection: close\r\n", 19, NULL, NULL);
-		len += 19;
+		sent += 19;
 	}
 	if (headers) {
 		struct evkeyval *np;
@@ -92,7 +92,7 @@ send_server_reply(struct ntrip_state *this, struct evbuffer *ev,
 		}
 	}
 	evbuffer_add_reference(ev, "\r\n", 2, NULL, NULL);
-	len += 2;
+	sent += 2;
 	if (m && evbuffer_add_reference(ev, m->s, m->len, mime_free_callback, m) < 0)
 		// the call failed so we need to free m instead of letting the callback do it.
 		mime_free(m);
