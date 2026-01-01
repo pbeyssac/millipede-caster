@@ -727,6 +727,7 @@ static int caster_reload_listeners(struct caster_state *this,
 	}
 
 	if (nlisteners == 0) {
+		free(new_listeners);
 		logfmt(&this->flog, LOG_CRIT, "No configured ports to listen to, aborting.");
 		return -1;
 	}
