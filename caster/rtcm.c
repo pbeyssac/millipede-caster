@@ -24,9 +24,9 @@ static inline void rtcm_typeset_init(struct rtcm_typeset *this) {
  */
 static inline int rtcm_typeset_check(struct rtcm_typeset *this, int type) {
 	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
-		return getbit(this->set1k, type-RTCM_1K_MIN);
+		return getbit_atomic(this->set1k, type-RTCM_1K_MIN);
 	if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
-		return getbit(this->set4k, type-RTCM_4K_MIN);
+		return getbit_atomic(this->set4k, type-RTCM_4K_MIN);
 	return 0;
 }
 
@@ -35,10 +35,10 @@ static inline int rtcm_typeset_check(struct rtcm_typeset *this, int type) {
  */
 static inline int rtcm_typeset_set(struct rtcm_typeset *this, int type) {
 	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX) {
-		setbit(this->set1k, type-RTCM_1K_MIN);
+		setbit_atomic(this->set1k, type-RTCM_1K_MIN);
 		return 0;
 	} else if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX) {
-		setbit(this->set4k, type-RTCM_4K_MIN);
+		setbit_atomic(this->set4k, type-RTCM_4K_MIN);
 		return 0;
 	}
 	return -1;
@@ -719,12 +719,6 @@ int rtcm_filter_check_mountpoint(struct caster_dynconfig *dyn, const char *mount
 	return hash_table_get_element(dyn->rtcm_filter_dict, mountpoint) != NULL;
 }
 
-static void handle_1006(struct rtcm_info *rp, struct packet *p) {
-	handle_1005_1006(rp, 1006, p);
-	// d += 3;
-	// unsigned short antenna_height = getbits(d, 152, 16);
-}
-
 /*
  * Return the RTCM cache as a JSON object.
  */
@@ -777,6 +771,16 @@ void rtcm_packet_dump(struct ntrip_state *st, struct packet *p) {
 	strfree(out);
 }
 
+static void rtcm_handler_pos(struct ntrip_state *st, struct packet *p, void *arg1) {
+	struct rtcm_info *rp = (struct rtcm_info *)arg1;
+
+	unsigned short type = rtcm_get_type(p);
+
+	P_RWLOCK_WRLOCK(&st->caster->rtcm_lock);
+	handle_1005_1006(rp, type, p);
+	P_RWLOCK_UNLOCK(&st->caster->rtcm_lock);
+}
+
 static void rtcm_handler(struct ntrip_state *st, struct packet *p, void *arg1) {
 	struct rtcm_info *rp = (struct rtcm_info *)arg1;
 	if (!rp)
@@ -785,14 +789,9 @@ static void rtcm_handler(struct ntrip_state *st, struct packet *p, void *arg1) {
 	int len = p->datalen;
 	unsigned short type = rtcm_get_type(p);
 
-	P_RWLOCK_WRLOCK(&st->caster->rtcm_lock);
 	rtcm_typeset_set(&rp->typeset, type);
-
-	if (type == 1005 && len == 25)
-		handle_1005_1006(rp, 1005, p);
-	else if (type == 1006 && len == 27)
-		handle_1006(rp, p);
-	P_RWLOCK_UNLOCK(&st->caster->rtcm_lock);
+	if ((type == 1005 && len == 25) || (type == 1006 && len == 27))
+		joblist_append_ntrip_packet(st->caster->joblist, rtcm_handler_pos, st, p, st->rtcm_info);
 }
 
 /*
@@ -857,7 +856,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			unsigned short type = rtcm_get_type(rtcmp);
 			ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len_rtcm, type);
 			//rtcm_packet_dump(st, rtcmp);
-			joblist_append_ntrip_packet(st->caster->joblist, rtcm_handler, st, rtcmp, st->rtcm_info);
+			rtcm_handler(st, rtcmp, st->rtcm_info);
 		} else
 			ntrip_log(st, LOG_INFO, "RTCM: bad checksum!");
 

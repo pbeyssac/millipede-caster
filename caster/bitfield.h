@@ -1,6 +1,7 @@
 #ifndef __BITFIELD_H__
 #define __BITFIELD_H__
 
+#include <stdatomic.h>
 #include <sys/types.h>
 #include <stdint.h>
 
@@ -97,6 +98,20 @@ static inline int getbit(unsigned char *d, int beg) {
  */
 static inline void setbit(unsigned char *d, int beg) {
 	d[beg>>3] |= 1<<(beg&7);
+}
+
+/*
+ * Get a single bit in an _Atomic bit field
+ */
+static inline int getbit_atomic(_Atomic unsigned char *d, int beg) {
+	return (atomic_load(&d[beg>>3]) & (1<<(beg&7))) != 0;
+}
+
+/*
+ * Set a single bit in an _Atomic bit field
+ */
+static inline void setbit_atomic(_Atomic unsigned char *d, int beg) {
+	atomic_fetch_or(&d[beg>>3], 1<<(beg&7));
 }
 
 void copybits(unsigned char *dst, int *pos_dst, unsigned char *src, int *pos_src, int len);

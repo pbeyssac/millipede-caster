@@ -1,6 +1,7 @@
 #ifndef __RTCM_H__
 #define __RTCM_H__
 
+#include <stdatomic.h>
 #include <sys/time.h>
 
 #include <json-c/json_object.h>
@@ -24,9 +25,9 @@ enum rtcm_conversion {
 
 struct rtcm_typeset {
 	/* bit field for RTCM types 1000-1230 */
-	unsigned char set1k[(RTCM_1K_MAX-RTCM_1K_MIN+8)>>3];
+	_Atomic unsigned char set1k[(RTCM_1K_MAX-RTCM_1K_MIN+8)>>3];
 	/* bit field for RTCM types 4000-4095 */
-	unsigned char set4k[(RTCM_4K_MAX-RTCM_4K_MIN+8)>>3];
+	_Atomic unsigned char set4k[(RTCM_4K_MAX-RTCM_4K_MIN+8)>>3];
 };
 
 struct rtcm_info {
