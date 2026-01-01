@@ -22,8 +22,6 @@ struct caster_state;
 struct packet *packet_new(size_t len_raw);
 struct packet *packet_new_from_string(const char *s);
 int packet_send(struct packet *packet, struct ntrip_state *st, time_t t);
-int packet_handle_raw(struct ntrip_state *st);
-int packet_handle_rtcm(struct ntrip_state *st);
 
 static inline void packet_incref(struct packet *packet) {
 	atomic_fetch_add(&packet->refcnt, 1);
