@@ -5,6 +5,7 @@
 
 #include <json-c/json_object.h>
 
+#include "bitfield.h"
 #include "hash.h"
 #include "packet.h"
 
@@ -59,5 +60,13 @@ struct packet *rtcm_info_pos_packet(struct rtcm_info *this, struct caster_state 
 json_object *rtcm_info_json(struct rtcm_info *this);
 int rtcm_packet_is_pos(struct packet *p);
 int rtcm_packet_handle(struct ntrip_state *st);
+
+/*
+ * Return RTCM packet type, or -1 if not a RTCM packet.
+ */
+static inline unsigned short rtcm_get_type(struct packet *p) {
+	unsigned char *d = p->data;
+	return (p->is_rtcm) ? getbits(d+3, 0, 12) : -1;
+}
 
 #endif

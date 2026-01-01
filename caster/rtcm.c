@@ -388,7 +388,7 @@ static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p
 	int n;
 	int nsat, nsig, ncell;
 
-	int type = getbits(data, 0, 12);
+	int type = rtcm_get_type(p);
 	if ((type < 1077 || type > 1127 || type % 10 != 7) || len < 22)
 		/* Invalid packet type or length, or too short */
 		return NULL;
@@ -571,8 +571,7 @@ int rtcm_filter_pass(struct rtcm_filter *this, struct packet *packet) {
 	if (!packet->is_rtcm)
 		return 0;
 
-	unsigned char *d = packet->data;
-	unsigned short type = getbits(d+3, 0, 12);
+	unsigned short type = rtcm_get_type(packet);
 	return rtcm_typeset_check(&this->pass, type);
 }
 
@@ -585,8 +584,7 @@ struct packet *rtcm_filter_convert(struct rtcm_filter *this, struct ntrip_state 
 	if (this == NULL)
 		return NULL;
 
-	unsigned char *d = packet->data;
-	unsigned short type = getbits(d+3, 0, 12);
+	unsigned short type = rtcm_get_type(packet);
 
 	if (!rtcm_typeset_check(&this->convert, type))
 		return NULL;
@@ -760,18 +758,17 @@ json_object *rtcm_info_json(struct rtcm_info *this) {
  * Return whether a packet is a position packet (types 1005 or 1006).
  */
 int rtcm_packet_is_pos(struct packet *p) {
-	unsigned char *d = p->data;
 	int len = p->datalen;
 	if (!p->is_rtcm || len < 25)
 		return 0;
-	unsigned short type = getbits(d+3, 0, 12);
+	unsigned short type = rtcm_get_type(p);
 	return (type == 1005 && len == 25) || (type == 1006 && len == 27);
 }
 
 void rtcm_packet_dump(struct ntrip_state *st, struct packet *p) {
 	unsigned char *d = p->data;
 	int len = p->datalen;
-	unsigned short type = getbits(d+3, 0, 12);
+	unsigned short type = rtcm_get_type(p);
 	char *out = (char *)strmalloc(4*len + 1);
 	out[4*len] = '\0';
 	for (int i = 0; i < len; i++)
@@ -785,9 +782,8 @@ static void rtcm_handler(struct ntrip_state *st, struct packet *p, void *arg1) {
 	if (!rp)
 		return;
 
-	unsigned char *d = p->data;
 	int len = p->datalen;
-	unsigned short type = getbits(d+3, 0, 12);
+	unsigned short type = rtcm_get_type(p);
 
 	P_RWLOCK_WRLOCK(&st->caster->rtcm_lock);
 	rtcm_typeset_set(&rp->typeset, type);
@@ -858,7 +854,7 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 
 		if (rtcm_crc_check(rtcmp)) {
 			rtcmp->is_rtcm = 1;
-			unsigned short type = getbits(rtcmp->data+3, 0, 12);
+			unsigned short type = rtcm_get_type(rtcmp);
 			ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len_rtcm, type);
 			//rtcm_packet_dump(st, rtcmp);
 			joblist_append_ntrip_packet(st->caster->joblist, rtcm_handler, st, rtcmp, st->rtcm_info);
