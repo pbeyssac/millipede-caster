@@ -7,24 +7,27 @@ import sys
 import threading
 import time
 
-
 #
 # Source stream to server on a given mountpoint, user+password, number of samples
 #
 class SourceStream(object):
-  def __init__(self, host, mountpoint, userpass, n):
+  def __init__(self, host, mountpoint, userpass, n, start_delay=0, packet_delay=1, packet=None):
     self._stop = False
     self._ok = False
     self.host = host
     self.mountpoint = mountpoint.encode('ascii')
     self.b64userpass = base64.b64encode(userpass.encode('ascii'))
     self.n = n
+    self.start_delay = start_delay
+    self.packet_delay = packet_delay
+    self.packet = packet
   def start(self):
     self._thr = threading.Thread(target=self._run, daemon=True, args=())
     self._thr.start()
     # Give time for the source to start
     while not self._ok and self.is_alive():
       time.sleep(.1)
+    time.sleep(self.start_delay)
   def _run(self):
     ssource = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     ssource.connect(self.host)
@@ -35,8 +38,11 @@ class SourceStream(object):
     for i in range(self.n):
       if self._stop:
         break
-      ssource.sendall(b'%s %d\n' % (self.mountpoint, i))
-      time.sleep(1)
+      if self.packet is None:
+        ssource.sendall(b'%s %d\n' % (self.mountpoint, i))
+      else:
+        ssource.sendall(self.packet)
+      time.sleep(self.packet_delay)
     ssource.close()
   def stop(self):
     self._stop = True

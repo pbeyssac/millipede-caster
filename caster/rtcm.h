@@ -48,6 +48,7 @@ struct rtcm_filter {
 
 int rtcm_typeset_parse(struct rtcm_typeset *this, const char *typelist);
 char *rtcm_typeset_str(struct rtcm_typeset *this);
+struct packet *rtcm_convert_msm7(struct packet *p, int msm_version);
 struct hash_table *rtcm_filter_dict_parse(struct rtcm_filter *this, const char *apply);
 void rtcm_filter_free(struct rtcm_filter *this);
 struct rtcm_filter *rtcm_filter_new(const char *pass, const char *convert, enum rtcm_conversion conversion);

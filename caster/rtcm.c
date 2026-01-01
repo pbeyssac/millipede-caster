@@ -371,7 +371,7 @@ static unsigned int rtcm_df407_to_df402(unsigned int df407) {
 /*
  * Convert MSM7 message to MSM3 or MSM4.
  */
-static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p, int msm_version) {
+struct packet *rtcm_convert_msm7(struct packet *p, int msm_version) {
 	unsigned char *data = p->data+3;
 	int len = p->datalen-6;
 	unsigned char *data_rtcm, *data_out;
@@ -384,7 +384,7 @@ static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p
 	unsigned short df407;
 	uint64_t df394, df396;
 	uint32_t df395;
-	char df393;
+	//char df393;
 	int n;
 	int nsat, nsig, ncell;
 
@@ -399,7 +399,7 @@ static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p
 	int pos = 12 + 12 + 30;
 
 	/* Multiple Message Bit */
-	df393 = getbit(data, pos);
+	//df393 = getbit(data, pos);
 
 	// Skip IODS, Reserved field, Clock Steering Indicator, External Clock Indicator,
 	// GNSS Divergence-free Smoothing Indicator, GNSS Smoothing Interval.
@@ -422,10 +422,8 @@ static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p
 
 	int endcell = pos + nsat*nsig;
 
-	if (endcell > len*8) {
-		ntrip_log(st, LOG_EDEBUG, "packet nsat=%d nsig=%d endcell %d len %d not long enough", nsat, nsig, endcell, len*8);
+	if (endcell > len*8)
 		return NULL;
-	}
 
 	/* GNSS Cell Mask */
 	df396 = getbits(data, pos, nsat*nsig);
@@ -433,13 +431,8 @@ static struct packet *rtcm_convert_msm7(struct ntrip_state *st, struct packet *p
 	ncell = count_set(df396);
 
 	int endpos = pos + (8+4+10+14)*nsat + (20+24+10+1+10+15)*ncell;
-	if (endpos > len*8) {
-		ntrip_log(st, LOG_EDEBUG, "packet nsat=%d nsig=%d end %d len %d not long enough", nsat, nsig, endpos, len*8);
+	if (endpos > len*8)
 		return NULL;
-	}
-
-	ntrip_log(st, LOG_EDEBUG, "type %d MM=%d nsat=%d nsig=%d ncell=%d sat %016lx sig %08x cell %016lx",
-			type, df393, nsat, nsig, ncell, df394, df395, df396);
 
 	if (msmv == 4)
 		len_out_bits = 169 + (8+10+nsig)*nsat + (15+22+4+1+6)*ncell;
@@ -589,10 +582,17 @@ struct packet *rtcm_filter_convert(struct rtcm_filter *this, struct ntrip_state 
 	if (!rtcm_typeset_check(&this->convert, type))
 		return NULL;
 
-	if (this->conversion == RTCM_CONV_MSM7_4)
-		return rtcm_convert_msm7(st, packet, 4);
-	else if (this->conversion == RTCM_CONV_MSM7_3)
-		return rtcm_convert_msm7(st, packet, 3);
+	struct packet *p;
+	if (this->conversion == RTCM_CONV_MSM7_4) {
+		p = rtcm_convert_msm7(packet, 4);
+		if (p == NULL)
+			ntrip_log(st, LOG_NOTICE, "Unable to convert MSM7 packet to MSM4");
+	} else if (this->conversion == RTCM_CONV_MSM7_3) {
+		p = rtcm_convert_msm7(packet, 3);
+		if (p == NULL)
+			ntrip_log(st, LOG_NOTICE, "Unable to convert MSM7 packet to MSM3");
+	} else
+		p = NULL;
 	return NULL;
 }
 
