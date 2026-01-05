@@ -333,13 +333,11 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	 */
 	assert(!st->bev_freed);
 
-	P_MUTEX_LOCK(&this->append_mutex);
-
 	/* Drop callback if ntrip_state is waiting for deletion */
-	if (ntrip_get_state(st) == NTRIP_END) {
-		P_MUTEX_UNLOCK(&this->append_mutex);
+	if (ntrip_get_state(st) == NTRIP_END)
 		return;
-	}
+
+	P_MUTEX_LOCK(&this->append_mutex);
 
 	/*
 	 * Check whether the ntrip_state queue is empty.
