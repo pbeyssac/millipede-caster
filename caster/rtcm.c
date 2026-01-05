@@ -593,7 +593,7 @@ struct packet *rtcm_filter_convert(struct rtcm_filter *this, struct ntrip_state 
 			ntrip_log(st, LOG_NOTICE, "Unable to convert MSM7 packet to MSM3");
 	} else
 		p = NULL;
-	return NULL;
+	return p;
 }
 
 /*
