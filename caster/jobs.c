@@ -120,6 +120,16 @@ static void jobs_cond_broadcast(struct joblist *this) {
 }
 
 /*
+ * Wake-up one thread waiting for work.
+ */
+static void jobs_cond_signal(struct joblist *this) {
+	P_MUTEX_LOCK(&this->condlock);
+	if (pthread_cond_signal(&this->condjob) < 0)
+		caster_log_error(this->caster, "pthread_cond_signal");
+	P_MUTEX_UNLOCK(&this->condlock);
+}
+
+/*
  * Run jobs in a job list, on a FIFO basis.
  *
  * Simultaneously run by all workers.
@@ -313,36 +323,32 @@ static int job_equal(struct job *j1, struct job *j2) {
 }
 
 /*
- * Append a new job.
- *
- * If st != NULL:
- *	append to this ntrip_state's job queue.
- *	required lock: ntrip_state.
- *
- * If st == NULL:
- *	append to the main job queue.
- *	no required lock.
+ * Append a new job to the main job queue.
  */
-static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st, struct job *tmpj) {
+static void _joblist_append_generic_caster(struct joblist *this, struct caster_state *caster, struct job *tmpj) {
 	struct job *j = NULL;
-	if (st == NULL) {
-		j = (struct job *)malloc(sizeof(struct job));
-		if (j == NULL) {
-			ntrip_log(st, LOG_CRIT, "Out of memory, cannot allocate job.");
-			return;
-		}
-		memcpy(j, tmpj, sizeof(*j));
-		P_MUTEX_LOCK(&this->append_mutex);
-		assert(this->append_njobs >= 0);
-		STAILQ_INSERT_TAIL(&this->append_jobq, j, next);
-		this->append_njobs++;
-		P_MUTEX_UNLOCK(&this->append_mutex);
-		P_MUTEX_LOCK(&this->condlock);
-		if (pthread_cond_signal(&this->condjob) != 0)
-			caster_log_error(this->caster, "pthread_cond_signal");
-		P_MUTEX_UNLOCK(&this->condlock);
+
+	j = (struct job *)malloc(sizeof(struct job));
+	if (j == NULL) {
+		logfmt(&caster->flog, LOG_CRIT, "Out of memory, cannot allocate job.");
 		return;
 	}
+	memcpy(j, tmpj, sizeof(*j));
+	P_MUTEX_LOCK(&this->append_mutex);
+	assert(this->append_njobs >= 0);
+	STAILQ_INSERT_TAIL(&this->append_jobq, j, next);
+	this->append_njobs++;
+	P_MUTEX_UNLOCK(&this->append_mutex);
+	jobs_cond_signal(this);
+}
+
+/*
+ * Append a new job to a ntrip_state's job queue.
+ *
+ * Required lock: ntrip_state.
+ */
+static void _joblist_append_generic_st(struct joblist *this, struct ntrip_state *st, struct job *tmpj) {
+	struct job *j = NULL;
 
 	/*
 	 * Check the bufferevent has not been freed
@@ -428,10 +434,7 @@ static void _joblist_append_generic(struct joblist *this, struct ntrip_state *st
 	/*
 	 * Signal waiting workers there is a new job.
 	 */
-	P_MUTEX_LOCK(&this->condlock);
-	if (pthread_cond_signal(&this->condjob) != 0)
-		caster_log_error(this->caster, "pthread_cond_signal");
-	P_MUTEX_UNLOCK(&this->condlock);
+	jobs_cond_signal(this);
 }
 
 /*
@@ -449,7 +452,7 @@ void joblist_append(struct joblist *this, void (*cb)(struct bufferevent *bev, vo
 		tmpj.event.cb = cbe;
 		tmpj.event.events = events;
 	}
-	_joblist_append_generic(this, (struct ntrip_state *)arg, &tmpj);
+	_joblist_append_generic_st(this, (struct ntrip_state *)arg, &tmpj);
 }
 
 /*
@@ -461,7 +464,7 @@ void joblist_append_ntrip_locked(struct joblist *this, struct ntrip_state *st, v
 		struct job tmpj;
 		tmpj.type = JOB_NTRIP_LOCK;
 		tmpj.ntrip_locked.cb = cb;
-		_joblist_append_generic(this, st, &tmpj);
+		_joblist_append_generic_st(this, st, &tmpj);
 	} else
 		cb(st);
 }
@@ -475,7 +478,7 @@ void joblist_append_redistribute(struct joblist *this, void (*cb)(struct redistr
 		tmpj.type = JOB_REDISTRIBUTE;
 		tmpj.redistribute.cb = cb;
 		tmpj.redistribute.arg = redis_args;
-		_joblist_append_generic(this, NULL, &tmpj);
+		_joblist_append_generic_caster(this, redis_args->caster, &tmpj);
 	} else
 		cb(redis_args);
 }
@@ -493,7 +496,7 @@ void joblist_append_ntrip_unlocked(struct joblist *this, void (*cb)(struct ntrip
 		tmpj.type = JOB_NTRIP_UNLOCKED;
 		tmpj.ntrip_unlocked.cb = cb;
 		tmpj.ntrip_unlocked.st = st;
-		_joblist_append_generic(this, NULL, &tmpj);
+		_joblist_append_generic_caster(this, st->caster, &tmpj);
 	} else
 		cb(st);
 }
@@ -514,7 +517,7 @@ void joblist_append_ntrip_livesource(struct joblist *this, void (*cb)(struct ntr
 		tmpj.ntrip_livesource.arg1 = arg1;
 		ntrip_incref(st, "joblist_append_ntrip_livesource");
 		livesource_incref(livesource);
-		_joblist_append_generic(this, NULL, &tmpj);
+		_joblist_append_generic_caster(this, st->caster, &tmpj);
 	} else
 		cb(st, livesource, arg1);
 }
@@ -534,7 +537,7 @@ void joblist_append_ntrip_packet(struct joblist *this, void (*cb)(struct ntrip_s
 		tmpj.ntrip_packet.arg1 = arg1;
 		ntrip_incref(st, "joblist_append_ntrip_packet");
 		packet_incref(packet);
-		_joblist_append_generic(this, NULL, &tmpj);
+		_joblist_append_generic_caster(this, st->caster, &tmpj);
 	} else
 		cb(st, packet, arg1);
 }
@@ -558,7 +561,7 @@ void joblist_append_ntrip_unlocked_content(
 		tmpj.ntrip_unlocked_content.content_cb = content_cb;
 		tmpj.ntrip_unlocked_content.req = req;
 		ntrip_incref(st, "joblist_append_ntrip_unlocked_content");
-		_joblist_append_generic(this, NULL, &tmpj);
+		_joblist_append_generic_caster(this, st->caster, &tmpj);
 	} else
 		cb(st, content_cb, req);
 }
