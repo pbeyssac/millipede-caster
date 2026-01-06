@@ -13,6 +13,8 @@
 
 name="caster"
 rcvar="caster_enable"
+extra_commands="reload"
+reload_cmd="${name}_reload"
 
 load_rc_config $name
 
@@ -24,6 +26,12 @@ load_rc_config $name
 
 command="/usr/local/sbin/caster"
 command_args="${caster_args}"
+
+caster_reload() {
+	rc_pid=$(check_process ${command})
+	echo "Reloading ${name}."
+        kill -HUP $rc_pid
+}
 
 cd ${caster_chdir}
 run_rc_command "$1"
