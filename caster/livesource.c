@@ -808,13 +808,13 @@ static int livesource_update_execute_diff(struct caster_state *caster, struct li
 		}
 	} else if (!strcmp(type, "del")) {
 		if (!lr) {
-			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s does not exist", mountpoint);
+			logfmt(&caster->flog, LOG_NOTICE, "update failed: mountpoint %s does not exist", mountpoint);
 			return 503;
 		}
 		hash_table_del(lrlist->hash, mountpoint);
 	} else if (!strcmp(type, "update")) {
 		if (!lr) {
-			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s does not exist", mountpoint);
+			logfmt(&caster->flog, LOG_NOTICE, "update failed: mountpoint %s does not exist", mountpoint);
 			return 503;
 		}
 		const char *lstype = json_object_get_string(json_object_object_get(ls, "type"));

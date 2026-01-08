@@ -44,7 +44,7 @@ static void queue_full(struct syncer *this, struct ntrip_task *task) {
 static void queue_checkserial(struct syncer *this, int n) {
 	struct ntrip_task *task = this->task[n];
 	json_object *j = livesource_checkserial_json(task->caster->livesources);
-	logfmt(&task->caster->flog, LOG_DEBUG, "syncer queue checkserial, serial %lld", task->caster->livesources->serial);
+	logfmt(&task->caster->flog, LOG_DEBUG, "syncer queue %d checkserial, serial %lld", n, task->caster->livesources->serial);
 	queue_json(this, task, j);
 }
 
@@ -60,9 +60,9 @@ void syncer_queue(struct syncer *this, char *json) {
 
 	for (int i = 0; i < this->ntask; i++) {
 		if (this->task[i]->st)
-			ntrip_log(this->task[i]->st, LOG_DEBUG, "syncer %d queueing %s", i, json);
+			ntrip_log(this->task[i]->st, LOG_DEBUG, "syncer %d queueing %.80s", i, json);
 		else
-			logfmt(&this->caster->flog, LOG_DEBUG, "syncer %d queueing %s (not running)", i, json);
+			logfmt(&this->caster->flog, LOG_DEBUG, "syncer %d queueing %.80s (not running)", i, json);
 		ntrip_task_queue(this->task[i], packet);
 	}
 	packet_decref(packet);

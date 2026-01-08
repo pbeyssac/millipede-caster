@@ -45,7 +45,7 @@ struct joblist *joblist_new(struct caster_state *caster) {
 }
 
 /*
- * Required lock: ntrip_state
+ * Required lock (if st queue): ntrip_state
  */
 static int _joblist_drain(struct jobq *jobq, P_MUTEX_T *mutex) {
 	struct job *j;
@@ -102,7 +102,7 @@ void joblist_free(struct joblist *this) {
 	P_MUTEX_DESTROY(&this->append_mutex);
 	P_MUTEX_DESTROY(&this->condlock);
 	if (pthread_cond_destroy(&this->condjob) != 0)
-		caster_log_error(this->caster, "pthread_cond_signal");
+		caster_log_error(this->caster, "pthread_cond_destroy");
 	free(this);
 }
 
