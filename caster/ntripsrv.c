@@ -738,7 +738,13 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					}
 					struct sourceline *sourceline = stack_find_local_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
 					if (sourceline != NULL) {
+						int virtual = sourceline->virtual;
 						sourceline_decref(sourceline);
+						if (virtual) {
+							/* Disallow source on a virtual mountpoint */
+							err = 404;
+							break;
+						}
 					} else if (r != CHECKPW_MOUNTPOINT_WILDCARD) {
 						err = 404;
 						break;

@@ -11,16 +11,20 @@ import time
 # Source stream to server on a given mountpoint, user+password, number of samples
 #
 class SourceStream(object):
-  def __init__(self, host, mountpoint, userpass, n, start_delay=0, packet_delay=1, packet=None):
+  def __init__(self, host, mountpoint, userpass, n, start_delay=0, packet_delay=1, packet=None, post=True):
     self._stop = False
     self._ok = False
     self.host = host
     self.mountpoint = mountpoint.encode('ascii')
+    self.userpass = userpass.encode('ascii').split(b':', 1)
     self.b64userpass = base64.b64encode(userpass.encode('ascii'))
     self.n = n
     self.start_delay = start_delay
     self.packet_delay = packet_delay
     self.packet = packet
+    self.post = post
+    self.status = None
+    self.httpreply = None
   def start(self):
     self._thr = threading.Thread(target=self._run, daemon=True, args=())
     self._thr.start()
@@ -31,9 +35,16 @@ class SourceStream(object):
   def _run(self):
     ssource = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     ssource.connect(self.host)
-    ssource.sendall(b'POST /%s HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic %s\n\n'
-        % (self.mountpoint, self.b64userpass))
+    if self.post:
+      ssource.sendall(b'POST /%s HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic %s\n\n'
+          % (self.mountpoint, self.b64userpass))
+    else:
+      ssource.sendall(b'SOURCE %s %s\nUser-Agent: NTRIP test\n\n'
+          % (self.userpass[1], self.mountpoint))
     sdata = ssource.recv(10240)
+    httpreply = sdata.split(b' ', 2)
+    self.status = httpreply[1]
+    self.httpreply = sdata.split(b'\r', 1)[0]
     self._ok = True
     for i in range(self.n):
       if self._stop:
