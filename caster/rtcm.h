@@ -47,6 +47,7 @@ struct rtcm_filter {
 	enum rtcm_conversion conversion;	// type of conversion
 };
 
+int rtcm_crc_check(struct packet *p);
 int rtcm_typeset_parse(struct rtcm_typeset *this, const char *typelist);
 char *rtcm_typeset_str(struct rtcm_typeset *this);
 struct packet *rtcm_convert_msm7(struct packet *p, int msm_version);

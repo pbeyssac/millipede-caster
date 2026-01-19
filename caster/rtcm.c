@@ -193,7 +193,7 @@ static unsigned long rtcm_crc24q_hash(unsigned char *data, size_t len) {
 	return crc;
 }
 
-static int rtcm_crc_check(struct packet *p) {
+int rtcm_crc_check(struct packet *p) {
 	int len = p->datalen;
 	if (len < 4)
 		return 0;
