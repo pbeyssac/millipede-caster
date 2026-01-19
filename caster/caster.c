@@ -389,7 +389,7 @@ static int caster_reload_syncers(struct caster_state *this, struct config *confi
 			newdyn->syncers[i] = syncer_new(this, config->node, config->node_count, "/adm/api/v1/sync", 0);
 			if (newdyn->syncers[i] == NULL) {
 				for (int j = 0; j < i; j++)
-					syncer_free(newdyn->syncers[i]);
+					syncer_free(newdyn->syncers[j]);
 				free(newdyn->syncers);
 				return -1;
 			}
