@@ -84,7 +84,7 @@ void filedate(char *filename, size_t len, const char *format);
 char *mystrcasestr(const char *s, const char *find);
 
 #if DEBUG
-extern int str_alloc;
+extern _Atomic int str_alloc;
 struct mime_content *malloc_stats_dump(int json);
 #endif
 

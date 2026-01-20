@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <math.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -467,36 +468,24 @@ void timeval_to_json(struct timeval *t, json_object *json, const char *json_key)
 }
 
 #if DEBUG
-int str_alloc = 0;
-
-static P_MUTEX_T strmutex = PTHREAD_MUTEX_INITIALIZER;
+_Atomic int str_alloc = 0;
 
 char *mystrdup(const char *str) {
-	P_MUTEX_LOCK(&strmutex);
-	str_alloc++;
-	P_MUTEX_UNLOCK(&strmutex);
+	atomic_fetch_add(&str_alloc, 1);
 	return strdup(str);
 }
 void *strmalloc(size_t len) {
-	P_MUTEX_LOCK(&strmutex);
-	str_alloc++;
-	P_MUTEX_UNLOCK(&strmutex);
+	atomic_fetch_add(&str_alloc, 1);
 	return malloc(len);
 }
 void *strrealloc(void *p, size_t len) {
-	if (p == NULL) {
-		P_MUTEX_LOCK(&strmutex);
-		str_alloc++;
-		P_MUTEX_UNLOCK(&strmutex);
-	}
+	if (p == NULL)
+		atomic_fetch_add(&str_alloc, 1);
 	return realloc(p, len);
 }
 void strfree(void *str) {
-	if (str) {
-		P_MUTEX_LOCK(&strmutex);
-		str_alloc--;
-		P_MUTEX_UNLOCK(&strmutex);
-	}
+	if (str)
+		atomic_fetch_sub(&str_alloc, 1);
 	free(str);
 }
 #endif
