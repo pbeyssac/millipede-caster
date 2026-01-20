@@ -545,6 +545,79 @@ static int test_msm7_msm4() {
 	return fail;
 }
 
+static int timeval_from_iso_date_test() {
+	int fail = 0;
+	puts("timeval_from_iso_date");
+
+	struct timeval_test {
+		char *input;
+		struct timeval expected;
+		int should_pass;
+	};
+
+	struct timeval_test testlist[] = {
+		// Valid tests with milliseconds
+		{"2024-01-15T10:30:45.123Z", { 1705314645, 123000 }, 1},
+		{"2023-12-31T23:59:59.999Z", { 1704067199, 999000 }, 1},
+		{"2024-02-29T12:00:00.500Z", { 1709208000, 500000 }, 1},  // Leap year
+
+		// Valid tests without milliseconds
+		{"2024-01-15T10:30:45Z", { 1705314645, 0 }, 1},
+		{"2023-12-31T23:59:59Z", { 1704067199, 0 }, 1},
+		{"2024-02-29T12:00:00Z", { 1709208000, 0 }, 1},      // Leap year
+
+		// Edge cases - epoch and dates
+		{"1970-01-01T00:00:00Z", { 0, 0 }, 1},
+		{"1970-01-01T00:00:00.000Z", { 0, 0 }, 1},
+
+		// Various dates throughout the year
+		{"2004-11-11T08:30:15.250Z", { 1100161815, 250000 }, 1},
+		{"2024-07-14T18:00:00Z", { 1720980000, 0 }, 1},
+		{"2024-12-25T00:00:00.001Z", { 1735084800, 1000 }, 1},
+
+		// Invalid formats (should not crash, but result is undefined)
+		{"2024-01-15T10:30:45", { 0, 0 }, 0},
+		{"2024-01-15 10:30:45Z", { 0, 0 }, 0},
+		{"invalid-date", { 0, 0 }, 0},
+		{"2024-13-01T10:30:45Z", { 0, 0 }, 0},  // Invalid month
+		{"2024-01-32T10:30:45Z", { 0, 0 }, 0},  // Invalid day
+		{"2024-01-15T25:30:45Z", { 0, 0 }, 0},  // Invalid hour
+		{"2024-01-15T10:60:45Z", { 0, 0 }, 0},  // Invalid minute
+		{"2024-01-15T10:30:59Z", { 1705314659, 0 }, 1},
+		{"2024-01-15T10:30:60Z", { 1705314660, 0 }, 1},
+		// {"2024-01-15T10:31:61Z", { 1705314660, 0 }, 0},	// result differs on Linux vs BSD
+		{"2024-01-15T10:31:62Z", { 1705314660, 0 }, 0},  // Invalid second
+		{NULL, { 0, 0 }, 0}
+	};
+
+	for (struct timeval_test *t = testlist; t->input; t++) {
+		struct timeval result;
+		int r;
+		r = timeval_from_iso_date(&result, t->input);
+
+		if (t->should_pass && r) {
+			if (result.tv_sec == t->expected.tv_sec && result.tv_usec == t->expected.tv_usec) {
+				putchar('.');
+			} else {
+				printf("\nFAIL: input='%s'\n", t->input);
+				printf("  Expected: tv_sec=%ld tv_usec=%ld\n", t->expected.tv_sec, t->expected.tv_usec);
+				printf("  Got:      tv_sec=%ld tv_usec=%ld\n", result.tv_sec, result.tv_usec);
+				fail++;
+			}
+		} else if (t->should_pass && !r) {
+			fail++;
+			printf("FAIL on %s: unable to convert\n", t->input);
+		} else if (!t->should_pass && r) {
+			fail++;
+			printf("FAIL on %s: converted a wrong input\n", t->input);
+		} else if (!t->should_pass && !r) {
+			putchar('.');
+		}
+	}
+	putchar('\n');
+	return fail;
+}
+
 #if 0
 static void sourcetable_test(struct sourcetable *sourcetable) {
 	char *ggalist[] = {
@@ -583,5 +656,6 @@ int main() {
 	fail += test_prefix_table();
 	fail += test_ip_convert();
 	fail += test_msm7_msm4();
+	fail += timeval_from_iso_date_test();
 	return fail != 0;
 }
