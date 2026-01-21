@@ -14,7 +14,7 @@
 /*
  * Queue a GELF/JSON log entry.
  */
-void graylog_sender_queue(struct graylog_sender *this, char *json) {
+void graylog_sender_queue(struct graylog_sender *this, const char *json) {
 	struct packet *packet = packet_new_from_string(json);
 	if (packet == NULL){
 		logfmt(&this->task->caster->flog, LOG_CRIT, "No configured ports to listen to, aborting.");

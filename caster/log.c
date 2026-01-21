@@ -1,4 +1,5 @@
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,11 +89,12 @@ static void logfmt_syslog(struct log *this, struct gelf_entry *g, int level, con
 }
 
 static void logfmt_graylog(struct log *this, struct caster_state *caster, struct gelf_entry *g) {
+	if (atomic_load(&caster->graylog_log_level) == -1)
+		return;
 	json_object *j = gelf_json(g);
-	char *s = mystrdup(json_object_to_json_string(j));
-	json_object_put(j);
+	const char *s = json_object_to_json_string(j);
 	graylog_sender_queue(caster->config->dyn->graylog[0], s);
-	strfree(s);
+	json_object_put(j);
 }
 
 void
@@ -146,11 +148,13 @@ vlogall(struct caster_state *caster, struct gelf_entry *g, struct log *log, int 
 	}
 
 	if (!g->nograylog && caster->graylog_log_level != -1 && caster->config && level <= log->graylog_level) {
-		if (g->short_message == NULL)
+		if (g->short_message == NULL) {
 			g->short_message = msg;
+			msg = NULL;
+		}
 		logfmt_graylog(log, caster, g);
-		g->short_message = NULL;
 	}
-
+	free(g->short_message);
+	g->short_message = NULL;
 	free(msg);
 }

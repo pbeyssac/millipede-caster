@@ -10,7 +10,7 @@ struct graylog_sender {
 	struct ntrip_task *task;
 };
 
-void graylog_sender_queue(struct graylog_sender *this, char *json);
+void graylog_sender_queue(struct graylog_sender *this, const char *json);
 struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	const char *host, unsigned short port, const char *uri, int tls,
 	int status_timeout, int retry_delay, int max_retry_delay,
