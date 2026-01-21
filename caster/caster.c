@@ -65,49 +65,6 @@ void caster_log_error(struct caster_state *this, char *orig) {
 	logfmt(&this->flog, LOG_ERR, "%s: %s (%d)", orig, s, errno);
 }
 
-static void
-_caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, int level, const char *fmt, va_list ap) {
-	char date[36];
-	struct gelf_entry localg;
-	int thread_id = threads?(long)pthread_getspecific(caster->thread_id):-1;
-
-	if (g == NULL) {
-		g = &localg;
-		gelf_init(g, level, caster->hostname, thread_id);
-	} else {
-		g->hostname = caster->hostname;
-		g->thread_id = thread_id;
-	}
-
-	logdate(date, sizeof date, &g->ts);
-
-	char *msg;
-	vasprintf(&msg, fmt, ap);
-
-	if (level <= atomic_load(&caster->log_level)) {
-		if (threads)
-			logfmt_direct(log, "%s [%lu] %s\n", date, (long)pthread_getspecific(caster->thread_id), msg);
-		else
-			logfmt_direct(log, "%s %s\n", date, msg);
-	}
-
-	if (g->short_message == NULL)
-		g->short_message = msg;
-	else
-		free(msg);
-
-	if (level != -1 && !g->nograylog && level <= atomic_load(&caster->graylog_log_level)) {
-		json_object *j = gelf_json(g);
-		char *s = mystrdup(json_object_to_json_string(j));
-		json_object_put(j);
-		graylog_sender_queue(caster->config->dyn->graylog[0], s);
-		strfree(s);
-	}
-
-	free(g->short_message);
-	g->short_message = NULL;
-}
-
 /*
  * Caster access log.
  * level -1 => not sent to graylog.
@@ -115,14 +72,15 @@ _caster_log(struct caster_state *caster, struct gelf_entry *g, struct log *log, 
 static void
 caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	_caster_log(this, g, &this->alog, -1, fmt, ap);
+	vlogall(this, g, &this->alog, -1, fmt, ap);
 }
 
 static void
 caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	if (level <= atomic_load(&this->log_level) || level <= atomic_load(&this->graylog_log_level))
-		_caster_log(this, g, &this->flog, level, fmt, ap);
+	struct log *log = &this->flog;
+	if (level >= 0 && level <= log->max_log_level)
+		vlogall(this, g, &this->flog, level, fmt, ap);
 }
 
 /*
@@ -337,8 +295,8 @@ caster_new(const char *config_file, int nbase) {
 
 	this->joblist = threads ? joblist_new(this) : NULL;
 
-	int r1 = log_init(&this->flog, NULL, &caster_log_cb, this);
-	int r2 = log_init(&this->alog, NULL, &caster_alog, this);
+	int r1 = log_init(&this->flog, NULL, &caster_log_cb, -1, -1, -1, -1, this);
+	int r2 = log_init(&this->alog, NULL, &caster_alog, -1, -1, -1, -1, this);
 
 	if (err || r1 < 0 || r2 < 0 || !this->config_dir
 	    || (threads && this->joblist == NULL)
@@ -755,9 +713,13 @@ caster_reopen_logs(struct caster_state *this, struct config *config) {
 	int r = 0;
 	char *config_log = joinpath(this->config_dir, config->log);
 	char *access_log = joinpath(this->config_dir, config->access_log);
-	if (config_log == NULL || log_reopen(&this->flog, config_log) < 0)
+	int syslog_facility = config->syslog_count?config->syslog[0].facility:-1;
+	int syslog_level = config->syslog_count?config->syslog[0].log_level:-1;
+	int graylog_level = config->graylog_count?config->graylog[0].log_level:-1;
+	if (config_log == NULL || log_reopen(&this->flog, config_log,
+			config->log_level, graylog_level, syslog_level, syslog_facility) < 0)
 		r = -1;
-	if (access_log == NULL || log_reopen(&this->alog, access_log) < 0)
+	if (access_log == NULL || log_reopen(&this->alog, access_log, -1, -1, -1, -1) < 0)
 		r = -1;
 	strfree(config_log);
 	strfree(access_log);
@@ -926,7 +888,6 @@ static int caster_load(struct caster_state *this, int restart) {
 
 	P_RWLOCK_WRLOCK(&this->configlock);
 	atomic_store(&this->config, new_config);
-	atomic_store(&this->log_level, new_config->log_level);
 	atomic_store(&this->backlog_evbuffer, new_config->backlog_evbuffer);
 	P_RWLOCK_UNLOCK(&this->configlock);
 

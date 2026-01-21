@@ -2,6 +2,7 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 
 #include <cyaml/cyaml.h>
 
@@ -113,6 +114,22 @@ static const cyaml_strval_t log_level_strings[] = {
 	{ "INFO", LOG_INFO },
 	{ "DEBUG", LOG_DEBUG },
 	{ "EDEBUG", LOG_EDEBUG },
+};
+
+/*
+ * YAML mapping from syslog facility to integer values
+ */
+static const cyaml_strval_t facility_strings[] = {
+	{ "daemon", LOG_DAEMON },
+	{ "user", LOG_USER },
+	{ "local0", LOG_LOCAL0 },
+	{ "local1", LOG_LOCAL1 },
+	{ "local2", LOG_LOCAL2 },
+	{ "local3", LOG_LOCAL3 },
+	{ "local4", LOG_LOCAL4 },
+	{ "local5", LOG_LOCAL5 },
+	{ "local6", LOG_LOCAL6 },
+	{ "local7", LOG_LOCAL7 },
 };
 
 /*
@@ -230,6 +247,23 @@ static const cyaml_schema_value_t graylog_schema = {
 		struct config_graylog, graylog_fields_schema),
 };
 
+static const cyaml_schema_field_t syslog_fields_schema[] = {
+	CYAML_FIELD_ENUM(
+			"log_level", CYAML_FLAG_DEFAULT,
+			struct config_syslog, log_level, log_level_strings,
+			CYAML_ARRAY_LEN(log_level_strings)),
+	CYAML_FIELD_ENUM(
+			"facility", CYAML_FLAG_CASE_INSENSITIVE,
+			struct config_syslog, facility, facility_strings,
+			CYAML_ARRAY_LEN(facility_strings)),
+	CYAML_FIELD_END
+};
+
+static const cyaml_schema_value_t syslog_schema = {
+	CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT,
+		struct config_syslog, syslog_fields_schema),
+};
+
 static const cyaml_schema_field_t threads_fields_schema[] = {
 	CYAML_FIELD_INT(
 		"stacksize", CYAML_FLAG_OPTIONAL, struct config_threads, stacksize),
@@ -317,6 +351,9 @@ static const cyaml_schema_field_t top_mapping_schema[] = {
 	CYAML_FIELD_SEQUENCE(
 		"graylog", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
 		struct config, graylog, &graylog_schema, 0, 1),
+	CYAML_FIELD_SEQUENCE(
+		"syslog", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL,
+		struct config, syslog, &syslog_schema, 0, 1),
 	CYAML_FIELD_STRING_PTR(
 		"source_auth_file", CYAML_FLAG_POINTER, struct config, source_auth_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_STRING_PTR(

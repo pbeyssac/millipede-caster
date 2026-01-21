@@ -115,6 +115,11 @@ struct config_graylog {
 	const char *drainfilename;
 };
 
+struct config_syslog {
+	int log_level;
+	int facility;
+};
+
 struct config_threads {
 	/* Thread stack size */
 	size_t	stacksize;
@@ -194,6 +199,12 @@ struct config {
 	 */
 	struct config_graylog	*graylog;
 	int			graylog_count;
+
+	/*
+	 * Syslog configuration
+	 */
+	struct config_syslog	*syslog;
+	int			syslog_count;
 
 	/*
 	 * Sizes of accepted backlogs before we drop a client.

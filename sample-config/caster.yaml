@@ -33,6 +33,13 @@ listen:
 #    port:			2101
 
 #
+# Optional syslog configuration
+#
+#syslog:
+#  - facility:	local0
+#    log_level:	DEBUG
+
+#
 # Optional Graylog log server configuration.
 #
 #graylog:
