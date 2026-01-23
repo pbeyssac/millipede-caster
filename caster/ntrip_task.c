@@ -393,7 +393,6 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 			task->pending = 1;
 		}
 	}
-	P_RWLOCK_UNLOCK(&task->mimeq_lock);
 
 	/*
 	 * Only expect a reply from the server if we sent a HTTP request.
@@ -402,6 +401,7 @@ void ntrip_task_send_next_request(struct ntrip_state *st) {
 	 */
 	struct timeval read_timeout = { st->task->pending ? st->task->status_timeout : 0 };
 	bufferevent_set_timeouts(st->bev, &read_timeout, NULL);
+	P_RWLOCK_UNLOCK(&task->mimeq_lock);
 }
 
 /*
