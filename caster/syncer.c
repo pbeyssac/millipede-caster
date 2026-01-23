@@ -206,7 +206,6 @@ int syncer_reload(struct syncer *this,
 					err = 1;
 					break;
 				}
-				queue_full(this, nt);
 		}
 		tasks[i] = nt;
 	}
@@ -274,7 +273,7 @@ static void
 syncer_start_config(void *arg_cb, int n, struct config *new_config) {
 	struct syncer *a = (struct syncer *)arg_cb;
 	struct ntrip_task *task = a->task[n];
-
+	queue_full(a, task);
 	ntrip_task_start(task, a, NULL, 0, new_config);
 }
 
