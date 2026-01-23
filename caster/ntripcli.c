@@ -497,10 +497,19 @@ ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int t
 	if (livesource)
 		livesource_incref(livesource);
 	st->persistent = persistent;
+
+	struct timeval read_timeout = { st->config->ntripcli_default_read_timeout, 0 };
+	struct timeval write_timeout = { st->config->ntripcli_default_write_timeout, 0 };
+
 	if (task) {
 		st->task = task;
+		read_timeout.tv_sec = task->read_timeout;
+		write_timeout.tv_sec = task->write_timeout;
+		st->connection_keepalive = st->task->connection_keepalive;
 		task->start = st->start;
 	}
+
+	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 	return st;
 }
 
@@ -511,10 +520,7 @@ ntripcli_start(struct ntrip_state *st) {
 	ntrip_incref(st, "ntripcli_start");
 	ntrip_register(st);
 	ntrip_log(st, LOG_NOTICE, "Starting %s from %s:%d", st->type, st->host, st->port);
-	if (st->task) {
-		ntrip_log(st, LOG_NOTICE, "Connection: (keepalive) %d", st->task->connection_keepalive);
-		st->connection_keepalive = st->task->connection_keepalive;
-	}
+	ntrip_log(st, LOG_NOTICE, "Connection: (keepalive) %d", st->connection_keepalive);
 
 	if (threads)
 		bufferevent_setcb(bev, ntripcli_workers_readcb, ntripcli_workers_writecb, ntripcli_workers_eventcb, st);
@@ -522,12 +528,6 @@ ntripcli_start(struct ntrip_state *st) {
 		bufferevent_setcb(bev, ntripcli_readcb, ntripcli_writecb, ntripcli_eventcb, st);
 
 	bufferevent_enable(bev, EV_READ|EV_WRITE);
-
-	struct timeval read_timeout = {
-		st->task && st->task->read_timeout ? st->task->read_timeout : st->config->ntripcli_default_read_timeout, 0 };
-	struct timeval write_timeout = {
-		st->task && st->task->write_timeout ? st->task->write_timeout : st->config->ntripcli_default_write_timeout, 0 };
-	bufferevent_set_timeouts(bev, &read_timeout, &write_timeout);
 
 	bufferevent_socket_connect_hostname(bev, st->caster->dns_base, AF_UNSPEC, st->host, st->port);
 
