@@ -885,14 +885,14 @@ static int caster_load(struct caster_state *this, int restart) {
 		r = -1;
 	if (caster_reload_rtcm_filters(this, new_config, newdyn) < 0)
 		r = -1;
+	if (caster_reload_graylog(this, new_config, newdyn) < 0)
+		r = -1;
 
 	P_RWLOCK_WRLOCK(&this->configlock);
 	atomic_store(&this->config, new_config);
 	atomic_store(&this->backlog_evbuffer, new_config->backlog_evbuffer);
 	P_RWLOCK_UNLOCK(&this->configlock);
 
-	if (caster_reload_graylog(this, new_config, newdyn) < 0)
-		r = -1;
 	if (caster_reload_listeners(this, new_config, olddyn, newdyn) < 0)
 		r = -1;
 	if (caster_reload_fetchers(this, new_config, olddyn, newdyn) < 0)
