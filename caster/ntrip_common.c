@@ -415,7 +415,9 @@ void ntrip_free(struct ntrip_state *this, char *orig) {
 
 static void ntrip_deferred_free2(struct ntrip_state *this) {
 	struct caster_state *caster = this->caster;
+	bufferevent_lock(this->bev);
 	ntrip_log(this, LOG_EDEBUG, "ntrip_deferred_free2");
+	bufferevent_unlock(this->bev);
 
 	P_RWLOCK_WRLOCK(&this->caster->quotalock);
 	ntrip_quota_decr(this);
