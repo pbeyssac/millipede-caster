@@ -444,10 +444,12 @@ static void ntrip_task_free(struct ntrip_task *this) {
 }
 
 void ntrip_task_incref(struct ntrip_task *this) {
+	assert(this->refcnt > 0);
 	atomic_fetch_add(&this->refcnt, 1);
 }
 
 void ntrip_task_decref(struct ntrip_task *this) {
+	assert(this->refcnt > 0);
 	if (atomic_fetch_add_explicit(&this->refcnt, -1, memory_order_relaxed) == 1)
 		ntrip_task_free(this);
 }

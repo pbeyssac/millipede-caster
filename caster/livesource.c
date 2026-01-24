@@ -202,11 +202,13 @@ static void livesource_end(struct livesource *this) {
 }
 
 void livesource_decref(struct livesource *this) {
+	assert(this->refcnt > 0);
 	if (atomic_fetch_sub_explicit(&this->refcnt, 1, memory_order_relaxed) == 1)
 		livesource_free(this);
 }
 
 void livesource_incref(struct livesource *this) {
+	assert(this->refcnt > 0);
 	atomic_fetch_add_explicit(&this->refcnt, 1, memory_order_relaxed);
 }
 

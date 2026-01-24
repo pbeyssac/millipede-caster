@@ -444,6 +444,7 @@ static void ntrip_deferred_free2(struct ntrip_state *this) {
  * No lock needed.
  */
 void ntrip_incref(struct ntrip_state *this, char *orig) {
+	assert(this->refcnt > 0);
 	atomic_fetch_add(&this->refcnt, 1);
 }
 
@@ -452,6 +453,7 @@ void ntrip_incref(struct ntrip_state *this, char *orig) {
  * Required lock: ntrip_state
  */
 void ntrip_decref(struct ntrip_state *this, char *orig) {
+	assert(this->refcnt > 0);
 	if (atomic_fetch_sub(&this->refcnt, 1) == 1) {
 		assert(ntrip_get_state(this) == NTRIP_END);
 		ntrip_deferred_free(this, orig);

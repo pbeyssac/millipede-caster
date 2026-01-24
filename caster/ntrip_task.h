@@ -18,7 +18,7 @@ enum task_state {
  * Descriptor for a regularly scheduled outgoing connection task.
  */
 struct ntrip_task {
-	_Atomic u_int refcnt;
+	_Atomic int refcnt;
 
 	/* Host, port, whether to use TLS */
 	char *host;

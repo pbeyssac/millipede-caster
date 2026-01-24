@@ -1,6 +1,7 @@
 #ifndef __SOURCELINE_H__
 #define __SOURCELINE_H__
 
+#include <assert.h>
 #include <stdatomic.h>
 
 #include "queue.h"
@@ -28,6 +29,7 @@ struct sourceline *sourceline_new(const char *host, unsigned short port, int tls
 struct sourceline *sourceline_new_parse(const char *entry, const char *caster, unsigned short port, int tls, int priority, int on_demand);
 
 static inline void sourceline_incref(struct sourceline *this) {
+	assert(this->refcnt > 0);
 	atomic_fetch_add(&this->refcnt, 1);
 }
 

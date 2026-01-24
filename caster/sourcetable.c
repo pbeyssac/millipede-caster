@@ -159,10 +159,12 @@ static void sourcetable_free(struct sourcetable *this) {
 }
 
 void sourcetable_incref(struct sourcetable *this) {
+	assert(this->refcnt > 0);
 	atomic_fetch_add(&this->refcnt, 1);
 }
 
 void sourcetable_decref(struct sourcetable *this) {
+	assert(this->refcnt > 0);
 	if (atomic_fetch_add_explicit(&this->refcnt, -1, memory_order_relaxed) == 1)
 		sourcetable_free(this);
 }

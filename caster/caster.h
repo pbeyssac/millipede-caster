@@ -35,7 +35,7 @@ struct listener {
 	int tls;			// is TLS activated?
 	SSL_CTX *ssl_server_ctx;	// TLS context, certs etc.
 	char *hostname;			// hostname for TLS/SNI
-	_Atomic u_int refcnt;
+	_Atomic int refcnt;
 };
 
 /* Structure passed to signal callback for caster termination */

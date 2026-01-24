@@ -60,10 +60,12 @@ static void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
 }
 
 void fetcher_sourcetable_incref(struct sourcetable_fetch_args *this) {
+	assert(this->refcnt > 0);
 	atomic_fetch_add(&this->refcnt, 1);
 }
 
 void fetcher_sourcetable_decref(struct sourcetable_fetch_args *this) {
+	assert(this->refcnt > 0);
 	if (atomic_fetch_sub(&this->refcnt, 1) == 1)
 		fetcher_sourcetable_free(this);
 }
