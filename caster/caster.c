@@ -79,7 +79,7 @@ static void
 caster_log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
 	struct log *log = &this->flog;
-	if (level >= 0 && level <= log->max_log_level)
+	if (level >= 0 && level <= atomic_load(&log->max_log_level))
 		vlogall(this, g, &this->flog, level, fmt, ap);
 }
 

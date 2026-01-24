@@ -47,11 +47,11 @@ int log_reopen(struct log *this, const char *filename,
 	}
 	setlinebuf(newfile);
 	P_RWLOCK_WRLOCK(&this->lock);
-	this->syslog_facility = syslog_facility;
-	this->syslog_level = syslog_level;
-	this->graylog_level = graylog_level;
-	this->log_level = log_level;
-	this->max_log_level = max(max(syslog_level, graylog_level), log_level);
+	atomic_store(&this->syslog_facility, syslog_facility);
+	atomic_store(&this->syslog_level, syslog_level);
+	atomic_store(&this->graylog_level, graylog_level);
+	atomic_store(&this->log_level, log_level);
+	atomic_store(&this->max_log_level, max(max(syslog_level, graylog_level), log_level));
 	if (this->logfile)
 		fclose(this->logfile);
 	this->logfile = newfile;
@@ -84,7 +84,7 @@ static void logfmt_file(struct log *this, struct gelf_entry *g, int level, const
 static void logfmt_syslog(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
-	vsyslog((level>LOG_DEBUG?LOG_DEBUG:level)|this->syslog_facility, fmt, ap);
+	vsyslog((level>LOG_DEBUG?LOG_DEBUG:level)|atomic_load(&this->syslog_facility), fmt, ap);
 	va_end(ap);
 }
 
@@ -133,21 +133,22 @@ vlogall(struct caster_state *caster, struct gelf_entry *g, struct log *log, int 
 	char *msg;
 	vasprintf(&msg, fmt, ap);
 
-	if (level <= log->log_level) {
+	if (level <= atomic_load(&log->log_level)) {
 		if (threads)
 			logfmt_file(log, g, level, "[%lu] %s\n", (long)thread_id, msg);
 		else
 			logfmt_file(log, g, level, "%s\n", msg);
 	}
 
-	if (level <= log->syslog_level) {
+	if (level <= atomic_load(&log->syslog_level)) {
 		if (threads)
 			logfmt_syslog(log, g, level, "[%lu] %s\n", (long)thread_id, msg);
 		else
 			logfmt_syslog(log, g, level, "%s\n", msg);
 	}
 
-	if (!g->nograylog && caster->graylog_log_level != -1 && caster->config && level <= log->graylog_level) {
+	if (!g->nograylog && atomic_load(&caster->graylog_log_level) != -1 && caster->config
+	    && level <= atomic_load(&log->graylog_level)) {
 		if (g->short_message == NULL) {
 			g->short_message = msg;
 			msg = NULL;

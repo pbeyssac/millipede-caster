@@ -11,9 +11,9 @@ typedef void (*log_cb_t)(void *, struct gelf_entry *, int, const char *, va_list
 struct log {
 	FILE *logfile;		// NULL causes use of stderr instead
 	void *state;
-	int syslog_facility;
-	int max_log_level;
-	int syslog_level, graylog_level, log_level;
+	_Atomic int syslog_facility;
+	_Atomic int max_log_level;
+	_Atomic int syslog_level, graylog_level, log_level;
 	log_cb_t log_cb;
 	P_RWLOCK_T lock;
 };
