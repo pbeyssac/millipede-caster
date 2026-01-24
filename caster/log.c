@@ -84,7 +84,7 @@ static void logfmt_file(struct log *this, struct gelf_entry *g, int level, const
 static void logfmt_syslog(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
-	vsyslog((level>LOG_DEBUG?LOG_DEBUG:level)|LOG_DAEMON, fmt, ap);
+	vsyslog((level>LOG_DEBUG?LOG_DEBUG:level)|this->syslog_facility, fmt, ap);
 	va_end(ap);
 }
 
