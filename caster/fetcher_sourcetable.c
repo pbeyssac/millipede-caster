@@ -38,6 +38,7 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 
 	this->sourcetable = NULL;
 	this->priority = priority;
+	this->refcnt = 1;
 	return this;
 }
 
@@ -52,10 +53,19 @@ static void task_stop(struct sourcetable_fetch_args *this) {
 	}
 }
 
-void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
+static void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
 	fetcher_sourcetable_stop(this);
 	ntrip_task_decref(this->task);
 	free(this);
+}
+
+void fetcher_sourcetable_incref(struct sourcetable_fetch_args *this) {
+	atomic_fetch_add(&this->refcnt, 1);
+}
+
+void fetcher_sourcetable_decref(struct sourcetable_fetch_args *this) {
+	if (atomic_fetch_sub(&this->refcnt, 1) == 1)
+		fetcher_sourcetable_free(this);
 }
 
 void fetcher_sourcetable_stop(struct sourcetable_fetch_args *this) {

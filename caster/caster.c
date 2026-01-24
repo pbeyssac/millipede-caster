@@ -119,7 +119,7 @@ static void dynconfig_free_fetchers(struct caster_dynconfig *this) {
 	for (int i = 0; i < this->sourcetable_fetchers_count; i++) {
 		if (a[i]) {
 			logfmt(&this->caster->flog, LOG_INFO, "Stopping fetcher %s:%d", a[i]->task->host, a[i]->task->port);
-			fetcher_sourcetable_free(a[i]);
+			fetcher_sourcetable_decref(a[i]);
 		}
 	}
 	free(a);
@@ -984,8 +984,7 @@ static int caster_reload_fetchers(struct caster_state *this, struct config *new_
 				if (!strcmp(olddyn->sourcetable_fetchers[j]->task->host, new_config->proxy[i].host)
 				&& olddyn->sourcetable_fetchers[j]->task->port == new_config->proxy[i].port) {
 					p = olddyn->sourcetable_fetchers[j];
-					/* Found, clear in the old table */
-					olddyn->sourcetable_fetchers[j] = NULL;
+					fetcher_sourcetable_incref(p);
 					break;
 				}
 			}
