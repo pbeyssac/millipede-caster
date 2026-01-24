@@ -69,11 +69,11 @@ void log_free(struct log *this) {
 
 static void logfmt_file(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...) {
 	va_list ap;
-	FILE *out = this->logfile?this->logfile:stderr;
 	char date[36];
 	logdate(date, sizeof date, &g->ts);
 	va_start(ap, fmt);
 	P_RWLOCK_WRLOCK(&this->lock);
+	FILE *out = this->logfile?this->logfile:stderr;
 	fputs(date, out);
 	fputc(' ', out);
 	vfprintf(out, fmt, ap);
