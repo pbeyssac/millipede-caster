@@ -184,10 +184,11 @@ void ntrip_task_stop(struct ntrip_task *this) {
 
 	if (st) {
 		logfmt(&this->caster->flog, LOG_INFO, "Stopping %s (%p) from %s:%d", this->type, this, this->host, this->port);
-		bufferevent_lock(st->bev);
+		struct bufferevent *bev = st->bev;
+		bufferevent_lock(bev);
 		ntrip_decref_end(st, "ntrip_task_stop");
-		bufferevent_unlock(st->bev);
 		ntrip_decref(st, "ntrip_task_stop 2");
+		bufferevent_unlock(bev);
 	} else
 		logfmt(&this->caster->flog, LOG_INFO, "Stopping %s (%p) from %s:%d: not running", this->type, this, this->host, this->port);
 }
