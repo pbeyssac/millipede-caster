@@ -889,6 +889,8 @@ static int caster_load(struct caster_state *this, int restart) {
 		r = -1;
 	if (caster_reload_syncers(this, new_config, olddyn, newdyn) < 0)
 		r = -1;
+	if (caster_reload_fetchers(this, new_config, olddyn, newdyn) < 0)
+		r = -1;
 
 	P_RWLOCK_WRLOCK(&this->configlock);
 	atomic_store(&this->config, new_config);
@@ -896,8 +898,6 @@ static int caster_load(struct caster_state *this, int restart) {
 	P_RWLOCK_UNLOCK(&this->configlock);
 
 	if (caster_reload_listeners(this, new_config, olddyn, newdyn) < 0)
-		r = -1;
-	if (caster_reload_fetchers(this, new_config, olddyn, newdyn) < 0)
 		r = -1;
 
 	if (old_config)
