@@ -139,7 +139,23 @@ redistribute_source_stream_with_config(struct redistribute_cb_args *this, struct
 	if (sp != NULL)
 		sourcetable_decref(sp);
 
-	if (this->task->host == NULL || this->task->uri == NULL) {
+	/* Add Authorization: header, if relevant */
+
+	int erra = 0;
+
+	/* Per-host authentication system */
+	struct auth_entry *a = NULL;
+	struct config *config = caster_config_getref(this->caster);
+	if (config->host_auth)
+		a = auth_lookupi(config->host_auth, host);
+	config_decref(config);
+
+	if (a != NULL) {
+		if (http_headers_add_auth(&this->task->headers, a->user, a->password) < 0)
+			erra = 1;
+	}
+
+	if (this->task->host == NULL || this->task->uri == NULL || erra) {
 		strfree(this->task->host);
 		this->task->host = NULL;
 		strfree((char *)this->task->uri);

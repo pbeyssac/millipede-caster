@@ -13,5 +13,7 @@ struct auth_entry {
 struct caster_state;
 struct auth_entry *auth_parse(struct caster_state *caster, const char *filename);
 void auth_free(struct auth_entry *this);
+struct auth_entry *auth_lookup(struct auth_entry *auth, const char *key);
+struct auth_entry *auth_lookupi(struct auth_entry *auth, const char *key);
 
 #endif

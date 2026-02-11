@@ -64,19 +64,6 @@ static char *ntripcli_http_request_str(struct ntrip_state *st,
 		return NULL;
 	}
 
-	if (st->config->host_auth) {
-		for (struct auth_entry *a = &st->config->host_auth[0]; a->user != NULL; a++) {
-			if (!strcasecmp(a->key, host)) {
-				if (http_headers_add_auth(&headers, a->user, a->password) < 0) {
-					evhttp_clear_headers(&headers);
-					strfree(host_port);
-					return NULL;
-				} else
-					break;
-			}
-		}
-	}
-
 	int hlen = 0;
 	TAILQ_FOREACH(np, &headers, next) {
 		// lengths of key + value + ": " + "\r\n"

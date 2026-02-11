@@ -41,3 +41,23 @@ void auth_free(struct auth_entry *this) {
 	}
 	free(this);
 }
+
+static struct auth_entry *_auth_lookup(struct auth_entry *auth, const char *key,
+		int case_insensitive) {
+	while (auth->user != NULL) {
+		if (!(case_insensitive?strcasecmp:strcmp)(auth->key, key))
+			return auth;
+		auth++;
+	}
+	return NULL;
+}
+
+/* Case-sensitive lookup for a key */
+struct auth_entry *auth_lookup(struct auth_entry *auth, const char *key) {
+	return _auth_lookup(auth, key, 0);
+}
+
+/* Case-insensitive lookup for a key */
+struct auth_entry *auth_lookupi(struct auth_entry *auth, const char *key) {
+	return _auth_lookup(auth, key, 1);
+}

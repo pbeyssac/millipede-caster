@@ -189,7 +189,7 @@ void ntripsrv_deferred_output(
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd) {
 	int r = CHECKPW_MOUNTPOINT_INVALID;
 	int explicit_mountpoint = 0;
-	struct auth_entry *wildcard_entry = NULL;
+	struct auth_entry *wildcard_entry, *mountpoint_entry;
 
 	struct auth_entry *auth = this->config->source_auth;
 	if (auth == NULL) {
@@ -197,29 +197,23 @@ int check_password(struct ntrip_state *this, const char *mountpoint, const char 
 	}
 
 	ntrip_log(this, LOG_DEBUG, "mountpoint %s user %s", mountpoint, user);
-	for (; auth->key != NULL; auth++) {
-		if (!strcmp(auth->key, "*")) {
-			wildcard_entry = auth;
-			continue;
-		}
-		if (!strcmp(auth->key, mountpoint)) {
-			explicit_mountpoint = 1;
-			ntrip_log(this, LOG_DEBUG, "mountpoint %s found", mountpoint);
-			if (user && strcmp(auth->user, user))
-				break;
+	mountpoint_entry = auth_lookup(auth, mountpoint);
 
-			if (!strcmp(auth->password, passwd)) {
-				ntrip_log(this, LOG_DEBUG, "source %s auth ok", mountpoint);
-				r = CHECKPW_MOUNTPOINT_VALID;
-				break;
-			}
-			break;
+	if (mountpoint_entry != NULL) {
+		explicit_mountpoint = 1;
+		ntrip_log(this, LOG_DEBUG, "mountpoint %s found", mountpoint);
+
+		/* user == NULL for NTRIP1 sources, only passwd is filled */
+		if ((!user || !strcmp(mountpoint_entry->user, user)) && !strcmp(mountpoint_entry->password, passwd)) {
+			ntrip_log(this, LOG_DEBUG, "source %s auth ok", mountpoint);
+			r = CHECKPW_MOUNTPOINT_VALID;
 		}
 	}
 
-	if (explicit_mountpoint == 0 && wildcard_entry) {
-		/* Mountpoint entry not found, use the wildcard instead */
-		if (!strcmp(wildcard_entry->password, passwd)) {
+	if (explicit_mountpoint == 0) {
+		/* Mountpoint entry not found, use the wildcard instead, if any */
+		wildcard_entry = auth_lookup(auth, "*");
+		if (wildcard_entry && !strcmp(wildcard_entry->password, passwd)) {
 			ntrip_log(this, LOG_DEBUG, "source %s auth ok using wildcard", mountpoint);
 			r = CHECKPW_MOUNTPOINT_WILDCARD;
 		}
