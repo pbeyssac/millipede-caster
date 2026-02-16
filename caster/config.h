@@ -42,6 +42,9 @@ struct config_proxy {
 	 */
 	int table_refresh_delay;
 
+	// Optional Json configuration
+	const char *filter_filename;
+
 	/*
 	 * Priority when in a stack.
 	 *

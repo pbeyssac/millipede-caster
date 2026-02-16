@@ -976,13 +976,15 @@ static int caster_reload_fetchers(struct caster_state *this, struct config *new_
 	 */
 	for (int i = 0; i < new_config->proxy_count; i++) {
 		struct sourcetable_fetch_args *p = NULL;
-		if (olddyn)
+
+		if (olddyn && new_config->proxy[i].filter_filename == NULL)
 			for (int j = 0; j < olddyn->sourcetable_fetchers_count; j++) {
 				if (olddyn->sourcetable_fetchers[j] == NULL)
 					/* Already cleared */
 					continue;
 				if (!strcmp(olddyn->sourcetable_fetchers[j]->task->host, new_config->proxy[i].host)
-				&& olddyn->sourcetable_fetchers[j]->task->port == new_config->proxy[i].port) {
+				&& olddyn->sourcetable_fetchers[j]->task->port == new_config->proxy[i].port
+				&& olddyn->sourcetable_fetchers[j]->json_config == NULL) {
 					p = olddyn->sourcetable_fetchers[j];
 					fetcher_sourcetable_incref(p);
 					break;
@@ -995,6 +997,7 @@ static int caster_reload_fetchers(struct caster_state *this, struct config *new_
 				new_config->proxy[i].tls,
 				new_config->proxy[i].table_refresh_delay,
 				new_config->proxy[i].priority,
+				new_config->proxy[i].filter_filename,
 				new_config);
 		}
 		new_fetchers[i] = p;

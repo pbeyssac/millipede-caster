@@ -6,7 +6,9 @@
 
 #include "conf.h"
 #include "endpoints.h"
+#include "http.h"
 #include "jobs.h"
+#include "json.h"
 #include "redistribute.h"
 #include "ntripcli.h"
 #include "ntrip_task.h"
@@ -111,6 +113,7 @@ redistribute_args_free(struct redistribute_cb_args *this) {
 void
 redistribute_source_stream_with_config(struct redistribute_cb_args *this, struct config *new_config) {
 	struct sourcetable *sp = NULL;
+	json_object *json = NULL;
 	const char *host;
 	unsigned short port;
 	int tls;
@@ -123,6 +126,8 @@ redistribute_source_stream_with_config(struct redistribute_cb_args *this, struct
 			return;
 		}
 		sourceline_decref(s);
+		json = sp->json_config;
+		json_object_get(json);
 		host = sp->caster;
 		port = sp->port;
 		tls = sp->tls;
@@ -141,17 +146,27 @@ redistribute_source_stream_with_config(struct redistribute_cb_args *this, struct
 
 	/* Add Authorization: header, if relevant */
 
+	const char *user = NULL, *password = NULL;
+
+	if (json != NULL)
+		json_get_authentication(json, this->mountpoint, &user, &password);
+
+	/* If not found, try the former per-host authentication system */
+	if (user == NULL && password == NULL) {
+		struct auth_entry *a = NULL;
+		struct config *config = caster_config_getref(this->caster);
+		if (config->host_auth)
+			a = auth_lookupi(config->host_auth, host);
+		config_decref(config);
+		if (a != NULL) {
+			user = a->user;
+			password = a->password;
+		}
+	}
+
 	int erra = 0;
-
-	/* Per-host authentication system */
-	struct auth_entry *a = NULL;
-	struct config *config = caster_config_getref(this->caster);
-	if (config->host_auth)
-		a = auth_lookupi(config->host_auth, host);
-	config_decref(config);
-
-	if (a != NULL) {
-		if (http_headers_add_auth(&this->task->headers, a->user, a->password) < 0)
+	if (user != NULL && password != NULL) {
+		if (http_headers_add_auth(&this->task->headers, user, password) < 0)
 			erra = 1;
 	}
 

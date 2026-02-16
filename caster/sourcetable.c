@@ -30,7 +30,7 @@ struct sourcetable *sourcetable_read(struct caster_state *caster, const char *fi
 		return NULL;
 	}
 
-	struct sourcetable *tmp_sourcetable = sourcetable_new("LOCAL", 0, 0);
+	struct sourcetable *tmp_sourcetable = sourcetable_new("LOCAL", 0, 0, NULL);
 	if (tmp_sourcetable == NULL) {
 		logfmt(&caster->flog, LOG_ERR, "Can't read %s: out of memory", filename);
 		fclose(fp);
@@ -87,7 +87,7 @@ static struct sourcetable *sourcetable_from_json(json_object *j, struct caster_s
 	unsigned short port = json_object_get_int(jport);
 	unsigned short tls = jtls?json_object_get_boolean(jtls):0;
 
-	tmp_sourcetable = sourcetable_new(host, port, tls);
+	tmp_sourcetable = sourcetable_new(host, port, tls, NULL);
 	if (tmp_sourcetable == NULL)
 		return NULL;
 
@@ -117,7 +117,8 @@ static struct sourcetable *sourcetable_from_json(json_object *j, struct caster_s
 	return tmp_sourcetable;
 }
 
-struct sourcetable *sourcetable_new(const char *host, unsigned short port, int tls) {
+struct sourcetable *sourcetable_new(const char *host, unsigned short port, int tls,
+	json_object *json_config) {
 	struct sourcetable *this = (struct sourcetable *)malloc(sizeof(struct sourcetable));
 	char *duphost = (host == NULL) ? NULL : mystrdup(host);
 	char *header = mystrdup("");
@@ -143,11 +144,16 @@ struct sourcetable *sourcetable_new(const char *host, unsigned short port, int t
 	this->fetch_time = t;
 	this->nvirtual = 0;
 	this->tls = tls;
+	this->json_config = json_config;
+	if (json_config)
+		json_object_get(json_config);
 	atomic_store(&this->refcnt, 1);
 	return this;
 }
 
 static void sourcetable_free(struct sourcetable *this) {
+	if (this->json_config)
+		json_object_put(this->json_config);
 	strfree(this->header);
 	strfree(this->caster);
 	strfree((char *)this->filename);
@@ -650,7 +656,7 @@ struct sourcetable *stack_flatten_dist(struct caster_state *caster, sourcetable_
 	char *header = mystrdup("");
 	struct hash_iterator hi;
 	struct element *e;
-	struct sourcetable *r = sourcetable_new(NULL, 0, 0);
+	struct sourcetable *r = sourcetable_new(NULL, 0, 0, NULL);
 
 	if (header == NULL || r == NULL)
 		goto cancel;

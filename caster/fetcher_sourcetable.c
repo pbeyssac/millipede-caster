@@ -3,6 +3,7 @@
 
 #include "conf.h"
 #include "caster.h"
+#include "json.h"
 #include "ntrip_task.h"
 #include "ntripcli.h"
 #include "fetcher_sourcetable.h"
@@ -15,7 +16,7 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
  */
 struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *caster,
 	const char *host, unsigned short port, int tls, int refresh_delay, int priority,
-	struct config *config) {
+	const char *json_filename, struct config *config) {
 	struct sourcetable_fetch_args *this = (struct sourcetable_fetch_args *)malloc(sizeof(struct sourcetable_fetch_args));
 	if (this == NULL)
 		return NULL;
@@ -25,6 +26,25 @@ struct sourcetable_fetch_args *fetcher_sourcetable_new(struct caster_state *cast
 		free(this);
 		return NULL;
 	}
+
+	/* Read filter configuration, if any */
+	struct json_object *json_config = NULL;
+	if (json_filename != NULL) {
+		json_config = json_file_read(caster->config_dir, json_filename);
+		if (json_config == NULL) {
+			ntrip_task_decref(this->task);
+			free(this);
+			logfmt(&caster->flog, LOG_ERR, "Can't load Json from %s", json_filename);
+			return NULL;
+		}
+		this->json_config = json_config;
+		/* Prefetch for future use */
+		this->json_sources = json_object_object_get(json_config, "sources");
+	} else {
+		this->json_config = NULL;
+		this->json_sources = NULL;
+	}
+
 	this->task->end_cb = sourcetable_end_cb;
 	this->task->end_cb_arg = this;
 	this->task->cb_arg2 = 0;
@@ -56,6 +76,7 @@ static void task_stop(struct sourcetable_fetch_args *this) {
 static void fetcher_sourcetable_free(struct sourcetable_fetch_args *this) {
 	fetcher_sourcetable_stop(this);
 	ntrip_task_decref(this->task);
+	json_object_put(this->json_config);
 	free(this);
 }
 
@@ -146,6 +167,12 @@ static int sourcetable_line_cb(struct ntrip_state *st, void *arg_cb, const char 
 		return 1;
 	}
 
+	if (a->json_config) {
+		int r = json_get_source_action(line, a->json_sources);
+		if (r == 0)
+			return 0;
+	}
+
 	if (sourcetable_add(a->sourcetable, line, 1, st->caster) < 0) {
 		ntrip_log(st, LOG_INFO, "Error when inserting sourcetable line from %s:%d", a->sourcetable->caster, a->sourcetable->port);
 		sourcetable_decref(a->sourcetable);
@@ -163,7 +190,7 @@ void
 fetcher_sourcetable_start_with_config(void *arg_cb, int n, struct config *new_config) {
 	struct sourcetable_fetch_args *a = (struct sourcetable_fetch_args *)arg_cb;
 	assert(a->sourcetable == NULL);
-	a->sourcetable = sourcetable_new(a->task->host, a->task->port, a->task->tls);
+	a->sourcetable = sourcetable_new(a->task->host, a->task->port, a->task->tls, a->json_config);
 	a->sourcetable->priority = a->priority;
 
 	if (ntrip_task_start(a->task, a, NULL, 0, new_config) < 0) {

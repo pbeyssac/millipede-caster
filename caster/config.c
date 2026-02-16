@@ -174,6 +174,8 @@ static const cyaml_schema_field_t proxy_fields_schema[] = {
 		"priority", CYAML_FLAG_OPTIONAL, struct config_proxy, priority),
 	CYAML_FIELD_BOOL(
 		"tls", CYAML_FLAG_OPTIONAL, struct config_proxy, tls),
+	CYAML_FIELD_STRING_PTR(
+		"filter_file", CYAML_FLAG_POINTER|CYAML_FLAG_OPTIONAL, struct config_proxy, filter_filename, 0, CYAML_UNLIMITED),
 	CYAML_FIELD_END
 };
 
@@ -589,8 +591,10 @@ void config_free(struct config *this) {
 	}
 	free(this->bind);
 
-	for (int i = 0; i < this->proxy_count; i++)
+	for (int i = 0; i < this->proxy_count; i++) {
 		free((char *)this->proxy[i].host);
+		free((char *)this->proxy[i].filter_filename);
+	}
 	free(this->proxy);
 
 	for (int i = 0; i < this->webroots_count; i++) {

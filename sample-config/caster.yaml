@@ -27,10 +27,15 @@ listen:
 #
 # Optional caster from which we can get and announce sources.
 #
+# filter_file is optional: it can be used to post-process the imported
+# sourcetable and can contain specific authentication information
+# to enable access to mountpoints on the remote caster.
+#
 #proxy:
 #  - table_refresh_delay:	600
 #    host:			maincaster.fr
 #    port:			2101
+#    filter_file:		sourcetable-filter.json
 
 #
 # Optional syslog configuration
