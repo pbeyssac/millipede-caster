@@ -603,6 +603,18 @@ FILE *fopen_absolute(const char *dir, const char *filename, const char *mode) {
 	return r;
 }
 
+/*
+ * open() using dir to make file paths absolute (see joinpath).
+ */
+int open_absolute(const char *dir, const char *filename, int flags) {
+	char *path = joinpath(dir, filename);
+	if (path == NULL)
+		return -1;
+	int r = open(path, flags);
+	strfree(path);
+	return r;
+}
+
 static void string_array_free(string_array_t *s) {
 	for (int i = 0; i < s->count; i++)
 		strfree(s->ps[i]);
