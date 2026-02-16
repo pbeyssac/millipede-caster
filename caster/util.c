@@ -1,12 +1,15 @@
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <math.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/cdefs.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
+#include <unistd.h>
 #include <ctype.h>
 
 #ifdef DEBUG_JEMALLOC
@@ -421,6 +424,53 @@ static void mime_append(struct mime_content *this, const char *s) {
 		memcpy(this->s + this->len, s, len+1);
 		this->len += len;
 	}
+}
+
+/*
+ * Read a file in memory from an open file descriptor,
+ * add the requested amount of padding, close the file descriptor.
+ * Return a pointer to a struct mime_content or NULL.
+ */
+static struct mime_content *mime_file_read_pad(int fd, int padding) {
+	char *file_content;
+	struct stat sb;
+
+	/* Get file stats, check it's a regular file */
+	if (fstat(fd, &sb) < 0
+	    || ((sb.st_mode & S_IFMT) != S_IFREG)
+	    || ((file_content = (char *)malloc(sb.st_size + padding)) == NULL)) {
+		close(fd);
+		return NULL;
+	}
+
+	/* Read the full file in memory */
+	int r = read(fd, file_content, sb.st_size);
+	close(fd);
+	if (r != sb.st_size) {
+		free(file_content);
+		return NULL;
+	}
+
+	return mime_new(file_content, sb.st_size, NULL, 0);
+}
+
+/*
+ * Read a file in memory from an open file descriptor, close the file descriptor,
+ * return a pointer to a struct mime_content or NULL.
+ */
+struct mime_content *mime_file_read(int fd) {
+	return mime_file_read_pad(fd, 0);
+}
+
+/*
+ * Read a file in memory from an open file descriptor,  close the file descriptor,
+ * add a terminating '\0', return a pointer to a struct mime_content or NULL.
+ */
+struct mime_content *mime_file_read_string(int fd) {
+	struct mime_content *m = mime_file_read_pad(fd, 1);
+	if (m)
+		m->s[m->len++] = '\0';
+	return m;
 }
 
 void iso_date_from_timeval(char *iso_date, size_t iso_date_len, struct timeval *t) {
