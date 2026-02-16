@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -9,8 +10,6 @@
 #include "ntrip_common.h"
 #include "ntripsrv.h"
 
-#include <sys/stat.h>
-#include <fcntl.h>
 
 /*
  * Check the URI for subdir evasion
@@ -34,7 +33,6 @@ static int check_safe_uri(const char *uri) {
 
 int filesrv(struct ntrip_state *st, const char *uri, int *err, struct evkeyvalq *headers) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
-	struct stat sb;
 	struct config_webroots *wr = NULL;
 	int len_uri = strlen(uri);
 
@@ -82,30 +80,13 @@ int filesrv(struct ntrip_state *st, const char *uri, int *err, struct evkeyvalq 
 		return -1;
 	}
 
-	char *file_content;
+	struct mime_content *m = mime_file_read(fd);
 
-	/* Get file stats, check it's a regular file */
-	if (fstat(fd, &sb) < 0 || ((sb.st_mode & S_IFMT) != S_IFREG)) {
-		*err = 404;
-		close(fd);
-		return -1;
-	}
-	if ((file_content = (char *)malloc(sb.st_size)) == NULL) {
+	if (m == NULL) {
 		*err = 503;
-		close(fd);
 		return -1;
 	}
 
-	/* Read the full file in memory */
-	int r = read(fd, file_content, sb.st_size);
-	if (r != sb.st_size) {
-		*err = 503;
-		close(fd);
-		return -1;
-	}
-	close(fd);
-
-	struct mime_content *m = mime_new(file_content, sb.st_size, NULL, 0);
 	ntripsrv_send_result_ok(st, output, m, NULL);
 	ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 	return 0;
