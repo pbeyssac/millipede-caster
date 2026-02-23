@@ -16,6 +16,11 @@ struct auth_entry *auth_parse(struct caster_state *caster, const char *filename)
 	}
 	struct auth_entry *auth = (struct auth_entry *)malloc(sizeof(struct auth_entry)*(p->nlines+1));
 
+	if (auth == NULL) {
+		file_free(p);
+		return NULL;
+	}
+
 	int n;
 	for (n = 0; n < p->nlines; n++) {
 		auth[n].key = mystrdup(p->pls[n][0]);

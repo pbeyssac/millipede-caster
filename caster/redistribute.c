@@ -68,6 +68,11 @@ redistribute_args_new(struct caster_state *caster, struct livesource *livesource
 	this->task = ntrip_task_new(caster, NULL, 0, NULL, 0,
 		persistent?reconnect_delay:0, 0, 0,
 		"source_fetcher", NULL);
+	if (this->task == NULL) {
+		free(this);
+		strfree(uri);
+		return NULL;
+	}
 
 	this->task->method = "GET";
 	this->task->end_cb = redistribute_end_cb;
