@@ -492,7 +492,7 @@ ntripcli_new(struct caster_state *caster, char *host, unsigned short port, int t
 		st->task = task;
 		read_timeout.tv_sec = task->read_timeout;
 		write_timeout.tv_sec = task->write_timeout;
-		st->connection_keepalive = st->task->connection_keepalive;
+		st->connection_keepalive = task->connection_keepalive;
 		task->start = st->start;
 	}
 

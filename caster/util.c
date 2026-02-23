@@ -592,7 +592,7 @@ char *joinpath(const char *dir, const char *path) {
 }
 
 /*
- * fopen using dir to make file paths absolute (see joinpath).
+ * fopen() using dir to make file paths absolute (see joinpath).
  */
 FILE *fopen_absolute(const char *dir, const char *filename, const char *mode) {
 	char *path = joinpath(dir, filename);
