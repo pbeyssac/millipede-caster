@@ -32,7 +32,8 @@ struct log {
 
 struct caster_state;
 
-int log_init(struct log *this, const char *filename, log_cb_t log_cb, int graylog_level, int log_level, int syslog_level, int syslog_facility, void *arg);
+int log_init(struct log *this, const char *filename, log_cb_t log_cb,
+	int log_level, int graylog_level, int syslog_level, int syslog_facility, void *arg);
 int log_reopen(struct log *this, const char *filename, int log_level, int graylog_level, int syslog_level, int syslog_facility);
 void logfmt_g(struct log *this, struct gelf_entry *g, int level, const char *fmt, ...);
 void logfmt(struct log *this, int level, const char *fmt, ...);

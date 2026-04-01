@@ -72,7 +72,7 @@ void caster_log_error(struct caster_state *this, char *orig) {
 static void
 caster_alog(void *arg, struct gelf_entry *g, int dummy, const char *fmt, va_list ap) {
 	struct caster_state *this = (struct caster_state *)arg;
-	vlogall(this, g, &this->alog, -1, fmt, ap);
+	vlogall(this, g, &this->alog, 0, fmt, ap);
 }
 
 static void
@@ -296,7 +296,7 @@ caster_new(const char *config_file, int nbase) {
 	this->joblist = threads ? joblist_new(this) : NULL;
 
 	int r1 = log_init(&this->flog, NULL, &caster_log_cb, -1, -1, -1, -1, this);
-	int r2 = log_init(&this->alog, NULL, &caster_alog, -1, -1, -1, -1, this);
+	int r2 = log_init(&this->alog, NULL, &caster_alog, 0, -1, -1, -1, this);
 
 	if (err || r1 < 0 || r2 < 0 || !this->config_dir
 	    || (threads && this->joblist == NULL)
@@ -719,7 +719,7 @@ caster_reopen_logs(struct caster_state *this, struct config *config) {
 	if (config_log == NULL || log_reopen(&this->flog, config_log,
 			config->log_level, graylog_level, syslog_level, syslog_facility) < 0)
 		r = -1;
-	if (access_log == NULL || log_reopen(&this->alog, access_log, -1, -1, -1, -1) < 0)
+	if (access_log == NULL || log_reopen(&this->alog, access_log, 0, -1, -1, -1) < 0)
 		r = -1;
 	strfree(config_log);
 	strfree(access_log);
