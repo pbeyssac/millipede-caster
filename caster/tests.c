@@ -1,11 +1,13 @@
 #include <math.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "bitfield.h"
 #include "conf.h"
 #include "ip.h"
+#include "log.h"
 #include "rtcm.h"
 #include "util.h"
 
@@ -618,6 +620,68 @@ static int timeval_from_iso_date_test() {
 	return fail;
 }
 
+static void log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, va_list ap) {
+	vprintf(fmt, ap);
+	putchar('\n');
+}
+
+static int file_parse_test(const char *test_dir) {
+	struct log flog;
+	log_init(&flog, NULL, &log_cb, -1, -1, -1, -1, &flog);
+
+	struct file_parse_test {
+		const char *filename;
+		int nlines;
+		int nfields;
+		int ok;
+	};
+
+	struct file_parse_test testlist[] = {
+		{ "test_file_parse_10_2.txt", 10, 2, 1 },
+		{ "test_file_parse_10_2_err.txt", 10, 2, 0 },
+		{ "test_file_parse_10_2_err2.txt", 10, 2, 0 },
+		{ NULL, 0, 0 }
+	};
+
+	int fail = 0;
+	puts("file_parse_test");
+
+	for (struct file_parse_test *t = testlist; t->filename; t++) {
+		struct parsed_file *f;
+		f = file_parse(test_dir, t->filename, t->nfields, " \t", 1, &flog);
+		if (f == NULL) {
+			if (t->ok) {
+				fail++;
+				printf("FAIL on %s: unable to read\n", t->filename);
+			} else
+				putchar('.');
+			continue;
+		}
+		int nfail = 0;
+		if (!t->ok) {
+			nfail++;
+			printf("FAIL on %s: read ok, shouldn't\n", t->filename);
+		} else if (f->nlines != t->nlines) {
+			nfail++;
+			printf("FAIL on %s: bad number of lines %d vs %d\n", t->filename, f->nlines, t->nlines);
+		} else {
+			for (int i = 0; i < f->nlines && !nfail; i++)
+				for (int j = 0; j < t->nfields && !nfail; j++)
+					if (f->pls[i][j] == NULL)
+						nfail++;
+
+			if (nfail)
+				printf("FAIL on %s: missing fields\n", t->filename);
+		}
+		if (nfail)
+			fail++;
+		else
+			putchar('.');
+		file_free(f);
+	}
+	return fail;
+}
+
 #if 0
 static void sourcetable_test(struct sourcetable *sourcetable) {
 	char *ggalist[] = {
@@ -644,8 +708,13 @@ static void sourcetable_test(struct sourcetable *sourcetable) {
 }
 #endif
 
-int main() {
+int main(int argc, const char **argv) {
 	int fail = 0;
+	const char *test_dir;
+	if (argc < 2)
+		test_dir = ".";
+	else
+		test_dir = argv[1];
 	fail += gga_test();
 	fail += b64_test();
 	fail += test_ip_analyze_prefixquota();
@@ -657,5 +726,6 @@ int main() {
 	fail += test_ip_convert();
 	fail += test_msm7_msm4();
 	fail += timeval_from_iso_date_test();
+	fail += file_parse_test(test_dir);
 	return fail != 0;
 }

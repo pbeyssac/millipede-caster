@@ -680,7 +680,7 @@ struct parsed_file *file_parse(const char *dir, const char *filename, int nfield
 	size_t linecap = 0;
 	ssize_t linelen;
 	char *token;
-	int nlines = 0;
+	int nlines = 0, real_lines = 0;
 	int err = 0;
 
 	FILE *fp = fopen_absolute(dir, filename, "r");
@@ -701,6 +701,7 @@ struct parsed_file *file_parse(const char *dir, const char *filename, int nfield
 
 	while ((linelen = getline(&line, &linecap, fp)) > 0) {
 		char *septmp = line;
+		real_lines++;
 
 		for (; linelen && (line[linelen-1] == '\n' || line[linelen-1] == '\r'); linelen--)
 			line[linelen-1] = '\0';
@@ -733,15 +734,20 @@ struct parsed_file *file_parse(const char *dir, const char *filename, int nfield
 			break;
 		}
 
-		int n;
-		for (n = 0; n < nfields && (token = strsep(&septmp, seps)) != NULL;) {
+		int n, nf;
+		for (n = 0, nf = 0; (token = strsep(&septmp, seps)) != NULL;) {
 			if (!skipempty || token[0]) {
-				char *ctoken = mystrdup(token);
-				pl[n++] = ctoken;
+				if (n < nfields) {
+					char *ctoken = mystrdup(token);
+					pl[n++] = ctoken;
+				}
+				nf++;
 			}
 		}
-		if (n != nfields) {
-			logfmt(log, LOG_ERR, "Invalid line %d in %s", nlines+1, filename);
+		if (nf != nfields) {
+			logfmt(log, LOG_ERR, "Invalid line %d in %s (%d field(s), expected %d)",
+				real_lines, filename, n, nfields);
+			err++;
 			break;
 		}
 	}
