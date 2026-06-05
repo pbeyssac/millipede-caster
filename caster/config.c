@@ -615,6 +615,8 @@ void config_free(struct config *this) {
 	}
 	free(this->endpoint);
 
+	free(this->syslog);
+
 	for (int i = 0; i < this->graylog_count; i++) {
 		free((char *)this->graylog[i].host);
 		free((char *)this->graylog[i].uri);
@@ -639,6 +641,7 @@ void config_free(struct config *this) {
 	free(this->threads);
 
 	free((char *)this->trusted_http_proxy);
+	free((char *)this->trusted_http_ip_header);
 	free((char *)this->syncer_auth);
 	free((char *)this->host_auth_filename);
 	free((char *)this->source_auth_filename);
