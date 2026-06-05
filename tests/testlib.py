@@ -121,13 +121,14 @@ STR;C63;C63;RTCM3;1004,1005,1006,1008,1012,1019,1020,1033,1042,1045,1046,1077,10
 """
 
 class SourceServer(object):
-  def __init__(self, host, mountpoint):
+  def __init__(self, host, mountpoint, raw_headers=b''):
     self.err = 0
     self.naccept = 0
     self.host = host
     self.mountpoint = mountpoint.encode('ascii')
     self.endevent = None
     self._stop = False
+    self.raw_headers = raw_headers.encode('ascii')
   def set_endevent(self, event):
     self.endevent = event;
   def start(self):
@@ -187,12 +188,12 @@ class SourceServer(object):
             print("URI", uri)
             try:
               if uri == b'/':
-                s.send(b'HTTP/1.0 200 OK\r\nConnection: close\r\n\r\n%s' % sourcetable)
+                s.send(b'HTTP/1.0 200 OK\r\nConnection: close\r\n%s\r\n%s' % (self.raw_headers, sourcetable))
                 if self.endevent:
                   self.endevent.wait()
                 s.send(b'ENDSOURCETABLE\r\n')
               elif uri == b'/' + self.mountpoint:
-                s.send(b'HTTP/1.0 200 OK\r\n\r\n')
+                s.send(b'HTTP/1.0 200 OK\r\n%s\r\n' % self.raw_headers)
                 for j in range(500):
                   s.send(b'%d\r\n' % j)
                   time.sleep(1)

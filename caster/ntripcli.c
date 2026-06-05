@@ -268,6 +268,8 @@ void ntripcli_readcb(struct bufferevent *bev, void *arg) {
 						st->content_done = 0;
 					}
 				} else if (!strcasecmp(key, "content-type")) {
+					if (st->content_type != NULL)
+						strfree(st->content_type);
 					st->content_type = mystrdup(value);
 				}
 			}
