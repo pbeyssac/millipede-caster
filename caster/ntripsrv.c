@@ -589,7 +589,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 
 					char *mountpoint = st->http_args[1]+1;
 					struct sourceline *sourceline = NULL;
-					struct livesource *l = NULL;
+					int subscribe_ok = 0;
 
 					if (*mountpoint) {
 						if (config->dyn->rtcm_filter && rtcm_filter_check_mountpoint(config->dyn, mountpoint))
@@ -598,7 +598,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						 * Find both a relevant source line and a live source (actually live or on-demand).
 						 */
 						sourceline = stack_find_mountpoint(st->caster, &st->caster->sourcetablestack, mountpoint);
-						l = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 1, sourceline?sourceline->on_demand:0);
+						subscribe_ok = livesource_find_and_subscribe(st->caster, st, mountpoint, NULL, 1, sourceline?sourceline->on_demand:0);
 					}
 
 					/*
@@ -607,7 +607,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					 *
 					 * Empty mountpoint name: always reply with the sourcetable.
 					 */
-					if (*mountpoint == '\0' || (!sourceline && !l && st->client_version == 1)) {
+					if (*mountpoint == '\0' || (!sourceline && !subscribe_ok && st->client_version == 1)) {
 						st->type = "client";
 						err = ntripsrv_send_sourcetable(st, output);
 						if (st->connection_keepalive && st->received_keepalive) {
@@ -622,7 +622,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						}
 					}
 					st->connection_keepalive = 0;
-					if (!sourceline && !l) {
+					if (!sourceline && !subscribe_ok) {
 						err = 404;
 						break;
 					}
@@ -642,7 +642,7 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 					bufferevent_set_timeouts(bev, &read_timeout, NULL);
 
 					if (!st->source_virtual) {
-						if (!l) {
+						if (!subscribe_ok) {
 							if (st->client_version == 1) {
 								err = ntripsrv_send_sourcetable(st, output);
 								ntrip_set_state(st, NTRIP_WAIT_CLOSE);
