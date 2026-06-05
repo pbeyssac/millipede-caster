@@ -204,7 +204,7 @@ struct ntrip_state {
 	pos_t tmp_pos;				// temporary: future source position redistribute_switch_source()
 	char user_agent_ntrip;			// Flag: set if the User-Agent header
 						// contains "ntrip" (case-insensitive)
-	const char *user_agent;			// User-Agent header, if present
+	char *user_agent;			// User-Agent header, if present
 	char wildcard;				// Flag: set for a source if the mountpoint is unregistered (wildcard entry)
 
 	char *query_string;			// HTTP GET query string, if any.

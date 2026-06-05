@@ -503,6 +503,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						st->content_done = 0;
 					}
 				} else if (!strcasecmp(key, "content-type")) {
+					if (st->content_type != NULL)
+						strfree(st->content_type);
 					st->content_type = mystrdup(value);
 				} else if (!strcasecmp(key, "ntrip-version")) {
 					if (!strcasecmp(value, "ntrip/2.0"))
@@ -513,6 +515,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						// Set NTRIP version to 1, unless it is already known to be 2.
 						if (!st->client_version) st->client_version = 1;
 					}
+					if (st->user_agent != NULL)
+						strfree(st->user_agent);
 					st->user_agent = mystrdup(value);
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_EDEBUG, "Header %s: *****", key);
