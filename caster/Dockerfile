@@ -1,6 +1,6 @@
 FROM gcc:14-bookworm AS builder
 
-RUN apt update && apt install cmake libcyaml-dev libjson-c-dev -y
+RUN apt update && apt install cmake libcyaml-dev libjson-c-dev libevent-dev libyaml-dev libssl-dev -y
 
 COPY . /app
 WORKDIR /app

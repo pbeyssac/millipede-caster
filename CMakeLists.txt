@@ -25,6 +25,10 @@ link_libraries(m pthread event_core event_pthreads event_extra event_openssl jso
 add_executable(caster_cmake ${SOURCES})
 #add_executable(tests caster/tests.c caster/util.c)
 
+# Name the output binary "caster" so the Dockerfile and other tooling
+# that expect /app/build/caster keep working.
+set_target_properties(caster_cmake PROPERTIES OUTPUT_NAME "caster")
+
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     target_link_libraries(caster_cmake -static yaml)
 endif()
