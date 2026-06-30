@@ -183,6 +183,8 @@ struct mime_content *api_sync_json(struct caster_state *caster, struct request *
 		req->status = 400;
 	} else if (!strcmp(type, "sourcetable")) {
 		req->status = sourcetable_update_execute(caster, req->json);
+	} else if (!strcmp(type, "node")) {
+		req->status = node_update_execute(caster, req->json);
 	} else
 		req->status = livesource_update_execute(caster, caster->livesources, req);
 	char *s = mystrdup("");

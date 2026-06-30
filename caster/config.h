@@ -217,6 +217,17 @@ struct config {
 	size_t			backlog_evbuffer;
 
 	/*
+	 * Target backlog delay in seconds for NTRIP clients.
+	 *
+	 * When non-zero and the source rate is known, the effective backlog
+	 * threshold for a livesource is computed as:
+	 *   max(backlog_evbuffer, source_rate_bytes_per_sec * backlog_delay)
+	 * so that a slow client can buffer up to backlog_delay seconds of
+	 * data before being dropped.
+	 */
+	int			backlog_delay;
+
+	/*
 	 * Read timeout for sources
 	 */
 	int			source_read_timeout;

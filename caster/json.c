@@ -62,7 +62,7 @@ int json_get_authentication(json_object *json_config, const char *mountpoint,
 	if (sources == NULL)
 		return 0;
 
-	json_object *auth = json_object_object_get(sources, "mountpoint");
+	json_object *auth = json_object_object_get(sources, mountpoint);
 	if (auth == NULL)
 		auth = json_object_object_get(sources, "*");
 

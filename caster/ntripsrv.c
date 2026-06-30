@@ -521,11 +521,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 				} else if (!strcasecmp(key, "authorization")) {
 					ntrip_log(st, LOG_EDEBUG, "Header %s: *****", key);
 					if (http_decode_auth(value, &st->scheme_basic, &st->user, &st->password) < 0) {
-						if (config->log_level >= LOG_DEBUG) {
-							ntrip_log(st, LOG_DEBUG, "Can't decode Authorization: \"%s\"", value);
-						} else {
-							ntrip_log(st, LOG_NOTICE, "Can't decode Authorization");
-						}
+						/* Don't log the raw Authorization value, it may contain credentials */
+						ntrip_log(st, LOG_NOTICE, "Can't decode Authorization");
 					}
 				} else if (!strcasecmp(key, "ntrip-gga")) {
 					pos_t pos;

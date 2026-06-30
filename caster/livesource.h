@@ -52,6 +52,10 @@ struct livesource {
 	enum livesource_state state;
 	enum livesource_type type;
 	_Atomic int refcnt;
+
+	/* Source rate tracking for dynamic backlog (backlog_delay) */
+	struct timeval first_packet_time;	// when the first packet was received
+	unsigned long long bytes_total;		// total bytes received from this source
 };
 
 /*

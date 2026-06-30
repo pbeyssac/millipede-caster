@@ -65,8 +65,9 @@ struct caster_dynconfig {
 	int syncers_count;
 
 	/* RTCM filtering */
-	struct rtcm_filter *rtcm_filter;	// filters (max 1 currently)
-	struct hash_table *rtcm_filter_dict;	// mountpoint => filter dictionary
+	struct rtcm_filter **rtcm_filter;	// array of filters (one per rtcm_filter config block)
+	int rtcm_filter_count;			// number of filters
+	struct hash_table *rtcm_filter_dict;	// mountpoint => filter pointer
 
 	struct caster_state *caster;
 };

@@ -7,6 +7,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -133,9 +134,14 @@ dynconfig_free_rtcm_filters(struct caster_dynconfig *dyn) {
 		hash_table_free(dyn->rtcm_filter_dict);
 		dyn->rtcm_filter_dict = NULL;
 	}
-	if (dyn->rtcm_filter)
-		rtcm_filter_free(dyn->rtcm_filter);
+	if (dyn->rtcm_filter) {
+		for (int i = 0; i < dyn->rtcm_filter_count; i++)
+			if (dyn->rtcm_filter[i])
+				rtcm_filter_free(dyn->rtcm_filter[i]);
+		free(dyn->rtcm_filter);
+	}
 	dyn->rtcm_filter = NULL;
+	dyn->rtcm_filter_count = 0;
 }
 
 static void
@@ -772,14 +778,24 @@ static int
 caster_reload_rtcm_filters(struct caster_state *caster, struct config *new_config, struct caster_dynconfig *newdyn) {
 	if (new_config->rtcm_filter_count == 0)
 		return 0;
-	if (new_config->rtcm_filter_count != 1)
-		return -1;
 
 	if (newdyn->rtcm_filter_dict)
 		hash_table_free(newdyn->rtcm_filter_dict);
-	newdyn->rtcm_filter_dict = hash_table_new(5, NULL);
+	/*
+	 * Use hash_table_free_null as the free callback so the hash table
+	 * does NOT free the filter pointers stored as values (they are owned
+	 * by the rtcm_filter array below and freed separately).
+	 */
+	newdyn->rtcm_filter_dict = hash_table_new(5, hash_table_free_null);
 	if (newdyn->rtcm_filter_dict == NULL)
 		return -1;
+
+	/* Allocate the array of filter pointers */
+	struct rtcm_filter **filters = (struct rtcm_filter **)calloc(new_config->rtcm_filter_count, sizeof(struct rtcm_filter *));
+	if (filters == NULL) {
+		logfmt(&caster->flog, LOG_ERR, "Can't allocate rtcm_filter array from %s", caster->config_file);
+		return -1;
+	}
 
 	for (int i = 0; i < new_config->rtcm_filter_count; i++) {
 		struct rtcm_filter *rtcm_filter;
@@ -790,20 +806,68 @@ caster_reload_rtcm_filters(struct caster_state *caster, struct config *new_confi
 		);
 		if (rtcm_filter == NULL) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
+			for (int j = 0; j < i; j++)
+				if (filters[j])
+					rtcm_filter_free(filters[j]);
+			free(filters);
 			return -1;
 		}
-		struct hash_table *h = rtcm_filter_dict_parse(rtcm_filter, new_config->rtcm_filter[i].apply);
-		if (h == NULL) {
-			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
-			rtcm_filter_free(rtcm_filter);
+		filters[i] = rtcm_filter;
+
+		/*
+		 * Parse the comma-separated list of mountpoints this filter
+		 * applies to, and store the filter pointer as the value for
+		 * each mountpoint in the dictionary. This allows multiple
+		 * rtcm_filter blocks in the configuration, each with its own
+		 * set of mountpoints, pass types and conversion rules.
+		 */
+		const char *apply = new_config->rtcm_filter[i].apply;
+		if (apply == NULL || *apply == '\0') {
+			logfmt(&caster->flog, LOG_ERR, "Empty rtcm_filter apply list from %s", caster->config_file);
+			for (int j = 0; j <= i; j++)
+				if (filters[j])
+					rtcm_filter_free(filters[j]);
+			free(filters);
 			return -1;
 		}
-		hash_table_update(newdyn->rtcm_filter_dict, h);
-		hash_table_free(h);
-		if (newdyn->rtcm_filter)
-			rtcm_filter_free(newdyn->rtcm_filter);
-		newdyn->rtcm_filter = rtcm_filter;
+		const char *p = apply;
+		do {
+			while (*p && isspace((unsigned char)*p)) p++;
+			const char *key = p;
+			while (*p && *p != ',') p++;
+			if (p == key)
+				break;
+			int len = p - key;
+			if (*p) p++;
+			while (len && isspace((unsigned char)key[len-1])) len--;
+			if (!len)
+				continue;
+			char *dupkey = (char *)strmalloc(len+1);
+			if (dupkey == NULL) {
+				for (int j = 0; j <= i; j++)
+					if (filters[j])
+						rtcm_filter_free(filters[j]);
+				free(filters);
+				return -1;
+			}
+			memcpy(dupkey, key, len);
+			dupkey[len] = '\0';
+			int e = hash_table_add(newdyn->rtcm_filter_dict, dupkey, rtcm_filter);
+			strfree(dupkey);
+			if (e == -2) {
+				/* Out of memory */
+				for (int j = 0; j <= i; j++)
+					if (filters[j])
+						rtcm_filter_free(filters[j]);
+				free(filters);
+				return -1;
+			}
+			/* Duplicate key (e == -1): the first filter wins, silently ignore */
+		} while (*p);
 	}
+
+	newdyn->rtcm_filter = filters;
+	newdyn->rtcm_filter_count = new_config->rtcm_filter_count;
 	return 0;
 }
 

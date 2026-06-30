@@ -88,7 +88,15 @@ char *mystrcasestr(const char *s, const char *find);
 
 #if DEBUG
 extern _Atomic int str_alloc;
-struct mime_content *malloc_stats_dump(int json);
+#else
+/*
+ * In non-DEBUG builds, str_alloc tracking is disabled and
+ * malloc_stats_dump always returns NULL. Callers must handle a
+ * NULL return gracefully (the /adm/mem endpoint will reply with
+ * an empty body in non-DEBUG builds).
+ */
+#define str_alloc 0
 #endif
+struct mime_content *malloc_stats_dump(int json);
 
 #endif

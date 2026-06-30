@@ -9,6 +9,13 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "BSD")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUG_JEMALLOC")
 endif()
 
+# Enable DEBUG=1 (memory allocation tracking, junk-filling) only in Debug builds.
+# In Release builds DEBUG defaults to 0 (see caster/conf.h) for performance and
+# to avoid leaking sensitive data (e.g. passwords) through DEBUG/EDEBUG logs.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUG=1")
+endif()
+
 file(GLOB SOURCES "caster/*.c")
 get_filename_component(TESTS_C_ABS "caster/tests.c" ABSOLUTE)
 list(REMOVE_ITEM SOURCES ${TESTS_C_ABS})
@@ -19,5 +26,14 @@ add_executable(caster_cmake ${SOURCES})
 #add_executable(tests caster/tests.c caster/util.c)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-    target_link_libraries(caster -static yaml)
+    target_link_libraries(caster_cmake -static yaml)
 endif()
+
+# Enable testing with CTest
+enable_testing()
+# Run a Python integration test via ctest
+add_test(
+    NAME near1
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/test-near1.py
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tests
+)

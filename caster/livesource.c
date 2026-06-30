@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdatomic.h>
 #include <string.h>
+#include <sys/time.h>
 #include <time.h>
 
 #include <event2/buffer.h>
@@ -136,6 +137,8 @@ struct livesource *livesource_new(char *mountpoint, enum livesource_type type, e
 	this->state = state;
 	this->type = type;
 	atomic_init(&this->refcnt, 1);
+	timerclear(&this->first_packet_time);
+	this->bytes_total = 0;
 
 	P_RWLOCK_INIT(&this->lock, NULL);
 	return this;
@@ -313,8 +316,40 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 
 	this->npackets++;
 
-	int nbacklogged = 0;
+	/*
+	 * Track the source rate (bytes/sec) so we can dynamically size the
+	 * per-client backlog to about backlog_delay seconds of source data.
+	 * The first packet seeds first_packet_time; subsequent packets
+	 * accumulate bytes_total. Once we have at least 2 seconds of history
+	 * we compute an effective backlog threshold that grows with the
+	 * source rate, capped at 4 * backlog_evbuffer to avoid runaway
+	 * memory use on very high rate sources.
+	 */
+	if (!timerisset(&this->first_packet_time))
+		gettimeofday(&this->first_packet_time, NULL);
+	this->bytes_total += packet->datalen;
+
 	size_t backlog_evbuffer = atomic_load(&caster->backlog_evbuffer);
+	int backlog_delay = caster->config ? caster->config->backlog_delay : 0;
+	if (backlog_delay > 0) {
+		struct timeval now, elapsed;
+		gettimeofday(&now, NULL);
+		timersub(&now, &this->first_packet_time, &elapsed);
+		long elapsed_sec = elapsed.tv_sec;
+		if (elapsed_sec >= 2 && this->bytes_total > 0) {
+			/* bytes/sec as unsigned long long, then scale by backlog_delay */
+			unsigned long long rate_bps = this->bytes_total / (unsigned long long)elapsed_sec;
+			unsigned long long dynamic_backlog = rate_bps * (unsigned long long)backlog_delay;
+			/* Cap at 4x the static backlog to bound memory use */
+			unsigned long long cap = (unsigned long long)backlog_evbuffer * 4ULL;
+			if (dynamic_backlog > cap)
+				dynamic_backlog = cap;
+			if (dynamic_backlog > (unsigned long long)backlog_evbuffer)
+				backlog_evbuffer = (size_t)dynamic_backlog;
+		}
+	}
+
+	int nbacklogged = 0;
 
 	TAILQ_FOREACH(np, &this->subscribers, next) {
 		struct ntrip_state *st = np->ntrip_state;
@@ -344,9 +379,10 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		p = packet;
 		if (atomic_load(&st->use_rtcm_filter)) {
 			bufferevent_lock(bev);
-			if (!rtcm_filter_pass(st->config->dyn->rtcm_filter, packet)) {
+			struct rtcm_filter *f = rtcm_filter_get(st->config->dyn, st->mountpoint);
+			if (f && !rtcm_filter_pass(f, packet)) {
 				if (!pconv)
-					pconv = rtcm_filter_convert(st->config->dyn->rtcm_filter, st, packet);
+					pconv = rtcm_filter_convert(f, st, packet);
 				p = pconv;
 			}
 			bufferevent_unlock(bev);

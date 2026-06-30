@@ -29,6 +29,7 @@ void nodes_free(struct nodes *this);
 void node_set_state(struct nodes *this, const char *hostname, enum node_state state);
 void nodes_add_node(struct nodes *this, const char *hostname, json_object *j);
 int node_update_execute(struct caster_state *caster, struct json_object *json);
+json_object *node_json(struct caster_state *caster);
 json_object *nodes_json(struct nodes *this);
 
 #endif
