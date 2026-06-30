@@ -29,8 +29,13 @@ add_executable(caster_cmake ${SOURCES})
 # that expect /app/build/caster keep working.
 set_target_properties(caster_cmake PROPERTIES OUTPUT_NAME "caster")
 
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-    target_link_libraries(caster_cmake -static yaml)
+# Static linking is opt-in via -DSTATIC_BUILD=ON.
+# A fully static binary requires all static dependencies (libyaml, libzstd,
+# etc.) and is mainly useful for the Docker image. The default CI build
+# produces a dynamically linked binary which is simpler and more portable.
+option(STATIC_BUILD "Build a fully static binary" OFF)
+if(STATIC_BUILD)
+    target_link_libraries(caster_cmake -static yaml zstd z)
 endif()
 
 # Enable testing with CTest
