@@ -6,8 +6,10 @@
 #include <syslog.h>
 #include <errno.h>
 
+#include "caster.h"
 #include "graylog_sender.h"
 #include "log.h"
+#include "log_stream.h"
 
 #define max(a,b)	((a)>=(b)?(a):(b))
 
@@ -40,7 +42,7 @@ int log_init(struct log *this, const char *filename, log_cb_t log_cb,
 
 int log_reopen(struct log *this, const char *filename,
 	int log_level, int graylog_level, int syslog_level, int syslog_facility) {
-	FILE *newfile =	fopen(filename, "a+");
+	FILE *newfile = fopen(filename, "a+");
 	if (!newfile) {
 		fprintf(stderr, "Can't reopen log file %s: %s\n", filename, strerror(errno));
 		return -1;
@@ -132,6 +134,15 @@ vlogall(struct caster_state *caster, struct gelf_entry *g, struct log *log, int 
 
 	char *msg;
 	vasprintf(&msg, fmt, ap);
+
+	/* Publish to the SSE log stream (before dispatching to other sinks,
+	 * so subscribers see the message even if file/syslog/graylog skip it). */
+	if (caster->log_stream) {
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		log_stream_publish(caster->log_stream, &now, level,
+				   caster->hostname, thread_id, msg);
+	}
 
 	if (level <= atomic_load(&log->log_level)) {
 		if (threads)

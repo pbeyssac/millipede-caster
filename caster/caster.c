@@ -319,13 +319,14 @@ caster_new(const char *config_file, int nbase) {
 		free(this);
 		return NULL;
 	}
-
 	this->dns_base = dns_base;
 	TAILQ_INIT(&this->ntrips.queue);
 	TAILQ_INIT(&this->ntrips.free_queue);
 	this->ntrips.n = 0;
 	this->ntrips.nfree = 0;
 	this->rtcm_cache = hash_table_new(509, (void(*)(void *))rtcm_info_free);
+	this->rtcm_freq = rtcm_freq_tracker_new();
+	this->log_stream = log_stream_new();
 	this->hostname[sizeof(this->hostname)-1] = '\0';
 	TAILQ_INIT(&this->sourcetablestack.list);
 	return this;
@@ -457,6 +458,10 @@ void caster_free(struct caster_state *this) {
 
 	hash_table_free(this->ntrips.ipcount);
 	hash_table_free(this->rtcm_cache);
+	rtcm_freq_tracker_free(this->rtcm_freq);
+	if (this->log_stream_timer_event)
+		event_free(this->log_stream_timer_event);
+	log_stream_free(this->log_stream);
 
 	evdns_base_free(this->dns_base, 1);
 
@@ -1143,6 +1148,22 @@ int caster_main(char *config_file) {
 	if (caster_start(caster, caster->config ,1)) {
 		caster_free(caster);
 		return 1;
+	}
+
+	/* Start the SSE log stream periodic timer (1 Hz) on the main event base. */
+	if (caster->log_stream) {
+		struct timeval one_sec = { .tv_sec = 1, .tv_usec = 0 };
+		caster->log_stream_timer_event = event_new(caster->base[0], -1,
+			EV_PERSIST, log_stream_timer, caster->log_stream);
+		if (caster->log_stream_timer_event == NULL
+		    || event_add(caster->log_stream_timer_event, &one_sec) < 0) {
+			logfmt(&caster->flog, LOG_WARNING,
+				"Could not start log stream timer (SSE logs disabled)");
+			if (caster->log_stream_timer_event) {
+				event_free(caster->log_stream_timer_event);
+				caster->log_stream_timer_event = NULL;
+			}
+		}
 	}
 
 	event_base_dispatch(caster->base[0]);

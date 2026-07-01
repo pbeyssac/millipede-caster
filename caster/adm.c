@@ -10,9 +10,63 @@
 #include "api.h"
 #include "hash.h"
 #include "livesource.h"
+#include "log_stream.h"
 #include "ntripsrv.h"
 #include "request.h"
 #include "sourcetable.h"
+
+/*
+ * Handle GET /api/v1/logs/stream — Server-Sent Events (SSE) endpoint
+ * for real-time log streaming.
+ *
+ * Sends the HTTP response headers, registers the bufferevent as a log
+ * stream subscriber, and sets the ntrip_state to NTRIP_IDLE_CLIENT so
+ * the connection stays open until the client disconnects.
+ *
+ * Returns 0 on success (connection kept open), -1 on error (caller
+ * should set *err appropriately).
+ */
+static int handle_logs_stream_sse(struct ntrip_state *st, struct evkeyvalq *headers) {
+	struct evbuffer *output = bufferevent_get_output(st->bev);
+
+	/* Send HTTP 200 + SSE headers. We use Connection: close because
+	 * we don't want the client to pipeline another request on the
+	 * same connection (we'll be streaming forever). */
+	evbuffer_add_printf(output,
+		"HTTP/1.1 200 OK\r\n"
+		"Content-Type: text/event-stream; charset=utf-8\r\n"
+		"Cache-Control: no-cache, no-transform\r\n"
+		"Connection: close\r\n"
+		"Access-Control-Allow-Origin: *\r\n"
+		"X-Accel-Buffering: no\r\n"  /* disable nginx buffering */
+		"\r\n");
+
+	/* Send an initial "hello" event so the client knows we're alive. */
+	evbuffer_add_printf(output,
+		"event: hello\n"
+		"data: {\"message\":\"SSE log stream connected\"}\n\n");
+
+	/* Subscribe the bufferevent to the log stream. */
+	void *sub = log_stream_subscribe(st->caster->log_stream, st->bev);
+	if (sub == NULL) {
+		evbuffer_add_printf(output,
+			"event: error\n"
+			"data: {\"message\":\"Could not subscribe to log stream\"}\n\n");
+		/* Force close after the write completes. */
+		ntrip_set_state(st, NTRIP_WAIT_CLOSE);
+		return -1;
+	}
+	atomic_store(&st->log_stream_sub, sub);
+
+	/* Keep the connection open. NTRIP_IDLE_CLIENT means "waiting for
+	 * something to send" — which is exactly our case (the log stream
+	 * timer will push new entries to us). The libevent bufferevent
+	 * will notify us on EOF/error so we can clean up. */
+	ntrip_set_state(st, NTRIP_IDLE_CLIENT);
+	st->connection_keepalive = 0;  /* don't let the framework close us */
+
+	return 0;
+}
 
 int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, const char *uri, int *err, struct evkeyvalq *headers) {
 	struct evbuffer *output = bufferevent_get_output(st->bev);
@@ -63,6 +117,78 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		}
 	}
 
+	/*
+	 * /api/v1/ endpoints accept auth from EITHER:
+	 *   - HTTP Basic auth header (Authorization: Basic <base64>), OR
+	 *   - query string / POST body (user=X&password=Y)
+	 * The Basic auth path lets web UIs authenticate without exposing
+	 * the password in URLs (which would be logged).
+	 */
+	int is_api_v1 = (strncmp(uri, "/api/v1/", 8) == 0);
+
+	/* If Basic auth credentials are present, use them. */
+	if (is_api_v1 && st->user && st->password) {
+		if (!check_password(st, st->config->admin_user, st->user, st->password)) {
+			request_free(req);
+			int www_auth_value_len = strlen(root_uri) + 15;
+			char *www_auth_value = (char *)strmalloc(www_auth_value_len);
+			if (www_auth_value) {
+				snprintf(www_auth_value, www_auth_value_len,
+					"Basic realm=\"%s\"", root_uri);
+				*err = 401;
+				evhttp_add_header(headers, "WWW-Authenticate", www_auth_value);
+				strfree(www_auth_value);
+			} else {
+				*err = 500;
+			}
+			return -1;
+		}
+
+		/* Special-case: SSE log stream endpoint. */
+		if (!strcmp(method, "GET") && !strcmp(uri, "/api/v1/logs/stream")) {
+			request_free(req);
+			return handle_logs_stream_sse(st, headers);
+		}
+
+		struct uri_calls {
+			const char *uri;
+			const char *method;
+			struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req);
+		};
+		const struct uri_calls calls[] = {
+			{"/api/v1/net", "GET", api_ntrip_list_json},
+			{"/api/v1/rtcm", "GET", api_rtcm_json},
+			{"/api/v1/rtcm/frequencies", "GET", api_rtcm_freq_json},
+			{"/api/v1/mem","GET", api_mem_json},
+			{"/api/v1/nodes","GET", api_nodes_json},
+			{"/api/v1/livesources", "GET", livesource_list_json},
+			{"/api/v1/sourcetables", "GET", sourcetable_list_json},
+			{"/api/v1/reload", "POST", api_reload_json},
+			{"/api/v1/drop", "POST", api_drop_json},
+			{NULL, NULL, NULL}
+		};
+
+		int i;
+		for (i = 0; calls[i].uri; i++) {
+			if (!strcmp(uri, calls[i].uri))
+				break;
+		}
+
+		if (calls[i].uri == NULL) {
+			request_free(req);
+			*err = 404;
+			return -1;
+		}
+		if (strcmp(method, calls[i].method)) {
+			request_free(req);
+			*err = 405;
+			return -1;
+		}
+
+		joblist_append_ntrip_unlocked_content(st->caster->joblist, ntripsrv_deferred_output, st, calls[i].content_cb, req);
+		return 0;
+	}
+
 	if (req->hash) {
 		/*
 		 * Found url-encoded key=value pairs in the request, process
@@ -81,14 +207,24 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 			return -1;
 		}
 
+		/* Special-case: SSE log stream endpoint. Handle it before
+		 * the regular dispatch because it doesn't return a
+		 * mime_content (it keeps the connection open). */
+		if (!strcmp(method, "GET") && !strcmp(uri, "/api/v1/logs/stream")) {
+			/* Free the request struct; we won't use it for SSE. */
+			request_free(req);
+			return handle_logs_stream_sse(st, headers);
+		}
+
 		struct uri_calls {
 			const char *uri;
 			const char *method;
 			struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req);
 		};
 		const struct uri_calls calls[] = {
-			{"/api/v1/net",	"GET", api_ntrip_list_json},
+			{"/api/v1/net", "GET", api_ntrip_list_json},
 			{"/api/v1/rtcm", "GET", api_rtcm_json},
+			{"/api/v1/rtcm/frequencies", "GET", api_rtcm_freq_json},
 			{"/api/v1/mem","GET", api_mem_json},
 			{"/api/v1/nodes","GET", api_nodes_json},
 			{"/api/v1/livesources", "GET", livesource_list_json},

@@ -21,7 +21,7 @@ listen:
 # - port:			2443
 #   ip:				::0
 #   tls:			true
-#   tls_full_certificate_chain:	fullchain.pem
+#   tls_full_certificate_chain: fullchain.pem
 #   tls_private_key:		privkey.pem
 
 #
@@ -42,7 +42,7 @@ listen:
 #
 #syslog:
 #  - facility:	local0
-#    log_level:	DEBUG
+#    log_level: DEBUG
 
 #
 # Optional Graylog log server configuration.
@@ -80,7 +80,7 @@ host_auth_file:		/usr/local/etc/millipede/host.auth
 #
 # Blocklist file path (optional)
 #
-blocklist_file:	blocklist
+blocklist_file: blocklist
 
 #
 # Source credentials for local sources and their STR lines
@@ -131,8 +131,8 @@ hysteresis_m:		500.0
 #    - apply:		NEAR4
 #      pass:		1005,1006,1008,1019,1020,1032,1033,1042,1046,1074,1084,1094,1124,1230
 #      convert:
-#        - types:	1077,1087,1097,1107,1117,1127
-#          conversion:	msm7_4
+#	 - types:	1077,1087,1097,1107,1117,1127
+#	   conversion:	msm7_4
 #
 
 # default size set for sending buffers (SO_SNDBUF), 112 KB
@@ -143,3 +143,11 @@ backlog_evbuffer: 16384
 
 # admin user for the /adm section
 admin_user:	admin
+
+#
+# Web admin UI — uncomment to serve the admin dashboard at /admin/
+# After running `install.sh`, the web files are at /usr/local/share/millipede/web/
+#
+#webroots:
+#  - uri:	    /admin/
+#    path:	    /usr/local/share/millipede/web/

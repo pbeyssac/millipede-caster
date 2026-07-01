@@ -8,6 +8,7 @@
 #include "nodes.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
+#include "rtcm_freq.h"
 #include "sourcetable.h"
 
 /*
@@ -165,7 +166,7 @@ struct mime_content *api_drop_json(struct caster_state *caster, struct request *
 	char result[40];
 	int r = 0;
 	long long id = -1;
-	char *idval = (char *)hash_table_get(req->hash, "id");
+	char *idval = req->hash ? (char *)hash_table_get(req->hash, "id") : NULL;
 
 	if (idval && sscanf(idval, "%lld", &id) == 1)
 		r = ntrip_drop_by_id(caster, id);
@@ -189,5 +190,25 @@ struct mime_content *api_sync_json(struct caster_state *caster, struct request *
 		req->status = livesource_update_execute(caster, caster->livesources, req);
 	char *s = mystrdup("");
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	return m;
+}
+
+/*
+ * Return the RTCM frequency tracker as a JSON object.
+ *
+ * Optional query string parameter:
+ *   mountpoint=<name>	 restrict the response to a single mountpoint
+ */
+struct mime_content *api_rtcm_freq_json(struct caster_state *caster, struct request *req) {
+	json_object *j;
+	char *mountpoint = req->hash ? (char *)hash_table_get(req->hash, "mountpoint") : NULL;
+	if (mountpoint)
+		j = rtcm_freq_mountpoint_json(caster->rtcm_freq, mountpoint);
+	else
+		j = rtcm_freq_tracker_json(caster->rtcm_freq);
+	char *s = mystrdup(j ? json_object_to_json_string(j) : "{}");
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	if (j)
+		json_object_put(j);
 	return m;
 }

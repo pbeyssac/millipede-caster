@@ -373,6 +373,13 @@ void ntrip_clear_request(struct ntrip_state *this) {
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_EDEBUG, "FREE %s", orig);
 
+	/* Clean up SSE log stream subscription if active. */
+	if (this->caster->log_stream) {
+		void *sub = atomic_exchange(&this->log_stream_sub, NULL);
+		if (sub)
+			log_stream_unsubscribe(this->caster->log_stream, sub);
+	}
+
 	strfree(this->mountpoint);
 	strfree(this->uri);
 	strfree(this->virtual_mountpoint);

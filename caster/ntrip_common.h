@@ -245,6 +245,10 @@ struct ntrip_state {
 	struct config *config;
 	/* A possibly new configuration, if not NULL */
 	struct config *tmpconfig;
+
+	/* SSE log stream subscription handle (NULL if not subscribed).
+	 * Set by /api/v1/logs/stream on subscribe, cleared by ntrip_free(). */
+	_Atomic void *log_stream_sub;
 };
 
 struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *bev,

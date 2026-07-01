@@ -16,9 +16,11 @@
 #include "jobs.h"
 #include "livesource.h"
 #include "log.h"
+#include "log_stream.h"
 #include "nodes.h"
 #include "queue.h"
 #include "rtcm.h"
+#include "rtcm_freq.h"
 #include "sourcetable.h"
 #include "syncer.h"
 #include "util.h"
@@ -104,6 +106,13 @@ struct caster_state {
 	struct evdns_base *dns_base;
 	struct hash_table *rtcm_cache;
 	P_RWLOCK_T rtcm_lock;
+
+	/* RTCM frequency tracker (per-mountpoint, per-type sliding window) */
+	struct rtcm_freq_tracker *rtcm_freq;
+
+	/* Real-time log stream (SSE) */
+	struct log_stream *log_stream;
+	struct event *log_stream_timer_event;
 
 	// Protect access to the config pointer
 	P_RWLOCK_T configlock;

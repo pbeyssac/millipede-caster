@@ -18,11 +18,11 @@ syslog:
   - facility:	local0
     log_level:	DEBUG
 
-trusted_http_ip_header:	"X-Forwarded-For"
+trusted_http_ip_header: "X-Forwarded-For"
 
-ntripcli_default_write_timeout:	10
+ntripcli_default_write_timeout: 10
 ntripcli_default_read_timeout:	10
-ntripsrv_default_write_timeout:	10
+ntripsrv_default_write_timeout: 10
 ntripsrv_default_read_timeout:	10
 idle_max_delay:			10
 http_content_length_max:	100
@@ -33,6 +33,8 @@ syncer_auth:		'587e5bbadbc6186fad0d6177eb10a6cd9d5cb934d3d5f155107592535bd20290'
 webroots:
   - uri:		/example-well-known/
     path:		webroot/
+  - uri:		/admin/
+    path:		../../web/
 
 log_level:		EDEBUG
 
@@ -41,6 +43,6 @@ rtcm_filter:
     pass:		1005,1006,1008,1019,1020,1032,1033,1042,1046,1074,1084,1094,1124,1230
     convert:
       - types:		1077,1087,1097,1107,1117,1127
-        conversion:	msm7_4
+	conversion:	msm7_4
 
 admin_user:		admin

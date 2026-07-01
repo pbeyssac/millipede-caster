@@ -1,0 +1,41 @@
+[Unit]
+Description=Millipede NTRIP Caster
+Documentation=https://github.com/nicolasroduit/millipede-caster
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=caster
+Group=caster
+RuntimeDirectory=millipede
+RuntimeDirectoryMode=0755
+# Configuration and auth files are read from /etc/millipede
+# Logs are written to /var/log/millipede
+ExecStart=/usr/local/sbin/caster -c /etc/millipede/caster.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/log/millipede /run/millipede
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+# Resource limits (adjust for your workload)
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
