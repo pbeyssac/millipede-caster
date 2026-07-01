@@ -293,6 +293,8 @@ static int send_cb(struct log_stream_entry *e, unsigned long seq, void *arg) {
 }
 
 void log_stream_timer(int fd, short event, void *arg) {
+        (void)fd;
+        (void)event;
         struct log_stream *this = (struct log_stream *)arg;
         if (this == NULL)
                 return;

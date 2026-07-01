@@ -197,6 +197,7 @@ static void prom_emit_rtcm_metrics(struct mbuf *b, struct caster_state *caster, 
 }
 
 struct mime_content *prometheus_metrics_text(struct caster_state *caster, struct request *req) {
+	(void)req;  /* reserved for future use (e.g. content negotiation) */
 	struct mbuf b;
 	if (mbuf_init(&b, 8192) < 0) {
 		char *s = mystrdup("");
