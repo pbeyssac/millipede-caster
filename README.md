@@ -167,10 +167,12 @@ with credentials from the account configured as `admin_user` in
 | GET    | `/adm/api/v1/nodes`               | Node table (cluster sync)                    |
 | GET    | `/adm/api/v1/livesources`         | Live sources (local + remote)                |
 | GET    | `/adm/api/v1/sourcetables`        | Known sourcetables                           |
+| GET    | `/adm/api/v1/metrics`             | Prometheus exposition format (text/plain 0.0.4) |
 | POST   | `/adm/api/v1/reload`              | Reload the configuration                     |
 | POST   | `/adm/api/v1/drop?id=<n>`         | Drop a connection by id                      |
 | POST   | `/adm/api/v1/sync`                | Push a syncer update                         |
 | GET    | `/adm/api/v1/logs/stream`         | SSE stream of real-time log lines            |
+| GET    | `/adm/api/v1/logs/ws`             | WebSocket bidirectional command channel      |
 
 A companion CLI tool `mapi` (in `caster/bin/`) wraps these endpoints.
 
@@ -208,7 +210,72 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:2101/adm/api/v1/rtcm/fre
 # Subscribe to the real-time log stream (SSE) with token in URL
 # (EventSource can't set headers, so use ?token= for browser-based clients)
 curl -N "http://localhost:2101/adm/api/v1/logs/stream?token=$TOKEN"
+
+# Prometheus metrics (scrape this from prometheus.yml)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:2101/adm/api/v1/metrics
 ```
+
+### Prometheus integration
+
+Add this to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'millipede-caster'
+    scheme: http
+    basic_auth:
+      username: admin
+      password: <admin-password>
+    static_configs:
+      - targets: ['caster:2101']
+    metrics_path: /adm/api/v1/metrics
+```
+
+Exposed metrics (all prefixed with `millipede_`):
+
+| Metric                                | Type    | Labels                | Description                                  |
+|---------------------------------------|---------|-----------------------|----------------------------------------------|
+| `millipede_uptime_seconds`            | gauge   | —                     | Process uptime                               |
+| `millipede_connections_total`         | gauge   | `type`                | Active connections (source / client / other) |
+| `millipede_received_bytes_total`      | counter | —                     | Total bytes received from all connections    |
+| `millipede_sent_bytes_total`          | counter | —                     | Total bytes sent to all connections          |
+| `millipede_mountpoints`               | gauge   | —                     | Active local mountpoints                     |
+| `millipede_log_stream_subscribers`    | gauge   | —                     | SSE log stream subscribers                   |
+| `millipede_rtcm_packets_total`        | counter | `mountpoint`, `type`  | RTCM packets received per mountpoint/type    |
+| `millipede_rtcm_rate_hz`              | gauge   | `mountpoint`, `type`  | Sliding 60s RTCM packet rate (Hz)            |
+
+### WebSocket command channel
+
+The `/adm/api/v1/logs/ws` endpoint upgrades to a WebSocket and accepts
+JSON text-frame commands. Replies come back as JSON text frames. This
+is a **command channel** (not a log push channel — use `/logs/stream`
+SSE for real-time logs).
+
+```sh
+# Use any WebSocket client, e.g. websocat:
+websocat "ws://caster:2101/adm/api/v1/logs/ws?token=$TOKEN"
+> {"cmd":"ping"}
+< {"type":"pong"}
+> {"cmd":"reload"}
+< {"type":"reload","result":0}
+> {"cmd":"set_level","level":"DEBUG"}
+< {"type":"set_level","ok":true}
+> {"cmd":"drop","id":42}
+< {"type":"drop","result":1}
+```
+
+Supported commands:
+
+| Command                              | Reply                                       | Effect                                  |
+|--------------------------------------|---------------------------------------------|-----------------------------------------|
+| `{"cmd":"ping"}`                     | `{"type":"pong"}`                           | No-op round-trip latency probe         |
+| `{"cmd":"subscribe"}`                | `{"type":"subscribed"}`                     | Acknowledges subscription (logs are via SSE) |
+| `{"cmd":"reload"}`                   | `{"type":"reload","result":<n>}`            | Reloads the configuration              |
+| `{"cmd":"drop","id":<int>}`          | `{"type":"drop","result":<n>}`              | Drops a connection by id               |
+| `{"cmd":"set_level","level":"DEBUG"}`| `{"type":"set_level","ok":<bool>}`          | Changes runtime log level              |
+
+Levels: `EMERG`, `ALERT`, `CRIT`, `ERR`, `WARNING`, `NOTICE`, `INFO`,
+`DEBUG`, `EDEBUG`.
 
 Web admin UI
 ============

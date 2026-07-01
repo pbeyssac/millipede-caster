@@ -32,13 +32,13 @@
  * Per-type statistics
  */
 struct rtcm_freq_per_type {
-        unsigned int buckets[RTCM_FREQ_BUCKETS];
-        int current_idx;             // 0..RTCM_FREQ_BUCKETS-1
-        time_t current_sec;          // second value of current bucket
-        time_t first_bucket_sec;     // second value of oldest non-zero bucket in window (0 if none)
-        unsigned long total_count;   // since first packet
-        struct timeval first_seen;
-        struct timeval last_seen;
+	unsigned int buckets[RTCM_FREQ_BUCKETS];
+	int current_idx;             // 0..RTCM_FREQ_BUCKETS-1
+	time_t current_sec;          // second value of current bucket
+	time_t first_bucket_sec;     // second value of oldest non-zero bucket in window (0 if none)
+	unsigned long total_count;   // since first packet
+	struct timeval first_seen;
+	struct timeval last_seen;
 };
 
 /*
@@ -53,17 +53,17 @@ struct rtcm_freq_per_type {
 #define RTCM_FREQ_TOTAL_SLOTS (RTCM_FREQ_1K_SLOTS + RTCM_FREQ_4K_SLOTS)
 
 struct rtcm_freq_mountpoint {
-        P_MUTEX_T lock;
-        char *mountpoint;
-        struct rtcm_freq_per_type types[RTCM_FREQ_TOTAL_SLOTS];
+	P_MUTEX_T lock;
+	char *mountpoint;
+	struct rtcm_freq_per_type types[RTCM_FREQ_TOTAL_SLOTS];
 };
 
 /*
  * Top-level tracker: a hash table mountpoint -> rtcm_freq_mountpoint
  */
 struct rtcm_freq_tracker {
-        struct hash_table *table;
-        P_RWLOCK_T lock;
+	struct hash_table *table;
+	P_RWLOCK_T lock;
 };
 
 struct rtcm_freq_tracker *rtcm_freq_tracker_new(void);
@@ -74,14 +74,21 @@ void rtcm_freq_tracker_free(struct rtcm_freq_tracker *this);
  * Safe to call from any thread.
  */
 void rtcm_freq_record(struct rtcm_freq_tracker *this,
-                      const char *mountpoint,
-                      unsigned short rtcm_type,
-                      struct timeval *now);
+		      const char *mountpoint,
+		      unsigned short rtcm_type,
+		      struct timeval *now);
 
 /*
  * Remove a mountpoint from the tracker (e.g. when its livesource is freed).
  */
 void rtcm_freq_remove(struct rtcm_freq_tracker *this, const char *mountpoint);
+
+/*
+ * Compute the current sliding-window rate (Hz) for a per-type entry.
+ * Walks the 60-bucket circular buffer and divides by the active window.
+ * Safe to call from any thread; caller must hold the per-mountpoint mutex.
+ */
+double rtcm_freq_rate(struct rtcm_freq_per_type *t, time_t now_sec);
 
 /*
  * Serialize the whole tracker as a JSON object:
@@ -104,26 +111,26 @@ json_object *rtcm_freq_tracker_json(struct rtcm_freq_tracker *this);
  * Serialize a single mountpoint as a JSON object (or NULL if unknown).
  */
 json_object *rtcm_freq_mountpoint_json(struct rtcm_freq_tracker *this,
-                                       const char *mountpoint);
+				       const char *mountpoint);
 
 /*
  * Helper: map an RTCM type to a slot index, or -1 if out of range.
  */
 static inline int rtcm_freq_slot(unsigned short type) {
-        if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
-                return type - RTCM_1K_MIN;
-        if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
-                return type - RTCM_4K_MIN + RTCM_FREQ_1K_SLOTS;
-        return -1;
+	if (type >= RTCM_1K_MIN && type <= RTCM_1K_MAX)
+		return type - RTCM_1K_MIN;
+	if (type >= RTCM_4K_MIN && type <= RTCM_4K_MAX)
+		return type - RTCM_4K_MIN + RTCM_FREQ_1K_SLOTS;
+	return -1;
 }
 
 /*
  * Helper: reverse mapping (slot index -> RTCM type).
  */
 static inline unsigned short rtcm_freq_type(int slot) {
-        if (slot < RTCM_FREQ_1K_SLOTS)
-                return (unsigned short)(slot + RTCM_1K_MIN);
-        return (unsigned short)(slot - RTCM_FREQ_1K_SLOTS + RTCM_4K_MIN);
+	if (slot < RTCM_FREQ_1K_SLOTS)
+		return (unsigned short)(slot + RTCM_1K_MIN);
+	return (unsigned short)(slot - RTCM_FREQ_1K_SLOTS + RTCM_4K_MIN);
 }
 
 #endif /* __RTCM_FREQ_H__ */

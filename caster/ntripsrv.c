@@ -182,9 +182,9 @@ void ntripsrv_deferred_output(
  * Check password in the base
  *
  * Returns:
- *	CHECKPW_MOUNTPOINT_INVALID: mountpoint not found or wrong password, doesn't match a wildcard entry
- *	CHECKPW_MOUNTPOINT_VALID: mountpoint found and password is correct
- *	CHECKPW_MOUNTPOINT_WILDCARD: mountpoint not found, but password matches a wildcard entry
+ *      CHECKPW_MOUNTPOINT_INVALID: mountpoint not found or wrong password, doesn't match a wildcard entry
+ *      CHECKPW_MOUNTPOINT_VALID: mountpoint found and password is correct
+ *      CHECKPW_MOUNTPOINT_WILDCARD: mountpoint not found, but password matches a wildcard entry
  */
 int check_password(struct ntrip_state *this, const char *mountpoint, const char *user, const char *passwd) {
 	int r = CHECKPW_MOUNTPOINT_INVALID;
@@ -524,6 +524,14 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 						/* Don't log the raw Authorization value, it may contain credentials */
 						ntrip_log(st, LOG_NOTICE, "Can't decode Authorization");
 					}
+				} else if (!strcasecmp(key, "sec-websocket-key")) {
+					/* Captured for /api/v1/logs/ws handshake. Don't log:
+					 * it's a random base64 nonce but logging it would be noisy. */
+					if (st->sec_websocket_key) {
+						strfree(st->sec_websocket_key);
+						st->sec_websocket_key = NULL;
+					}
+					st->sec_websocket_key = mystrdup(value);
 				} else if (!strcasecmp(key, "ntrip-gga")) {
 					pos_t pos;
 					ntrip_log(st, LOG_EDEBUG, "Header GGA? \"%s\"", value);
