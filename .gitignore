@@ -10,6 +10,7 @@ CTestTestfile.cmake
 Makefile
 Testing
 _deps
+build/
 caster/caster
 caster/tests
 cmake-build-*/

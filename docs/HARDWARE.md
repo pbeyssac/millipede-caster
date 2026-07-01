@@ -7,11 +7,22 @@ scripts in `tools/` help with receiver detection and configuration.
 
 ## Supported receivers
 
-| Vendor      | Models              | Protocol | Detection method          |
-|-------------|---------------------|----------|---------------------------|
-| U-blox      | ZED-F9P, F9R, F9H   | UBX      | USB ID 1546:01a7/01a8/01a9 + UBX-MON-VER probe |
-| Septentrio  | mosaic-X5, mosaicGo | SBF/ASCII| USB ID 09d7:0200/0300 + `exePrintVersion` probe |
-| Unicore     | UM980, UM982        | ASCII    | USB ID 1d00:2010/2011 + `version` probe |
+| Vendor      | Models                          | Protocol  | Detection method          |
+|-------------|---------------------------------|-----------|---------------------------|
+| U-blox      | ZED-F9P, F9R, F9H               | UBX       | USB ID 1546:01a7/01a8/01a9 + UBX-MON-VER probe |
+| Septentrio  | mosaic-X5, mosaicGo             | SBF/ASCII | USB ID 09d7:0200/0300 + `exePrintVersion` probe |
+| Septentrio  | AsteRx-i, AsteRx-m, AsteRx-U    | SBF/ASCII | USB ID 09d7:0400/0401/0402 + `exePrintVersion` probe (auto-detected from by-id string) |
+| Unicore     | UM980, UM982                    | ASCII     | USB ID 1d00:2010/2011 + `version` probe |
+| Trimble     | BX992, BX996, BX996G            | TSIP/TAIP| USB ID 0c1d:0020/0021/0022 + TSIP 0x13/0x06 + TAIP `>QTM` probe |
+
+> **Note on Trimble BX-series**: these receivers are typically deployed in
+> agriculture/construction. The TSIP binary protocol is used for the
+> "software version" probe; if the receiver is in TAIP/RTP mode (common on
+> factory defaults), the script falls back to sending a `>QTM` ASCII
+> identity request. Note that the BX992 is not a high-precision RTK
+> receiver like the F9P — it is included here because some users want to
+> ingest its raw measurements into a Centipede base for diagnostic
+> purposes.
 
 ## Detecting receivers
 

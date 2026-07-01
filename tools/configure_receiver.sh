@@ -6,12 +6,16 @@
 # Supports:
 #   - U-blox ZED-F9P (UBX protocol, RTCM3 output at 1 Hz)
 #   - Septentrio mosaic-X5 (SBF/ASCII config)
+#   - Septentrio AsteRx-i, AsteRx-m, AsteRx-U (SBF/ASCII config — same syntax as mosaic)
 #   - Unicore UM980 (ASCII config)
+#   - Trimble BX992/BX996 (TSIP — limited: switches to RTCM3 output mode)
 #
 # Usage:
 #   ./configure_receiver.sh --device /dev/ttyACM0 --type ublox-f9p [--baud 115200]
 #   ./configure_receiver.sh --device /dev/ttyACM0 --type septentrio-mosaic
+#   ./configure_receiver.sh --device /dev/ttyACM0 --type septentrio-asterx
 #   ./configure_receiver.sh --device /dev/ttyUSB0 --type unicore-um980
+#   ./configure_receiver.sh --device /dev/ttyUSB0 --type trimble-bx992
 #
 # The script first runs detect_receiver.sh to confirm the receiver type
 # (unless --force is given).
@@ -38,7 +42,9 @@ Usage: $0 --device /dev/ttyXXX --type <type> [--baud N] [--rtcm-hz N] [--force]
 Supported types:
   ublox-f9p           U-blox ZED-F9P, F9R, F9H
   septentrio-mosaic   Septentrio mosaic-X5, mosaicGo
+  septentrio-asterx   Septentrio AsteRx-i, AsteRx-m, AsteRx-U
   unicore-um980       Unicore UM980, UM982
+  trimble-bx992       Trimble BX992, BX996, BX996G
 
 Use --force to skip receiver auto-detection.
 EOF
@@ -146,14 +152,15 @@ PY
         echo "==> U-blox F9P configuration applied."
 }
 
-# Configure Septentrio mosaic-X5
+# Configure Septentrio mosaic-X5 / AsteRx (same ASCII command set)
 configure_septentrio() {
         local dev="$1"
         local baud="$2"
         local hz="$3"
-        echo "==> Configuring Septentrio mosaic-X5 on $dev (baud $baud, RTCM $hz Hz)"
+        local model="$4"   # "mosaic" or "asterx"
+        echo "==> Configuring Septentrio $model on $dev (baud $baud, RTCM $hz Hz)"
         stty -F "$dev" "$baud" raw -echo -echoe -echok 2>/dev/null || true
-        # mosaic accepts ASCII commands
+        # mosaic and AsteRx share the same ASCII command set
         {
                 # Set RTCM3 output on COM1 (USB-COM1)
                 echo "setRTCMOutput, Stream1, RTCMv3, $hz, 0"
@@ -164,10 +171,42 @@ configure_septentrio() {
                 echo "setRTCMMessage, Stream1, 1094, $hz"
                 echo "setRTCMMessage, Stream1, 1124, $hz"
                 echo "setRTCMMessage, Stream1, 1230, $hz"
+                # For AsteRx: also enable 1006 (with height) since AsteRx
+                # typically has a more accurate antenna position
+                if [[ "$model" == "asterx" ]]; then
+                        echo "setRTCMMessage, Stream1, 1006, $hz"
+                fi
                 # Save config
                 echo "saveConfig"
         } > "$dev"
-        echo "==> Septentrio mosaic-X5 configuration applied."
+        echo "==> Septentrio $model configuration applied."
+}
+
+# Configure Trimble BX992 / BX996 via TSIP
+# Note: this is a minimal config — switches the BX to RTCM3 output mode
+# at the requested rate. For full configuration (DGPS corrections, etc.)
+# use the Trimble GPS Pathfinder software.
+configure_trimble() {
+        local dev="$1"
+        local baud="$2"
+        local hz="$3"
+        echo "==> Configuring Trimble BX-series on $dev (baud $baud, RTCM $hz Hz)"
+        stty -F "$dev" "$baud" raw -echo -echoe -echok 2>/dev/null || true
+        # TSIP packet 0x35 (set I/O options) selects RTCM3 output.
+        # For the BX992 family, the recommended way is via the ASCII
+        # command "$PASHS" (when in TAIP mode) or via TSIP 0x35/0x27.
+        # Here we send a TAIP/RTP command to switch to RTCM3 output:
+        #   >QST,RTCM,1<CR>
+        # (set stream type to RTCMv3 at 1 Hz on the main port)
+        {
+                printf '>/CR/>QST,RTCM,%d/\r' "$hz"
+                # Request identity to confirm
+                printf '>QTM\r'
+        } > "$dev"
+        echo "==> Trimble BX-series configuration applied."
+        echo "    (Note: BX992 RTCM3 message set is fixed by firmware."
+        echo "     For full control over individual RTCM messages, use"
+        echo "     Trimble GPS Pathfinder or the Web UI.)"
 }
 
 # Configure Unicore UM980
@@ -200,13 +239,20 @@ case "$TYPE" in
                 configure_ublox_f9p "$DEVICE" "$BAUD" "$RTCM_HZ"
                 ;;
         septentrio-mosaic|septentrio)
-                configure_septentrio "$DEVICE" "$BAUD" "$RTCM_HZ"
+                configure_septentrio "$DEVICE" "$BAUD" "$RTCM_HZ" "mosaic"
+                ;;
+        septentrio-asterx|asterx)
+                configure_septentrio "$DEVICE" "$BAUD" "$RTCM_HZ" "asterx"
                 ;;
         unicore-um980|unicore)
                 configure_unicore "$DEVICE" "$BAUD" "$RTCM_HZ"
                 ;;
+        trimble-bx992|trimble-bx996|trimble)
+                configure_trimble "$DEVICE" "$BAUD" "$RTCM_HZ"
+                ;;
         *)
                 echo "ERROR: unknown receiver type '$TYPE'." >&2
+                echo "Supported: ublox-f9p, septentrio-mosaic, septentrio-asterx, unicore-um980, trimble-bx992" >&2
                 exit 1
                 ;;
 esac

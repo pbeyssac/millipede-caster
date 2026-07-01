@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Millipede Caster — Admin</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="" />
 </head>
 <body>
   <!-- Login overlay -->
@@ -38,6 +41,7 @@
         <button data-view="dashboard" class="active">Dashboard</button>
         <button data-view="sources">Sources</button>
         <button data-view="clients">Clients</button>
+        <button data-view="map">Map</button>
         <button data-view="rtcm">RTCM</button>
         <button data-view="logs">Logs</button>
       </nav>
@@ -124,6 +128,24 @@
         </div>
       </section>
 
+      <!-- Map -->
+      <section id="view-map" class="view">
+        <h2>Base stations map</h2>
+        <div class="toolbar">
+          <button id="map-refresh">Refresh</button>
+          <label class="checkbox">
+            <input type="checkbox" id="map-autofit" checked> Auto-fit
+          </label>
+          <span class="hint" id="map-hint"></span>
+        </div>
+        <div id="leaflet-map" class="leaflet-map"></div>
+        <p class="hint">
+          Positions are fetched from <code>/api/v1/sourcetables</code>. Click a
+          marker to see the mountpoint details. Live (currently connected)
+          sources are shown in green, declared-but-offline bases in grey.
+        </p>
+      </section>
+
       <!-- RTCM -->
       <section id="view-rtcm" class="view">
         <h2>RTCM frequency tracker</h2>
@@ -175,6 +197,9 @@
     </footer>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
   <script src="app.js"></script>
 </body>
 </html>

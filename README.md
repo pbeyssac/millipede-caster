@@ -92,15 +92,15 @@ sudo service caster start
 Updating an existing installation:
 
 ```
-sudo ./update.sh	    # git pull + rebuild + restart
+sudo ./update.sh            # git pull + rebuild + restart
 sudo ./update.sh --no-pull  # rebuild from current source
 ```
 
 Uninstalling (keeps config and logs):
 
 ```
-sudo ./uninstall.sh		# remove binary + service, keep config & logs
-sudo ./uninstall.sh --purge	# remove everything including config & logs
+sudo ./uninstall.sh             # remove binary + service, keep config & logs
+sudo ./uninstall.sh --purge     # remove everything including config & logs
 ```
 
 Manual installation (FreeBSD)
@@ -111,10 +111,10 @@ As root:
 2. `cd caster; make install`
 3. Create configuration files in (default) `/usr/local/etc/millipede/`,
    samples in `sample-config/`.
-	* `caster.yaml` main configuration file
-	* `sourcetable.dat` our local sourcetable
-	* `source.auth` authentication of sources from our sourcetable
-	* `host.auth` authentication as a client to other hosts
+        * `caster.yaml` main configuration file
+        * `sourcetable.dat` our local sourcetable
+        * `source.auth` authentication of sources from our sourcetable
+        * `host.auth` authentication as a client to other hosts
 4. `mkdir /var/log/millipede && chown caster /var/log/millipede`
 5. `install -m 0755 sample-config/caster.sh /usr/local/etc/rc.d/caster`
 6. `sysrc caster_enable=YES`
@@ -158,42 +158,104 @@ require HTTP Basic auth (or `user`/`password` query-string parameters)
 with credentials from the account configured as `admin_user` in
 `caster.yaml` (typically defined in `source.auth`).
 
-| Method | Endpoint			     | Description				    |
+| Method | Endpoint                          | Description                                  |
 |--------|-----------------------------------|----------------------------------------------|
-| GET	 | `/adm/api/v1/net`		     | List all NTRIP sessions (sources + clients)  |
-| GET	 | `/adm/api/v1/rtcm`		     | RTCM cache (last 1005/1006 per mountpoint)   |
-| GET	 | `/adm/api/v1/rtcm/frequencies`    | RTCM per-type rate (sliding 60s window)	    |
-| GET	 | `/adm/api/v1/mem`		     | Memory statistics (debug builds only)	    |
-| GET	 | `/adm/api/v1/nodes`		     | Node table (cluster sync)		    |
-| GET	 | `/adm/api/v1/livesources`	     | Live sources (local + remote)		    |
-| GET	 | `/adm/api/v1/sourcetables`	     | Known sourcetables			    |
-| POST	 | `/adm/api/v1/reload`		     | Reload the configuration			    |
-| POST	 | `/adm/api/v1/drop?id=<n>`	     | Drop a connection by id			    |
-| POST	 | `/adm/api/v1/sync`		     | Push a syncer update			    |
-| GET	 | `/adm/api/v1/logs/stream`	     | SSE stream of real-time log lines	    |
+| GET    | `/adm/api/v1/net`                 | List all NTRIP sessions (sources + clients)  |
+| GET    | `/adm/api/v1/rtcm`                | RTCM cache (last 1005/1006 per mountpoint)   |
+| GET    | `/adm/api/v1/rtcm/frequencies`    | RTCM per-type rate (sliding 60s window)      |
+| GET    | `/adm/api/v1/mem`                 | Memory statistics (debug builds only)        |
+| GET    | `/adm/api/v1/nodes`               | Node table (cluster sync)                    |
+| GET    | `/adm/api/v1/livesources`         | Live sources (local + remote)                |
+| GET    | `/adm/api/v1/sourcetables`        | Known sourcetables                           |
+| POST   | `/adm/api/v1/reload`              | Reload the configuration                     |
+| POST   | `/adm/api/v1/drop?id=<n>`         | Drop a connection by id                      |
+| POST   | `/adm/api/v1/sync`                | Push a syncer update                         |
+| GET    | `/adm/api/v1/logs/stream`         | SSE stream of real-time log lines            |
 
 A companion CLI tool `mapi` (in `caster/bin/`) wraps these endpoints.
+
+### Authentication
+
+The `/adm/api/v1/` endpoints accept any of the following authentication
+methods (the server tries them in order):
+
+1. **HTTP Basic** — `Authorization: Basic <base64(user:password)>`
+   (validated against `admin_user` + `source.auth` file).
+2. **HTTP Bearer** — `Authorization: Bearer <token>` (validated against
+   `admin_token` in `caster.yaml`). Recommended for production.
+3. **Query string** — `?user=X&password=Y` or `?token=Z`. Useful for
+   EventSource (SSE) clients which cannot set custom headers.
+
+To enable bearer token auth, add this to `caster.yaml`:
+
+```yaml
+admin_token: <random-32-byte-hex-string>
+# Generate one with: openssl rand -hex 32
+```
 
 Examples:
 
 ```sh
-# List all sessions
+# List all sessions (Basic auth)
 curl -u "admin:admin" http://localhost:2101/adm/api/v1/net
 
-# RTCM frequency tracker (per-mountpoint, per-type)
-curl -u "admin:admin" http://localhost:2101/adm/api/v1/rtcm/frequencies
+# Same call with Bearer token
+curl -H "Authorization: Bearer $TOKEN" http://localhost:2101/adm/api/v1/net
 
-# Subscribe to the real-time log stream (SSE)
-curl -N -u "admin:admin" http://localhost:2101/adm/api/v1/logs/stream
+# RTCM frequency tracker (per-mountpoint, per-type)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:2101/adm/api/v1/rtcm/frequencies
+
+# Subscribe to the real-time log stream (SSE) with token in URL
+# (EventSource can't set headers, so use ?token= for browser-based clients)
+curl -N "http://localhost:2101/adm/api/v1/logs/stream?token=$TOKEN"
 ```
+
+Web admin UI
+============
+
+A built-in dashboard is available in `web/admin/`. After running
+`install.sh`, point your browser at `http://caster:2101/admin/` to
+access:
+
+- **Dashboard** — KPIs (sources, clients, bytes in/out, uptime) + active sources table.
+- **Sources** — drop / inspect NTRIP source sessions.
+- **Clients** — drop / inspect NTRIP client sessions.
+- **Map** — Leaflet map showing all known bases from `/api/v1/sourcetables`.
+  Live (connected) sources are green; declared-but-offline bases are grey.
+  Click a marker for mountpoint details, coordinates, and raw sourcetable line.
+- **RTCM** — per-mountpoint RTCM frequency tracker with anomaly detection
+  (low / missing messages flagged in red).
+- **Logs** — live SSE log stream with filtering and auto-scroll.
 
 Hardware detection (companion tool)
 ===================================
 
 For deployments where the caster also manages a local GNSS receiver, a
 companion script `tools/detect_receiver.sh` probes serial/USB devices
-and identifies known receivers (U-blox ZED-F9P, Septentrio mosaic-X5,
-Unicore UM980). See `docs/HARDWARE.md` for details.
+and identifies known receivers:
+
+- U-blox ZED-F9P / F9R / F9H (UBX)
+- Septentrio mosaic-X5 / mosaicGo (SBF/ASCII)
+- Septentrio AsteRx-i / AsteRx-m / AsteRx-U (SBF/ASCII)
+- Unicore UM980 / UM982 (ASCII)
+- Trimble BX992 / BX996 / BX996G (TSIP/TAIP)
+
+See `docs/HARDWARE.md` for details. A companion `tools/configure_receiver.sh`
+applies a recommended RTCM3 base configuration for each supported receiver.
+
+Grafana dashboard
+=================
+
+A pre-built Grafana dashboard is provided in `tools/grafana/`. It uses
+the [Infinity data source plugin](https://grafana.com/grafana/plugins/yesoreyeram-infinity-datasource/)
+to scrape the caster's REST API directly (no Prometheus needed).
+
+The dashboard includes:
+- Live sessions table (sources + clients)
+- RTCM message rates bar gauge (color-coded by expected rate)
+- RTCM anomaly detector table (highlighting degraded/missing messages)
+
+See `tools/grafana/README.md` for setup instructions.
 
 The caster itself does not manage receivers — this is by design. The
 caster is a pure NTRIP relay; receiver management is left to RTKBase

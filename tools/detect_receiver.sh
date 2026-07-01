@@ -6,7 +6,10 @@
 # Supports:
 #   - U-blox ZED-F9P, F9R, F9H (USB ID 1546:01a9 / 1546:01a7)
 #   - Septentrio mosaic-X5 (USB ID 09d7:0300)
+#   - Septentrio AsteRx (any USB ID matching vendor 09d7:*, or by-id string)
 #   - Unicore UM980 / UM982 (USB ID 1d00:2010, or by-id string)
+#   - Trimble BX992 / BX996 (USB ID 0c1d:0020 / 0c1d:0021, or by-id string)
+#     — also detects via TAIP/RTP response on serial
 #
 # Output: a JSON document on stdout describing each detected receiver.
 #
@@ -128,6 +131,53 @@ probe_unicore() {
 }
 
 #
+# Probe one device for a Trimble receiver (BX992, BX996, etc.) by sending
+# a TSIP "report software version" packet (0x13 command 0x06).
+# Returns the model string on stdout (empty if not Trimble).
+#
+probe_trimble() {
+        local dev="$1"
+        local baud="$2"
+        # TSIP packet: DLE [0x13] [0x06] DLE ETX
+        # 0x13 = "report packet" command, 0x06 = "software version"
+        # Any 0x10 (DLE) in payload must be byte-stuffed, but here the
+        # payload is just 0x06 (no DLE) so no stuffing needed.
+        local tsip_cmd=$'\x10\x13\x06\x10\x03'
+        local reply
+        reply=$(timeout 1 bash -c "
+                exec 3<>'$dev'
+                stty -F '$dev' '$baud' raw -echo -echoe -echok 2>/dev/null || true
+                printf '%s' '$tsip_cmd' >&3
+                head -c 256 <&3 2>/dev/null | xxd -p
+                exec 3<&-
+        " 2>/dev/null || true)
+        # TSIP response to 0x13/0x06 is packet 0x4D (report software version).
+        # Reply format: DLE 4D [major] [minor] [day] [month] [year] ... DLE ETX
+        # The receiver model name isn't in this packet, but Trimble BX992/BX996
+        # also expose a TAIP/RTP ASCII interface — try that as a fallback.
+        if [[ "$reply" =~ 104d ]]; then
+                echo "Trimble BX-series (TSIP)"
+                return 0
+        fi
+
+        # Try TAIP/RTP ASCII: ">QTM<CR><LF>" requests model identity
+        # (TAIP packet format: '>' [id] [data] '<' [checksum] <CR>)
+        local taip_cmd='>QTM<CR>\r\n'
+        reply=$(timeout 1 bash -c "
+                exec 3<>'$dev'
+                stty -F '$dev' '$baud' raw -echo -echoe -echok 2>/dev/null || true
+                printf '%s' '$taip_cmd' >&3
+                head -c 256 <&3 2>/dev/null
+                exec 3<&-
+        " 2>/dev/null || true)
+        if echo "$reply" | grep -qiE "trimble|bx99[0-9]|sp80|sp85|r8s|r10"; then
+                echo "$reply" | head -1 | tr -dc '[:print:]'
+                return 0
+        fi
+        return 1
+}
+
+#
 # Identify a device by its USB ID (via udevadm).
 # Returns "VENDOR MODEL" on stdout (empty if unknown).
 #
@@ -142,12 +192,22 @@ identify_by_usb_id() {
                                 echo "U-blox ZED-F9P"
                                 return 0
                                 ;;
-                        09d7:0300|09d7:0200)
+                        09d7:0300|09d7:0200|09d7:0301|09d7:0302)
                                 echo "Septentrio mosaic-X5"
+                                return 0
+                                ;;
+                        09d7:0400|09d7:0401|09d7:0402)
+                                # AsteRx-i, AsteRx-m, AsteRx-U series
+                                echo "Septentrio AsteRx"
                                 return 0
                                 ;;
                         1d00:2010|1d00:2011)
                                 echo "Unicore UM980/UM982"
+                                return 0
+                                ;;
+                        0c1d:0020|0c1d:0021|0c1d:0022)
+                                # Trimble BX992, BX996, BX996G
+                                echo "Trimble BX-series"
                                 return 0
                                 ;;
                 esac
@@ -157,9 +217,17 @@ identify_by_usb_id() {
                 if [[ "$by_id" =~ [Uu]blox ]]; then
                         echo "U-blox (USB)"; return 0
                 elif [[ "$by_id" =~ [Ss]eptentrio ]]; then
-                        echo "Septentrio (USB)"; return 0
+                        # Distinguish AsteRx from mosaic by name
+                        if [[ "$by_id" =~ [Aa]steRx ]]; then
+                                echo "Septentrio AsteRx"
+                        else
+                                echo "Septentrio mosaic"
+                        fi
+                        return 0
                 elif [[ "$by_id" =~ [Uu]nicore ]]; then
                         echo "Unicore (USB)"; return 0
+                elif [[ "$by_id" =~ [Tt]rimble|BX99 ]]; then
+                        echo "Trimble BX-series"; return 0
                 fi
         fi
         return 1
@@ -201,6 +269,14 @@ probe_device() {
                                 detected_model="$model"
                                 detected_baud="$baud"
                                 detected_protocol="UNICORE"
+                                break
+                        fi
+                fi
+                if [[ "$usb_id" == Trimble* ]] || [[ -z "$usb_id" ]]; then
+                        if model=$(probe_trimble "$dev" "$baud"); then
+                                detected_model="$model"
+                                detected_baud="$baud"
+                                detected_protocol="TSIP"
                                 break
                         fi
                 fi

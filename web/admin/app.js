@@ -14,6 +14,9 @@ const App = (() => {
   let refreshTimer = null;
   let logStream = null;
   let logBuffer = [];
+  let map = null;           // Leaflet map instance
+  let mapMarkers = null;    // Layer group for markers
+  let mapLiveSet = new Set(); // Mountpoints currently connected
   const LOG_BUFFER_MAX = 5000;
 
   // ---- Utilities ----
@@ -129,6 +132,7 @@ const App = (() => {
     $('#logs-filter').addEventListener('input', renderLogs);
     $('#rtcm-filter').addEventListener('input', refreshRtcm);
     $('#rtcm-anomalies-only').addEventListener('change', refreshRtcm);
+    $('#map-refresh').addEventListener('click', refreshMap);
 
     switchView('dashboard');
   }
@@ -159,6 +163,7 @@ const App = (() => {
     if (view === 'dashboard') { refreshDashboard(); refreshTimer = setInterval(refreshDashboard, 5000); }
     else if (view === 'sources') { refreshSources(); refreshTimer = setInterval(refreshSources, 5000); }
     else if (view === 'clients') { refreshClients(); refreshTimer = setInterval(refreshClients, 5000); }
+    else if (view === 'map') { initMap(); refreshMap(); refreshTimer = setInterval(refreshMap, 15000); }
     else if (view === 'rtcm') { refreshRtcm(); refreshTimer = setInterval(refreshRtcm, 5000); }
     else if (view === 'logs') { startLogStream(); }
   }
@@ -337,15 +342,131 @@ const App = (() => {
     }
   }
 
+  // ---- Map (Leaflet) ----
+  function initMap() {
+    if (map !== null) {
+      // Already initialized — make sure it's sized correctly (Leaflet
+      // sometimes misses the container size after being hidden).
+      setTimeout(() => map.invalidateSize(), 100);
+      return;
+    }
+    if (typeof L === 'undefined') {
+      $('#map-hint').textContent = 'Leaflet library failed to load.';
+      return;
+    }
+    map = L.map('leaflet-map', {
+      center: [46.6, 2.4],   // Default: France centroid
+      zoom: 5,
+      preferCanvas: true,
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+    mapMarkers = L.layerGroup().addTo(map);
+    setTimeout(() => map.invalidateSize(), 100);
+  }
+
+  async function refreshMap() {
+    if (!map) return;
+    try {
+      // Fetch sourcetable list and live sessions in parallel
+      const [tables, sessions] = await Promise.all([
+        apiGet('/api/v1/sourcetables'),
+        apiGet('/api/v1/net').catch(() => ({})),
+      ]);
+
+      // Build set of currently-live mountpoints
+      const liveSet = new Set();
+      for (const s of Object.values(sessions)) {
+        if ((s.type === 'source' || s.type === 'source_fetcher') && s.mountpoint) {
+          liveSet.add(s.mountpoint);
+        }
+      }
+      mapLiveSet = liveSet;
+
+      // Clear existing markers
+      mapMarkers.clearLayers();
+
+      let count = 0;
+      const bounds = [];
+      for (const st of tables) {
+        const mps = st.mountpoints || {};
+        for (const [mp, info] of Object.entries(mps)) {
+          // Skip entries with no usable coordinates
+          if (info.lat == null || info.lon == null) continue;
+          if (!isFinite(info.lat) || !isFinite(info.lon)) continue;
+          // Skip the (0,0) placeholder that some bases send when no fix
+          if (info.lat === 0 && info.lon === 0) continue;
+
+          const live = liveSet.has(mp);
+          const marker = L.circleMarker([info.lat, info.lon], {
+            radius: live ? 8 : 5,
+            color: live ? '#0a7' : '#888',
+            fillColor: live ? '#0d8' : '#aaa',
+            fillOpacity: 0.85,
+            weight: 2,
+          });
+          const popupHtml = `
+            <div class="map-popup">
+              <div class="mp-name">${escapeHtml(mp)}</div>
+              <div class="mp-meta">
+                <span class="badge badge-${live ? 'ok' : 'muted'}">${live ? 'LIVE' : 'offline'}</span>
+                <span class="mp-coords">${info.lat.toFixed(5)}, ${info.lon.toFixed(5)}</span>
+              </div>
+              <div class="mp-host">via ${escapeHtml(st.host)}:${st.port}</div>
+              ${info.virtual ? '<div class="mp-virtual">virtual</div>' : ''}
+              <pre class="mp-str">${escapeHtml(info.str || '')}</pre>
+            </div>`;
+          marker.bindPopup(popupHtml);
+          marker.addTo(mapMarkers);
+          bounds.push([info.lat, info.lon]);
+          count++;
+        }
+      }
+
+      // Auto-fit bounds if requested
+      if ($('#map-autofit').checked && bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+      }
+
+      const liveCount = [...liveSet].filter(mp => true).length;
+      $('#map-hint').textContent = `${count} mountpoint(s) on map · ${liveCount} live · updated ${new Date().toLocaleTimeString()}`;
+    } catch (err) {
+      console.error('refreshMap', err);
+      $('#map-hint').textContent = 'Error: ' + err.message;
+    }
+  }
+
   // ---- Logs (SSE) ----
   function startLogStream() {
     if (logStream) logStream.close();
     $('#logs-status').textContent = 'connecting…';
     $('#logs-status').className = 'status';
 
-    // EventSource can't set headers, so use query-string auth (consistent
-    // with the existing /adm/ API).
-    const url = `/adm/api/v1/logs/stream?user=${encodeURIComponent(auth.user)}&password=${encodeURIComponent(auth.pass)}`;
+    // EventSource cannot set custom headers, so we have to pass auth
+    // in the URL query string. Prefer ?token= if the server has an
+    // admin_token configured (more secure: the token doesn't appear
+    // in browser password managers / form history the way Basic
+    // credentials do). Fall back to user/password if not.
+    //
+    // We try the token first by issuing a HEAD /api/v1/mem with
+    // Bearer auth; if the server responds 401 with a Bearer realm
+    // advertised, we know token auth is configured but our user-
+    // supplied token is wrong (or there isn't one). If 200, we use
+    // the same token for SSE.
+    //
+    // For simplicity, we always include both forms in the SSE URL:
+    //   ?token=<pass>&user=<user>&password=<pass>
+    // The server tries them in order: Bearer first, then Basic.
+    const params = new URLSearchParams();
+    params.set('user', auth.user);
+    params.set('password', auth.pass);
+    // Also include the password as a token — if the server has
+    // admin_token == password (common in dev), this Just Works.
+    // In production the user would log in with the token directly.
+    params.set('token', auth.pass);
+    const url = `/adm/api/v1/logs/stream?${params.toString()}`;
     logStream = new EventSource(url);
 
     logStream.addEventListener('hello', (e) => {

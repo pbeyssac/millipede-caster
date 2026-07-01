@@ -20,7 +20,7 @@ file(GLOB SOURCES "caster/*.c")
 get_filename_component(TESTS_C_ABS "caster/tests.c" ABSOLUTE)
 list(REMOVE_ITEM SOURCES ${TESTS_C_ABS})
 
-link_libraries(m pthread event_core event_pthreads event_extra event_openssl json-c cyaml ssl crypto)
+link_libraries(m pthread event_core event_pthreads event_extra event_openssl json-c cyaml yaml ssl crypto)
 
 add_executable(caster_cmake ${SOURCES})
 #add_executable(tests caster/tests.c caster/util.c)
