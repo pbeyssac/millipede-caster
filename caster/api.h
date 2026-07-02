@@ -5,6 +5,7 @@ struct mime_content *api_ntrip_list_json(struct caster_state *caster, struct req
 struct mime_content *api_rtcm_json(struct caster_state *caster, struct request *req);
 struct mime_content *api_rtcm_freq_json(struct caster_state *caster, struct request *req);
 struct mime_content *api_rtcm_ringbuffer_json(struct caster_state *caster, struct request *req);
+struct mime_content *api_rinex(struct caster_state *caster, struct request *req);
 struct mime_content *api_mem_json(struct caster_state *caster, struct request *req);
 struct mime_content *api_nodes_json(struct caster_state *caster, struct request *req);
 struct mime_content *api_reload_json(struct caster_state *caster, struct request *req);
