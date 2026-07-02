@@ -26,10 +26,10 @@
  * that one is file-static.
  */
 static int count_set_u64(uint64_t v) {
-	int c;
-	for (c = 0; v; c++)
-		v &= v - 1;
-	return c;
+        int c;
+        for (c = 0; v; c++)
+                v &= v - 1;
+        return c;
 }
 
 /*
@@ -37,11 +37,16 @@ static int count_set_u64(uint64_t v) {
  * Mirrors get_int38() in rtcm.c.
  */
 static int64_t get_int38(unsigned char *d, int beg) {
-	uint64_t r = getbits(d, beg, 38);
-	if (r & (1ULL << 37))
-		r |= 0xFFFFFFC0000000ULL;
-	return (int64_t)r;
+        uint64_t r = getbits(d, beg, 38);
+        if (r & (1ULL << 37))
+                r |= 0xFFFFFFC0000000ULL;
+        return (int64_t)r;
 }
+
+/*
+ * Speed of light (m/s). Used for the rough-range ms -> meters conversion.
+ */
+#define C_SPEED 299792458.0
 
 /*
  * Decode RTCM 1005 (Stationary Antenna Reference Point).
@@ -58,23 +63,23 @@ static int64_t get_int38(unsigned char *d, int beg) {
  *   bits 112-149: ECEF-Z (DF027, int38, 0.0001 m)
  */
 int rtcm_obs_decode_1005(struct packet *p, double *x, double *y, double *z) {
-	if (p == NULL || p->datalen < 6 + 19)  /* need at least 152 bits payload */
-		return -1;
+        if (p == NULL || p->datalen < 6 + 19)  /* need at least 152 bits payload */
+                return -1;
 
-	unsigned char *d = p->data + 3;
-	unsigned short type = rtcm_get_type(p);
-	if (type != 1005 && type != 1006)
-		return -1;
+        unsigned char *d = p->data + 3;
+        unsigned short type = rtcm_get_type(p);
+        if (type != 1005 && type != 1006)
+                return -1;
 
-	int64_t ex = get_int38(d, 34);
-	int64_t ey = get_int38(d, 74);
-	int64_t ez = get_int38(d, 114);
+        int64_t ex = get_int38(d, 34);
+        int64_t ey = get_int38(d, 74);
+        int64_t ez = get_int38(d, 114);
 
-	/* Scale: 0.0001 m per LSB */
-	*x = ex * 0.0001;
-	*y = ey * 0.0001;
-	*z = ez * 0.0001;
-	return 0;
+        /* Scale: 0.0001 m per LSB */
+        *x = ex * 0.0001;
+        *y = ey * 0.0001;
+        *z = ez * 0.0001;
+        return 0;
 }
 
 /*
@@ -83,99 +88,312 @@ int rtcm_obs_decode_1005(struct packet *p, double *x, double *y, double *z) {
  * MSM7 type ranges (RTCM 3.3 table 3.5-92):
  *   1071-1077 : GPS
  *   1081-1087 : GLONASS
- *   1091-1097 : SBAS
+ *   1091-1097 : Galileo
  *   1101-1107 : QZSS
- *   1111-1117 : BeiDou
- *   1121-1127 : NavIC/IRNSS
+ *   1111-1117 : SBAS
+ *   1121-1127 : BeiDou
+ *   1131-1137 : NavIC/IRNSS
  * The last digit (1..7) indicates the MSM variant (1=MSM1 ... 7=MSM7).
  */
 enum rtcm_sys rtcm_obs_type_to_sys(unsigned short type) {
-	if (type >= 1071 && type <= 1077) return RTCM_SYS_GPS;
-	if (type >= 1081 && type <= 1087) return RTCM_SYS_GLO;
-	if (type >= 1091 && type <= 1097) return RTCM_SYS_SBS;
-	if (type >= 1101 && type <= 1107) return RTCM_SYS_QZS;
-	if (type >= 1111 && type <= 1117) return RTCM_SYS_BDS;
-	return RTCM_SYS_NONE;
+        if (type >= 1071 && type <= 1077) return RTCM_SYS_GPS;
+        if (type >= 1081 && type <= 1087) return RTCM_SYS_GLO;
+        if (type >= 1091 && type <= 1097) return RTCM_SYS_GAL;
+        if (type >= 1101 && type <= 1107) return RTCM_SYS_QZS;
+        if (type >= 1111 && type <= 1117) return RTCM_SYS_SBS;
+        if (type >= 1121 && type <= 1127) return RTCM_SYS_BDS;
+        if (type >= 1131 && type <= 1137) return RTCM_SYS_NAV;
+        return RTCM_SYS_NONE;
 }
 
 /*
  * Decode the satellite mask into a list of PRNs.
  *
  * The 64-bit satellite mask (DF394) is MSB-first: bit 0 (MSB) = PRN 1,
- * bit 63 (LSB) = PRN 64. For GPS, PRN 1-32 are valid; for Galileo,
- * PRN 1-36. We just store the PRN for each set bit, regardless of
- * constellation (the caller already knows the system).
+ * bit 63 (LSB) = PRN 64. The PRN range depends on the constellation:
+ *   GPS      1-32
+ *   GLONASS  1-24 (32 with extended slots)
+ *   Galileo  1-36
+ *   BeiDou   1-63 (BeiDou-3 numbering)
+ *   QZSS     193-199 (mapped to 1-7 inside the mask)
+ *   SBAS     120-151 (mapped to 1-32 inside the mask)
+ *   NavIC    1-14
+ * We just store the PRN for each set bit (1-indexed); the caller
+ * already knows the system.
  *
  * Returns the number of satellites found (nsat).
  */
 static int decode_sat_mask(uint64_t mask, unsigned char *prns_out, int max_prns) {
-	int nsat = 0;
-	for (int i = 0; i < 64 && nsat < max_prns; i++) {
-		if (mask & (1ULL << (63 - i))) {
-			prns_out[nsat++] = (unsigned char)(i + 1);
-		}
-	}
-	return nsat;
+        int nsat = 0;
+        for (int i = 0; i < 64 && nsat < max_prns; i++) {
+                if (mask & (1ULL << (63 - i))) {
+                        prns_out[nsat++] = (unsigned char)(i + 1);
+                }
+        }
+        return nsat;
 }
 
 /*
- * Decode the signal mask into a list of RINEX signal codes.
+ * Per-signal descriptor: RINEX band + attribute + nominal carrier
+ * frequency. The signal mask in MSM messages is 32 bits wide, but only
+ * the low 16 bits are used for any constellation in practice; we
+ * therefore keep a 16-entry table per system.
  *
- * The 32-bit signal mask (DF395) is MSB-first. The meaning of each
- * bit depends on the GNSS system. For GPS:
- *   bit 0 (MSB) = L1 C/A      -> 'C'
- *   bit 1       = L1 L1C (L2C) -> 'L'
- *   bit 2       = L2 L2C(M)   -> 'S'
- *   bit 3       = L2 L1 (L2P) -> 'P' (we'll reuse 'P')
- *   bit 4       = L2 L2C(L)   -> 'L'
- *   bit 5       = L2 L2C(M+L) -> 'X'
- *   bit 6       = L5 I        -> 'I'
- *   bit 7       = L5 Q        -> 'Q'
- *   bit 8       = L5 I+Q      -> 'X'
- *   ...
- * For Galileo:
- *   bit 0 = E1A  -> 'A'
- *   bit 1 = E1B  -> 'B'
- *   bit 2 = E1C  -> 'C'
- *   bit 3 = E1B+C -> 'X'
- *   bit 4 = E5aI -> 'I'
- *   bit 5 = E5aQ -> 'Q'
- *   bit 6 = E5aI+Q -> 'X'
- *   bit 7 = E5bI -> '7'
- *   bit 8 = E5bQ -> '8'
- *   bit 9 = E5bI+Q -> 'X'
- *   bit 10 = E6A -> '6'
- *   bit 11 = E6B -> '9'
- *   bit 12 = E6C -> '4'
- *   bit 13 = E6B+C -> 'X'
- *
- * We keep a lookup table per system. Bits beyond the table are ignored
- * (treated as 'X' = unknown).
+ * carrier_freq_hz = 0.0 means "unknown / not in the MVP"; the
+ * wavelength lookup will fall back to a system+band default.
  */
-static const char GPS_SIG_TABLE[16] = {
-	'C', 'L', 'S', 'P', 'L', 'X', 'I', 'Q',   /* bits 0-7  */
-	'X', '?', '?', '?', '?', '?', '?', '?'     /* bits 8-15 */
-};
-static const char GAL_SIG_TABLE[16] = {
-	'A', 'B', 'C', 'X', 'I', 'Q', 'X', '7',   /* bits 0-7  */
-	'8', 'X', '6', '9', '4', 'X', '?', '?'     /* bits 8-15 */
+struct sig_entry {
+        char band;             /* '0' = invalid (skip) */
+        char attr;             /* RINEX attribute code */
+        double freq_hz;        /* nominal carrier frequency, Hz */
 };
 
+/* Sentinel: band=0 means "this signal mask bit is unused". */
+#define SIG_UNUSED { '0', '?', 0.0 }
+
+/*
+ * GPS signal mask (RTCM 3.3 table 3.5-15):
+ *   bit 0 : L1 C/A        -> 1C  (1575.42 MHz)
+ *   bit 1 : L1 L1C (P)    -> 1L
+ *   bit 2 : L1 L1C (D)    -> 1S (RTCM uses 'S' for L1C data, but RINEX
+ *                                reserves 'S' for L2C(M); for L1C the
+ *                                correct RINEX attrs are 'L' pilot,
+ *                                'S' data, 'X' pilot+data — we keep
+ *                                'S' for both, see below)
+ *   bit 3 : L1 L1C (D+P)  -> 1X
+ *   bit 4 : L2 L2C (M)    -> 2S  (1227.60 MHz)
+ *   bit 5 : L2 L2C (L)    -> 2L
+ *   bit 6 : L2 L2C (M+L)  -> 2X
+ *   bit 7 : L2 P(Y)       -> 2P
+ *   bit 8 : L5 I          -> 5I  (1176.45 MHz)
+ *   bit 9 : L5 Q          -> 5Q
+ *   bit 10: L5 I+Q        -> 5X
+ *   bit 11: L2 Z-tracking -> 2W
+ *   bit 12: L2 Y          -> 2Y
+ *   bit 13: L2 M          -> 2M
+ *   bit 14: L1 P          -> 1P  (rarely used)
+ *   bit 15: L1 Z-tracking -> 1W
+ */
+static const struct sig_entry GPS_SIG_TABLE[16] = {
+        { '1', 'C', 1575420000.0 },   /* bit 0: L1 C/A          */
+        { '1', 'L', 1575420000.0 },   /* bit 1: L1 L1C pilot    */
+        { '1', 'S', 1575420000.0 },   /* bit 2: L1 L1C data     */
+        { '1', 'X', 1575420000.0 },   /* bit 3: L1 L1C pilot+data */
+        { '2', 'S', 1227600000.0 },   /* bit 4: L2 L2C(M)       */
+        { '2', 'L', 1227600000.0 },   /* bit 5: L2 L2C(L)       */
+        { '2', 'X', 1227600000.0 },   /* bit 6: L2 L2C(M+L)     */
+        { '2', 'P', 1227600000.0 },   /* bit 7: L2 P(Y)         */
+        { '5', 'I', 1176450000.0 },   /* bit 8: L5 I            */
+        { '5', 'Q', 1176450000.0 },   /* bit 9: L5 Q            */
+        { '5', 'X', 1176450000.0 },   /* bit 10: L5 I+Q         */
+        { '2', 'W', 1227600000.0 },   /* bit 11: L2 Z-tracking  */
+        { '2', 'Y', 1227600000.0 },   /* bit 12: L2 Y           */
+        { '2', 'M', 1227600000.0 },   /* bit 13: L2 M           */
+        { '1', 'P', 1575420000.0 },   /* bit 14: L1 P           */
+        { '1', 'W', 1575420000.0 },   /* bit 15: L1 Z-tracking  */
+};
+
+/*
+ * GLONASS signal mask (RTCM 3.3 table 3.5-30):
+ *   bit 0 : L1 C/A        -> 1C  (G1 nominal 1602.0 MHz)
+ *   bit 1 : L1 P          -> 1P
+ *   bit 2 : L2 C/A        -> 2C  (G2 nominal 1246.0 MHz)
+ *   bit 3 : L2 P          -> 2P
+ *   bit 4 : L1 OCd        -> 1A  (L1 CDMA, 1600.995 MHz)
+ *   bit 5 : L1 OCp        -> 1B
+ *   bit 6 : L1 OCd+OCp    -> 1X
+ *   bit 7 : L1 SCd        -> 1D
+ *   bit 8 : L1 SCp        -> 1E
+ *   bit 9 : L1 SCd+SCp    -> 1Z
+ *   bit 10: L2 CSI        -> 2I  (L2 CDMA, 1248.06 MHz)
+ *   bit 11: L2 OCp        -> 2B
+ *   bit 12: L2 CSI+OCp    -> 2X
+ *   bit 13: L2 SCd        -> 2D
+ *   bit 14: L2 SCp        -> 2E
+ *   bit 15: L2 SCd+SCp    -> 2Z
+ *
+ * The G1/G2 carrier frequencies are FDMA and vary per satellite:
+ *   f_L1 = 1602.0 + n * 0.5625 MHz (n = -7..+13, frequency slot)
+ *   f_L2 = 1246.0 + n * 0.4375 MHz
+ * The slot number n is NOT in the MSM7 message; it comes from the
+ * GLONASS ephemeris (RTCM 1020). The MVP uses n=0 (nominal). Callers
+ * that need accurate phase must rescale: phase_correct = phase *
+ * (f_sat / f_nominal). The L1/L2 CDMA frequencies are fixed.
+ *
+ * L3 frequencies are not in RTCM 3.3 table 3.5-30; L3 ICD is at
+ * ~1202.025 MHz (RTCM 3.4 adds it but we mark it unused here).
+ */
+static const struct sig_entry GLO_SIG_TABLE[16] = {
+        { '1', 'C', 1602000000.0 },   /* bit 0: L1 C/A (FDMA, n=0 nominal) */
+        { '1', 'P', 1602000000.0 },   /* bit 1: L1 P   (FDMA, n=0 nominal) */
+        { '2', 'C', 1246000000.0 },   /* bit 2: L2 C/A (FDMA, n=0 nominal) */
+        { '2', 'P', 1246000000.0 },   /* bit 3: L2 P   (FDMA, n=0 nominal) */
+        { '1', 'A', 1600995000.0 },   /* bit 4: L1 OCd (CDMA)              */
+        { '1', 'B', 1600995000.0 },   /* bit 5: L1 OCp (CDMA)              */
+        { '1', 'X', 1600995000.0 },   /* bit 6: L1 OCd+OCp                 */
+        { '1', 'D', 1600995000.0 },   /* bit 7: L1 SCd (CDMA)              */
+        { '1', 'E', 1600995000.0 },   /* bit 8: L1 SCp (CDMA)              */
+        { '1', 'Z', 1600995000.0 },   /* bit 9: L1 SCd+SCp                 */
+        { '2', 'I', 1248060000.0 },   /* bit 10: L2 CSI (CDMA)             */
+        { '2', 'B', 1248060000.0 },   /* bit 11: L2 OCp (CDMA)             */
+        { '2', 'X', 1248060000.0 },   /* bit 12: L2 CSI+OCp                */
+        { '2', 'D', 1248060000.0 },   /* bit 13: L2 SCd (CDMA)             */
+        { '2', 'E', 1248060000.0 },   /* bit 14: L2 SCp (CDMA)             */
+        { '2', 'Z', 1248060000.0 },   /* bit 15: L2 SCd+SCp                */
+};
+
+/*
+ * Galileo signal mask (RTCM 3.3 table 3.5-49):
+ *   bit 0 : E1A           -> 1A  (1575.42 MHz)
+ *   bit 1 : E1B           -> 1B
+ *   bit 2 : E1C           -> 1C
+ *   bit 3 : E1B+C         -> 1X
+ *   bit 4 : E1A+B+C       -> 1Z
+ *   bit 5 : E5aI          -> 5I  (1176.45 MHz)
+ *   bit 6 : E5aQ          -> 5Q
+ *   bit 7 : E5aI+Q        -> 5X
+ *   bit 8 : E5bI          -> 7I  (1207.14 MHz)
+ *   bit 9 : E5bQ          -> 7Q
+ *   bit 10: E5bI+Q        -> 7X
+ *   bit 11: E5(b+a)       -> 8X  (1191.795 MHz)
+ *   bit 12: E6A           -> 6A  (1278.75 MHz)
+ *   bit 13: E6B           -> 6B
+ *   bit 14: E6C           -> 6C
+ *   bit 15: E6B+C         -> 6X
+ */
+static const struct sig_entry GAL_SIG_TABLE[16] = {
+        { '1', 'A', 1575420000.0 },   /* bit 0: E1A            */
+        { '1', 'B', 1575420000.0 },   /* bit 1: E1B            */
+        { '1', 'C', 1575420000.0 },   /* bit 2: E1C            */
+        { '1', 'X', 1575420000.0 },   /* bit 3: E1B+C          */
+        { '1', 'Z', 1575420000.0 },   /* bit 4: E1A+B+C        */
+        { '5', 'I', 1176450000.0 },   /* bit 5: E5aI           */
+        { '5', 'Q', 1176450000.0 },   /* bit 6: E5aQ           */
+        { '5', 'X', 1176450000.0 },   /* bit 7: E5aI+Q         */
+        { '7', 'I', 1207140000.0 },   /* bit 8: E5bI           */
+        { '7', 'Q', 1207140000.0 },   /* bit 9: E5bQ           */
+        { '7', 'X', 1207140000.0 },   /* bit 10: E5bI+Q        */
+        { '8', 'X', 1191795000.0 },   /* bit 11: E5(b+a)       */
+        { '6', 'A', 1278750000.0 },   /* bit 12: E6A           */
+        { '6', 'B', 1278750000.0 },   /* bit 13: E6B           */
+        { '6', 'C', 1278750000.0 },   /* bit 14: E6C           */
+        { '6', 'X', 1278750000.0 },   /* bit 15: E6B+C         */
+};
+
+/*
+ * BeiDou signal mask (RTCM 3.3 table 3.5-74 for BDS-2, extended
+ * in RTCM 3.3 amendment for BDS-3):
+ *   bit 0 : B1I           -> 2I  (1561.098 MHz)
+ *   bit 1 : B1Q           -> 2Q
+ *   bit 2 : B1I+Q         -> 2X
+ *   bit 3 : B3I           -> 6I  (1268.52 MHz)
+ *   bit 4 : B3Q           -> 6Q
+ *   bit 5 : B3I+Q         -> 6X
+ *   bit 6 : B2I           -> 7I  (1207.14 MHz)
+ *   bit 7 : B2Q           -> 7Q
+ *   bit 8 : B2I+Q         -> 7X
+ *   bit 9 : B1C (Pilot)   -> 1C  (1575.42 MHz)
+ *   bit 10: B1C (Data)    -> 1D
+ *   bit 11: B1C Pilot+Data -> 1X
+ *   bit 12: B2a (Pilot)   -> 5P  (1176.45 MHz)
+ *   bit 13: B2a (Data)    -> 5D
+ *   bit 14: B2a Pilot+Data -> 5X
+ *   bit 15: B2b (Data)    -> 7D  (1207.14 MHz, same band as B2I)
+ *
+ * Note: BeiDou band '2' = B1 (legacy B1I at 1561.098 MHz), NOT the
+ * GPS-style L2 (1227.6 MHz). Band '1' is reserved for modernized B1C
+ * at 1575.42 MHz (same as GPS L1).
+ */
+static const struct sig_entry BDS_SIG_TABLE[16] = {
+        { '2', 'I', 1561098000.0 },   /* bit 0: B1I            */
+        { '2', 'Q', 1561098000.0 },   /* bit 1: B1Q            */
+        { '2', 'X', 1561098000.0 },   /* bit 2: B1I+Q          */
+        { '6', 'I', 1268520000.0 },   /* bit 3: B3I            */
+        { '6', 'Q', 1268520000.0 },   /* bit 4: B3Q            */
+        { '6', 'X', 1268520000.0 },   /* bit 5: B3I+Q          */
+        { '7', 'I', 1207140000.0 },   /* bit 6: B2I            */
+        { '7', 'Q', 1207140000.0 },   /* bit 7: B2Q            */
+        { '7', 'X', 1207140000.0 },   /* bit 8: B2I+Q          */
+        { '1', 'C', 1575420000.0 },   /* bit 9: B1C Pilot      */
+        { '1', 'D', 1575420000.0 },   /* bit 10: B1C Data      */
+        { '1', 'X', 1575420000.0 },   /* bit 11: B1C P+D       */
+        { '5', 'P', 1176450000.0 },   /* bit 12: B2a Pilot     */
+        { '5', 'D', 1176450000.0 },   /* bit 13: B2a Data      */
+        { '5', 'X', 1176450000.0 },   /* bit 14: B2a P+D       */
+        { '7', 'D', 1207140000.0 },   /* bit 15: B2b Data      */
+};
+
+/*
+ * SBAS signal mask (RTCM 3.3 table 3.5-95):
+ *   bit 0 : L1 C/A        -> 1C  (1575.42 MHz)
+ *   bit 5 : L5 I          -> 5I  (1176.45 MHz)
+ *   bit 6 : L5 Q          -> 5Q
+ *   bit 7 : L5 I+Q        -> 5X
+ * Bits 1-4 are reserved.
+ */
+static const struct sig_entry SBS_SIG_TABLE[16] = {
+        { '1', 'C', 1575420000.0 },   /* bit 0: L1 C/A         */
+        SIG_UNUSED, SIG_UNUSED, SIG_UNUSED, SIG_UNUSED,
+        { '5', 'I', 1176450000.0 },   /* bit 5: L5 I           */
+        { '5', 'Q', 1176450000.0 },   /* bit 6: L5 Q           */
+        { '5', 'X', 1176450000.0 },   /* bit 7: L5 I+Q         */
+        SIG_UNUSED, SIG_UNUSED, SIG_UNUSED, SIG_UNUSED,
+        SIG_UNUSED, SIG_UNUSED, SIG_UNUSED, SIG_UNUSED,
+};
+
+/*
+ * QZSS signal mask (RTCM 3.3 table 3.5-87) — same signal set as GPS
+ * plus L1S and L6. The MVP reuses the GPS table for bits 0-15; bits
+ * beyond 15 are out of range for our 16-entry table.
+ */
+#define QZS_SIG_TABLE GPS_SIG_TABLE
+
+/*
+ * NavIC/IRNSS signal mask — not in RTCM 3.3 table; NavIC was added
+ * in RTCM 3.4. The MVP falls back to the GPS table for bits 0-15.
+ */
+#define NAV_SIG_TABLE GPS_SIG_TABLE
+
+/*
+ * Decode the signal mask into a list of per-signal descriptors.
+ *
+ * The 32-bit signal mask (DF395) is MSB-first. Only the low 16 bits
+ * carry meaning for any constellation in practice. We use the per-
+ * system table to map each set bit to (band, attribute, frequency).
+ *
+ * Returns the number of signals found (nsig).
+ */
 static int decode_sig_mask(uint32_t mask, enum rtcm_sys sys,
-			   char *sigs_out, int max_sigs) {
-	const char *table = NULL;
-	switch (sys) {
-		case RTCM_SYS_GPS: table = GPS_SIG_TABLE; break;
-		case RTCM_SYS_GAL: table = GAL_SIG_TABLE; break;
-		default:            table = GPS_SIG_TABLE; break;  /* fallback */
-	}
-	int nsig = 0;
-	for (int i = 0; i < 16 && nsig < max_sigs; i++) {
-		if (mask & (1u << (15 - i))) {
-			sigs_out[nsig++] = table[i];
-		}
-	}
-	return nsig;
+                           struct sig_entry *sigs_out, int max_sigs) {
+        const struct sig_entry *table;
+        switch (sys) {
+                case RTCM_SYS_GPS: table = GPS_SIG_TABLE; break;
+                case RTCM_SYS_GLO: table = GLO_SIG_TABLE; break;
+                case RTCM_SYS_GAL: table = GAL_SIG_TABLE; break;
+                case RTCM_SYS_SBS: table = SBS_SIG_TABLE; break;
+                case RTCM_SYS_QZS: table = QZS_SIG_TABLE; break;
+                case RTCM_SYS_BDS: table = BDS_SIG_TABLE; break;
+                case RTCM_SYS_NAV: table = NAV_SIG_TABLE; break;
+                default:            table = GPS_SIG_TABLE; break;
+        }
+        int nsig = 0;
+        for (int i = 0; i < 16 && nsig < max_sigs; i++) {
+                if (mask & (1u << (15 - i))) {
+                        if (table[i].band != '0') {
+                                sigs_out[nsig++] = table[i];
+                        }
+                }
+        }
+        return nsig;
+}
+
+/*
+ * Compute the wavelength (meters) for a given carrier frequency.
+ */
+static double wavelength_for_freq(double freq_hz) {
+        if (freq_hz <= 0.0)
+                return 0.0;
+        return C_SPEED / freq_hz;
 }
 
 /*
@@ -184,7 +402,8 @@ static int decode_sig_mask(uint32_t mask, enum rtcm_sys sys,
  * MSM7 layout (RTCM 3.3 section 3.5.4.7):
  *   bits   0-11  : message type
  *   bits  12-23  : reference station ID (DF003)
- *   bits  24-53  : GNSS epoch time (DF401, TOW ms for GPS/Galileo)
+ *   bits  24-53  : GNSS epoch time (DF401; TOW ms for GPS/Galileo/QZSS,
+ *                  ms-of-day for GLONASS, etc.)
  *   bit    54    : multiple message bit (DF393)
  *   bits  55-57  : IODS (DF409)
  *   bits  58-60  : reserved
@@ -209,272 +428,242 @@ static int decode_sig_mask(uint32_t mask, enum rtcm_sys sys,
  *
  * For the MVP we only decode:
  *   - satellite PRN (from sat mask)
- *   - signal code (from sig mask)
+ *   - signal code + band + frequency (from sig mask)
  *   - rough range (DF397) + fine pseudorange (DF405) -> pseudorange
- *   - phase range (DF406) -> phase in cycles (need frequency; we approximate)
+ *   - phase range (DF406) -> phase in cycles (need frequency; we use
+ *     the nominal carrier_freq_hz from the sig_entry table)
  *   - lock time indicator (DF407)
- *   - signal CNR (DF400 for MSM7 = 10-bit, 0.25 dB-Hz)
+ *   - signal CNR (DF408 for MSM7 = 10-bit, 0.25 dB-Hz)
  *
  * Skip: doppler, half-cycle, phase range rate (DF420). These are in
  * MSM7 but not strictly needed for a minimal RINEX obs file.
  */
 int rtcm_obs_decode_msm7(struct packet *p, struct rtcm_obs_epoch *epoch) {
-	if (p == NULL || epoch == NULL)
-		return -1;
+        if (p == NULL || epoch == NULL)
+                return -1;
 
-	unsigned short type = rtcm_get_type(p);
-	if (type < 1071 || type > 1127 || (type % 10) != 7)
-		return -1;
+        unsigned short type = rtcm_get_type(p);
+        /* Accept MSM1..MSM7 (last digit 1-7), not just MSM7, since the
+         * payload layout up to the per-cell section is identical. The
+         * per-cell field widths differ between MSM1/2/3/4/5/6/7, but
+         * for the MVP we only support MSM7 (last digit 7). */
+        if (type < 1071 || type > 1137)
+                return -1;
+        if ((type % 10) != 7)
+                return -1;
 
-	enum rtcm_sys sys = rtcm_obs_type_to_sys(type);
-	if (sys == RTCM_SYS_NONE)
-		return -1;
+        enum rtcm_sys sys = rtcm_obs_type_to_sys(type);
+        if (sys == RTCM_SYS_NONE)
+                return -1;
 
-	/* MVP: only GPS and Galileo. */
-	if (sys != RTCM_SYS_GPS && sys != RTCM_SYS_GAL)
-		return -1;
+        memset(epoch, 0, sizeof(*epoch));
+        epoch->sys = sys;
 
-	memset(epoch, 0, sizeof(*epoch));
-	epoch->sys = sys;
+        if (p->datalen < 6 + 21)  /* need at least the MSM header */
+                return -1;
 
-	if (p->datalen < 6 + 21)  /* need at least the MSM header */
-		return -1;
+        unsigned char *d = p->data + 3;
+        int len_bits = (int)(p->datalen - 6) * 8;
+        int pos = 0;
 
-	unsigned char *d = p->data + 3;
-	int len_bits = (int)(p->datalen - 6) * 8;
-	int pos = 0;
+        /* Skip message type (12 bits) */
+        pos += 12;
 
-	/* Skip message type (12 bits) */
-	pos += 12;
+        /* DF003: reference station ID (12 bits) */
+        epoch->station_id = (unsigned int)getbits(d, pos, 12);
+        pos += 12;
 
-	/* DF003: reference station ID (12 bits) */
-	epoch->station_id = (unsigned int)getbits(d, pos, 12);
-	pos += 12;
+        /* DF401: GNSS epoch time (30 bits, ms). Semantics depend on
+         * system: TOW (ms) for GPS/Galileo/QZSS, ms-of-day for
+         * GLONASS/SBAS. We don't use it because we lack the week
+         * number / day number; instead we use wall-clock as the
+         * RINEX epoch timestamp. */
+        uint32_t tow_ms = (uint32_t)getbits(d, pos, 30);
+        pos += 30;
+        {
+                struct timeval now;
+                gettimeofday(&now, NULL);
+                epoch->epoch_time = now;
+                (void)tow_ms;
+        }
 
-	/* DF401: GNSS epoch time (30 bits, ms) */
-	uint32_t tow_ms = (uint32_t)getbits(d, pos, 30);
-	pos += 30;
+        /* Skip MMB, IODS, reserved, clock steering, external clock,
+         * smoothing indicator, smoothing interval (1+3+7+2+2+1+3 = 19 bits) */
+        pos += 19;
 
-	/* Store epoch time as a struct timeval (TOW in seconds + ms) */
-	{
-		struct timeval now;
-		gettimeofday(&now, NULL);
-		/* We don't know the GPS week from MSM7 alone, so we use
-		 * the wall clock as the epoch timestamp and store TOW
-		 * in tv_usec for debugging. The RINEX writer will use
-		 * the wall clock. */
-		epoch->epoch_time = now;
-		(void)tow_ms;
-	}
+        /* DF394: satellite mask (64 bits) */
+        if (pos + 64 > len_bits) return -1;
+        uint64_t sat_mask = (uint64_t)getbits(d, pos, 64);
+        pos += 64;
 
-	/* Skip MMB, IODS, reserved, clock steering, external clock,
-	 * smoothing indicator, smoothing interval (1+3+7+2+2+1+3 = 19 bits) */
-	pos += 19;
+        /* DF395: signal mask (32 bits) */
+        if (pos + 32 > len_bits) return -1;
+        uint32_t sig_mask = (uint32_t)getbits(d, pos, 32);
+        pos += 32;
 
-	/* DF394: satellite mask (64 bits) */
-	if (pos + 64 > len_bits) return -1;
-	uint64_t sat_mask = (uint64_t)getbits(d, pos, 64);
-	pos += 64;
+        unsigned char sat_prns[RTCM_OBS_MAX_SATS];
+        int nsat = decode_sat_mask(sat_mask, sat_prns, RTCM_OBS_MAX_SATS);
 
-	/* DF395: signal mask (32 bits) */
-	if (pos + 32 > len_bits) return -1;
-	uint32_t sig_mask = (uint32_t)getbits(d, pos, 32);
-	pos += 32;
+        struct sig_entry sigs[RTCM_OBS_MAX_SIGS];
+        int nsig = decode_sig_mask(sig_mask, sys, sigs, RTCM_OBS_MAX_SIGS);
 
-	unsigned char sat_prns[RTCM_OBS_MAX_SATS];
-	int nsat = decode_sat_mask(sat_mask, sat_prns, RTCM_OBS_MAX_SATS);
+        if (nsat == 0 || nsig == 0)
+                return -1;
 
-	char sig_codes[RTCM_OBS_MAX_SIGS];
-	int nsig = decode_sig_mask(sig_mask, sys, sig_codes, RTCM_OBS_MAX_SIGS);
+        if (nsat * nsig > 64)
+                return -1;  /* per RTCM spec */
 
-	if (nsat == 0 || nsig == 0)
-		return -1;
+        /* DF396: cell mask (nsat*nsig bits) */
+        int cell_mask_bits = nsat * nsig;
+        if (pos + cell_mask_bits > len_bits) return -1;
+        uint64_t cell_mask = 0;
+        for (int i = 0; i < cell_mask_bits; i++) {
+                if (getbits(d, pos + i, 1))
+                        cell_mask |= (1ULL << (cell_mask_bits - 1 - i));
+        }
+        pos += cell_mask_bits;
 
-	if (nsat * nsig > 64)
-		return -1;  /* per RTCM spec */
+        int ncell = count_set_u64(cell_mask);
+        if (ncell > RTCM_OBS_MAX_CELLS)
+                return -1;
 
-	/* DF396: cell mask (nsat*nsig bits) */
-	int cell_mask_bits = nsat * nsig;
-	if (pos + cell_mask_bits > len_bits) return -1;
-	uint64_t cell_mask = 0;
-	for (int i = 0; i < cell_mask_bits; i++) {
-		if (getbits(d, pos + i, 1))
-			cell_mask |= (1ULL << (cell_mask_bits - 1 - i));
-	}
-	pos += cell_mask_bits;
+        /* Per-satellite section:
+         *   DF397 (8 bits each) : rough range in ms
+         *   DF398 (10 bits each): rough range mod 1 ms
+         *   DF399 (14 bits each): rough phase range rate (sign-magnitude, 1 mm/s)
+         * Then MSM7-specific: DF405 fine pseudorange, DF406 fine phase range
+         *   DF405 (20 bits each): fine pseudorange (sign-magnitude, 0.5 mm)
+         *   DF406 (24 bits each): fine phase range (sign-magnitude, 0.5 mm) -- MSM7
+         */
 
-	int ncell = count_set_u64(cell_mask);
-	if (ncell > RTCM_OBS_MAX_CELLS)
-		return -1;
+        /* DF397: rough range ms */
+        if (pos + 8 * nsat > len_bits) return -1;
+        int32_t rough_ms[RTCM_OBS_MAX_SATS];
+        for (int i = 0; i < nsat; i++) {
+                rough_ms[i] = (int32_t)getbits(d, pos, 8);
+                pos += 8;
+        }
 
-	/* Per-satellite section:
-	 *   DF397 (8 bits each) : rough range in ms
-	 *   DF398 (10 bits each): rough range mod 1 ms
-	 *   DF399 (14 bits each): rough phase range rate (sign-magnitude, 1 mm/s)
-	 * Then MSM7-specific: DF405 fine pseudorange, DF406 fine phase range
-	 *   DF405 (20 bits each): fine pseudorange (sign-magnitude, 0.5 mm)
-	 *   DF406 (24 bits each): fine phase range (sign-magnitude, 0.5 mm) -- MSM7
-	 */
+        /* Skip extended satellite info (DF397b, 4 bits per sat in MSM7) */
+        if (pos + 4 * nsat > len_bits) return -1;
+        pos += 4 * nsat;
 
-	/* DF397: rough range ms */
-	if (pos + 8 * nsat > len_bits) return -1;
-	int32_t rough_ms[RTCM_OBS_MAX_SATS];
-	for (int i = 0; i < nsat; i++) {
-		rough_ms[i] = (int32_t)getbits(d, pos, 8);
-		pos += 8;
-	}
+        /* DF398: rough range mod 1 ms (10 bits each) */
+        if (pos + 10 * nsat > len_bits) return -1;
+        uint32_t rough_mod[RTCM_OBS_MAX_SATS];
+        for (int i = 0; i < nsat; i++) {
+                rough_mod[i] = (uint32_t)getbits(d, pos, 10);
+                pos += 10;
+        }
 
-	/* Skip extended satellite info (DF397b, 4 bits per sat in MSM7) */
-	if (pos + 4 * nsat > len_bits) return -1;
-	pos += 4 * nsat;
+        /* DF399: rough phase range rate (14 bits each, sign-magnitude) */
+        if (pos + 14 * nsat > len_bits) return -1;
+        pos += 14 * nsat;  /* skip for MVP */
 
-	/* DF398: rough range mod 1 ms (10 bits each) */
-	if (pos + 10 * nsat > len_bits) return -1;
-	uint32_t rough_mod[RTCM_OBS_MAX_SATS];
-	for (int i = 0; i < nsat; i++) {
-		rough_mod[i] = (uint32_t)getbits(d, pos, 10);
-		pos += 10;
-	}
+        /* Per-cell section:
+         *   DF405 (20 bits): fine pseudorange
+         *   DF406 (24 bits): fine phase range
+         *   DF407 (10 bits): lock time indicator
+         *   DF408 (10 bits): CNR (0.25 dB-Hz)
+         *   (DF420 etc. skipped for MVP)
+         */
 
-	/* DF399: rough phase range rate (14 bits each, sign-magnitude) */
-	if (pos + 14 * nsat > len_bits) return -1;
-	pos += 14 * nsat;  /* skip for MVP */
+        /* Decode cells in order of (sat, sig) pairs where cell_mask bit is set.
+         * Cell mask bits are ordered: for each satellite (in mask order),
+         *   for each signal (in mask order):
+         *     bit = 1 if cell present.
+         */
+        unsigned int cell_idx = 0;
+        for (int s = 0; s < nsat && cell_idx < RTCM_OBS_MAX_CELLS; s++) {
+                for (int g = 0; g < nsig && cell_idx < RTCM_OBS_MAX_CELLS; g++) {
+                        int cell_bit = s * nsig + g;
+                        if (!(cell_mask & (1ULL << (cell_mask_bits - 1 - cell_bit))))
+                                continue;
 
-	/* Per-cell section:
-	 *   DF405 (20 bits): fine pseudorange
-	 *   DF406 (24 bits): fine phase range
-	 *   DF407 (10 bits): lock time indicator
-	 *   DF408 (10 bits): CNR (0.25 dB-Hz)
-	 *   (DF420 etc. skipped for MVP)
-	 */
+                        /* DF405: fine pseudorange (20 bits, sign-magnitude, 0.5 mm) */
+                        if (pos + 20 > len_bits) return -1;
+                        uint32_t raw_ps = (uint32_t)getbits(d, pos, 20);
+                        pos += 20;
 
-	/* Decode cells in order of (sat, sig) pairs where cell_mask bit is set.
-	 * Cell mask bits are ordered: for each satellite (in mask order),
-	 *   for each signal (in mask order):
-	 *     bit = 1 if cell present.
-	 */
-	unsigned int cell_idx = 0;
-	for (int s = 0; s < nsat && cell_idx < RTCM_OBS_MAX_CELLS; s++) {
-		for (int g = 0; g < nsig && cell_idx < RTCM_OBS_MAX_CELLS; g++) {
-			int cell_bit = s * nsig + g;
-			if (!(cell_mask & (1ULL << (cell_mask_bits - 1 - cell_bit))))
-				continue;
+                        /* DF406: fine phase range (24 bits, sign-magnitude, 0.5 mm) */
+                        if (pos + 24 > len_bits) return -1;
+                        uint32_t raw_ph = (uint32_t)getbits(d, pos, 24);
+                        pos += 24;
 
-			/* DF405: fine pseudorange (20 bits, sign-magnitude, 0.5 mm) */
-			if (pos + 20 > len_bits) return -1;
-			uint32_t raw_ps = (uint32_t)getbits(d, pos, 20);
-			pos += 20;
+                        /* DF407: lock time indicator (10 bits) */
+                        if (pos + 10 > len_bits) return -1;
+                        unsigned int lti = (unsigned int)getbits(d, pos, 10);
+                        pos += 10;
 
-			/* DF406: fine phase range (24 bits, sign-magnitude, 0.5 mm) */
-			if (pos + 24 > len_bits) return -1;
-			uint32_t raw_ph = (uint32_t)getbits(d, pos, 24);
-			pos += 24;
+                        /* DF408: CNR (10 bits, 0.25 dB-Hz) */
+                        if (pos + 10 > len_bits) return -1;
+                        unsigned int cnr = (unsigned int)getbits(d, pos, 10);
+                        pos += 10;
 
-			/* DF407: lock time indicator (10 bits) */
-			if (pos + 10 > len_bits) return -1;
-			unsigned int lti = (unsigned int)getbits(d, pos, 10);
-			pos += 10;
+                        /* Skip DF407b (lock time extension, 2 bits) and
+                         * DF404 (half-cycle ambiguity, 1 bit) for MSM7.
+                         * The remaining fields per cell are DF404 (1 bit)
+                         * and possibly DF420 (1 bit) — see RTCM 3.3 3.5.4.7.
+                         */
+                        pos += 1;  /* DF404 half-cycle */
 
-			/* DF408: CNR (10 bits, 0.25 dB-Hz) */
-			if (pos + 10 > len_bits) return -1;
-			unsigned int cnr = (unsigned int)getbits(d, pos, 10);
-			pos += 10;
+                        /* Compute pseudorange in meters.
+                         *   PR = DF397 * 1e-3 (s) * c
+                         *      + DF398 * (1e-3 / 1024) (s) * c
+                         *      + DF405 * 0.5e-3 (m, sign-magnitude)
+                         * DF405 is sign-magnitude: bit 19 = sign, bits 0-18 = magnitude.
+                         */
+                        double pr_ms = (double)rough_ms[s] * 1e-3;
+                        double pr_mod = (double)rough_mod[s] * (1e-3 / 1024.0);
+                        int32_t fine_sign = (raw_ps & (1u << 19)) ? -1 : 1;
+                        int32_t fine_mag = raw_ps & ((1u << 19) - 1);
+                        double pr_fine = (double)(fine_sign * fine_mag) * 0.5e-3;
 
-			/* Skip DF407b (lock time extension, 2 bits) and
-			 * DF404 (half-cycle ambiguity, 1 bit) for MSM7.
-			 * Actually MSM7 has more fields — we stop here for the MVP
-			 * and skip the remaining per-cell bits. The remaining
-			 * fields are DF404 (1 bit) and possibly DF420 (1 bit).
-			 */
-			pos += 1;  /* DF404 half-cycle */
+                        double pseudorange = pr_ms * C_SPEED
+                                           + pr_mod * C_SPEED
+                                           + pr_fine;
 
-			/* Compute pseudorange in meters.
-			 * DF397 (8 bits) = N ms, range 0..255 ms.
-			 * DF398 (10 bits) = sub-ms in 0.1024 ms units
-			 *                   (so 0..1023 * 0.1024e-3 s = 0..0.1048 s)
-			 * Wait — the standard says DF398 is "modulo 1 ms"
-			 * with 1024 levels, so 1 ms / 1024 = ~0.977 us per LSB.
-			 *
-			 * Pseudorange = (DF397 * 1e-3) + (DF398 * 1e-3 / 1024) + (DF405 * 0.5e-3)
-			 *
-			 * Actually for MSM7 the fine pseudorange is the
-			 * fractional part with 0.5 mm resolution. So:
-			 *   PR = DF397 * 1e-3 (in seconds, then * c for meters)
-			 *      + DF398 * (1e-3 / 1024) (seconds, * c)
-			 *      + DF405 * 0.5e-3 (meters, sign-magnitude)
-			 * DF405 is sign-magnitude: bit 19 = sign, bits 0-18 = magnitude.
-			 */
-			double pr_ms = (double)rough_ms[s] * 1e-3;
-			double pr_mod = (double)rough_mod[s] * (1e-3 / 1024.0);
-			/* Fine pseudorange: 20-bit sign-magnitude, 0.5 mm LSB.
-			 * Magnitude is bits 0-18 (19 bits), sign is bit 19. */
-			int32_t fine_sign = (raw_ps & (1u << 19)) ? -1 : 1;
-			int32_t fine_mag = raw_ps & ((1u << 19) - 1);
-			double pr_fine = (double)(fine_sign * fine_mag) * 0.5e-3;  /* meters */
+                        /* Phase range in meters (DF406: 24-bit sign-magnitude, 0.5 mm). */
+                        int32_t ph_sign = (raw_ph & (1u << 23)) ? -1 : 1;
+                        int32_t ph_mag = raw_ph & ((1u << 23) - 1);
+                        double phase_range_m = (double)(ph_sign * ph_mag) * 0.5e-3;
 
-			double pseudorange = pr_ms * 299792458.0
-					   + pr_mod * 299792458.0
-					   + pr_fine;
+                        /* Convert phase range (meters) to phase (cycles) using
+                         * the carrier frequency for this signal. */
+                        double freq_hz = sigs[g].freq_hz;
+                        double wavelength = wavelength_for_freq(freq_hz);
+                        double phase_cycles;
+                        if (wavelength > 0.0) {
+                                phase_cycles = phase_range_m / wavelength;
+                        } else {
+                                phase_cycles = NAN;  /* unknown carrier */
+                        }
 
-			/* Phase range in meters (DF406: 24-bit sign-magnitude, 0.5 mm). */
-			int32_t ph_sign = (raw_ph & (1u << 23)) ? -1 : 1;
-			int32_t ph_mag = raw_ph & ((1u << 23) - 1);
-			double phase_range_m = (double)(ph_sign * ph_mag) * 0.5e-3;
+                        /* SNR in dB-Hz: DF408 is 10-bit unsigned, 0.25 dB-Hz per LSB. */
+                        double snr_dbhz = (double)cnr * 0.25;
 
-			/* Convert phase range (meters) to phase (cycles) using
-			 * the signal's wavelength. For GPS L1: 0.190293672 m,
-			 * L2: 0.244210213 m, L5: 0.254833148 m.
-			 * For Galileo E1: 0.190293672 m (same as L1),
-			 * E5a: 0.254833148 m, E5b: 0.246839246 m.
-			 *
-			 * We use a coarse lookup by signal code + system.
-			 */
-			double wavelength = 0.190293672;  /* default L1/E1 */
-			char sc = sig_codes[g];
-			if (sys == RTCM_SYS_GPS) {
-				if (sc == 'C' || sc == 'L' || sc == 'P' || sc == 'Y' || sc == 'M' || sc == 'N')
-					wavelength = 0.190293672; /* L1 */
-				else if (sc == 'S' || sc == 'X')
-					wavelength = 0.244210213; /* L2 */
-				else if (sc == 'I' || sc == 'Q')
-					wavelength = 0.254833148; /* L5 */
-			} else if (sys == RTCM_SYS_GAL) {
-				if (sc == 'A' || sc == 'B' || sc == 'C' || sc == 'X')
-					wavelength = 0.190293672; /* E1 */
-				else if (sc == 'I' || sc == 'Q' || sc == 'X')
-					wavelength = 0.254833148; /* E5a */
-				else if (sc == '7' || sc == '8' || sc == 'X')
-					wavelength = 0.246839246; /* E5b */
-				else if (sc == '6' || sc == '9' || sc == '4')
-					wavelength = 0.186682684; /* E6 */
-			}
-			double phase_cycles = phase_range_m / wavelength;
+                        /* Lock time indicator: RINEX LLI is a single digit 0-7.
+                         * RTCM DF407 has a non-linear mapping (see DF402 in rtcm.c).
+                         * For the MVP we just store the raw value modulo 8.
+                         */
+                        unsigned int lli = lti & 0x7;
 
-			/* SNR in dB-Hz: DF408 is 10-bit unsigned, 0.25 dB-Hz per LSB.
-			 * RINEX S/N is stored as integers 1-9 (signal strength indicator).
-			 * We use raw dB-Hz for now and let the RINEX writer convert. */
-			double snr_dbhz = (double)cnr * 0.25;
+                        /* Fill the cell. */
+                        struct rtcm_obs_cell *cell = &epoch->cells[cell_idx++];
+                        cell->sat_prn = sat_prns[s];
+                        cell->sig_code = sigs[g].attr;
+                        cell->band = sigs[g].band;
+                        cell->carrier_freq_hz = freq_hz;
+                        cell->pseudorange = pseudorange;
+                        cell->phase = phase_cycles;
+                        cell->doppler = NAN;  /* not decoded in MVP */
+                        cell->snr = snr_dbhz;
+                        cell->lock_time = lli;
+                }
+        }
 
-			/* Lock time indicator: RINEX LLI is a single digit 0-7.
-			 * RTCM DF407 has a non-linear mapping (see DF402 in rtcm.c).
-			 * For the MVP we just store the raw value modulo 8.
-			 */
-			unsigned int lli = lti & 0x7;
-
-			/* Fill the cell. */
-			struct rtcm_obs_cell *cell = &epoch->cells[cell_idx++];
-			cell->sat_prn = sat_prns[s];
-			cell->sig_code = sc;
-			cell->pseudorange = pseudorange;
-			cell->phase = phase_cycles;
-			cell->doppler = NAN;  /* not decoded in MVP */
-			cell->snr = snr_dbhz;
-			cell->lock_time = lli;
-		}
-	}
-
-	epoch->ncells = cell_idx;
-	if (epoch->ncells == 0)
-		return -1;
-	return 0;
+        epoch->ncells = cell_idx;
+        if (epoch->ncells == 0)
+                return -1;
+        return 0;
 }

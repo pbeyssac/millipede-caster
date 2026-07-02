@@ -5,11 +5,12 @@
 | Phase                          | Status      | Notes                                              |
 |--------------------------------|-------------|----------------------------------------------------|
 | `rtcm_ringbuffer` module       | ✅ MVP done | `caster/rtcm_ringbuffer.{c,h}` + `/api/v1/rtcm/ringbuffer` |
-| RTCM parser (1005 + MSM7)      | ✅ MVP done | `caster/rtcm_obs.{c,h}` — GPS (1071) + Galileo (1094) |
-| RINEX 3.04 writer              | ✅ MVP done | `caster/rinex.{c,h}` + shared `caster/mbuf.h`     |
+| RTCM parser (1005 + MSM7)      | ✅ extended | `caster/rtcm_obs.{c,h}` — GPS (1077), GLONASS (1087), Galileo (1097), BeiDou (1127) |
+| RINEX 3.04 writer              | ✅ extended | `caster/rinex.{c,h}` — MIXED file marker, G/R/E/C obs types |
 | HTTP endpoint + streaming      | ✅ MVP done | `GET /api/v1/rinex?mountpoint=...&from=...&to=...` |
 | Config + docs                  | ⏳ partial  | compile-time defaults for now; YAML keys later     |
 | Integration tests (RTCM→RINEX) | ✅ MVP done | `tests/test-rinex.py` (5/5 PASS, header validated) |
+| Multi-constellation unit test  | ✅ added    | `tests/test_msm7_multi.c` builds synthetic 1077/1087/1097/1127 packets and validates decode + RINEX emit |
 
 ## Goal
 
@@ -44,26 +45,26 @@ file directly from the caster URL.
 ### Architecture
 
 ```
-		+-----------------------+
+                +-----------------------+
    RTCM in ---->|  rtcm_ringbuffer      |  (existing: rtcm_cache + rtcm_freq)
-		|  (per-mountpoint,     |
-		|   sliding window)     |
-		+-----------+-----------+
-			    |
-			    v
-		+-----------------------+
+                |  (per-mountpoint,     |
+                |   sliding window)     |
+                +-----------+-----------+
+                            |
+                            v
+                +-----------------------+
    GET /rinex ->|  rinex_builder        |  (new module: caster/rinex.c)
-		|  - select window      |
-		|  - decode RTCM 1005/  |
-		|    107x/108x/109x     |
-		|  - emit RINEX 3.04    |
-		|    obs + nav records  |
-		+-----------+-----------+
-			    |
-			    v
-		+-----------------------+
-		|  HTTP response body   |  (streamed, chunked)
-		+-----------------------+
+                |  - select window      |
+                |  - decode RTCM 1005/  |
+                |    107x/108x/109x     |
+                |  - emit RINEX 3.04    |
+                |    obs + nav records  |
+                +-----------+-----------+
+                            |
+                            v
+                +-----------------------+
+                |  HTTP response body   |  (streamed, chunked)
+                +-----------------------+
 ```
 
 ### Storage: extend rtcm_ringbuffer
