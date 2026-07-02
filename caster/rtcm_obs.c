@@ -23,8 +23,10 @@
 /*
  * Count set bits in a uint64_t (Kernighan's algorithm).
  * Mirrors the static count_set() in rtcm.c — duplicated here because
- * that one is file-static.
+ * that one is file-static. Currently unused after the cell-mask
+ * rewrite to a byte-array form, but kept for future use.
  */
+static int count_set_u64(uint64_t v) __attribute__((unused));
 static int count_set_u64(uint64_t v) {
         int c;
         for (c = 0; v; c++)
@@ -79,6 +81,78 @@ int rtcm_obs_decode_1005(struct packet *p, double *x, double *y, double *z) {
         *x = ex * 0.0001;
         *y = ey * 0.0001;
         *z = ez * 0.0001;
+        return 0;
+}
+
+/*
+ * Process-wide GLONASS frequency-slot table.
+ *
+ * Indexed by GLONASS PRN (1-24). Entry 0 is unused. A value of 0
+ * means "no 1020 message seen yet for this PRN" (the decoder falls
+ * back to the n=0 nominal carrier in that case).
+ *
+ * Access is via stdatomic (relaxed ordering is sufficient: a stale
+ * read simply yields the n=0 fallback, which is still a valid carrier
+ * frequency, just less accurate).
+ */
+#include <stdatomic.h>
+static _Atomic int8_t glo_freq_slots[25];   /* [0..24], index 0 unused */
+
+void rtcm_obs_set_glo_freq_slot(unsigned int prn, int freq_n) {
+        if (prn < 1 || prn > 24)
+                return;
+        if (freq_n < -7 || freq_n > 13)
+                return;     /* out of valid range, ignore */
+        atomic_store_explicit(&glo_freq_slots[prn], (int8_t)freq_n,
+                              memory_order_relaxed);
+}
+
+int rtcm_obs_get_glo_freq_slot(unsigned int prn) {
+        if (prn < 1 || prn > 24)
+                return 0;
+        return (int)atomic_load_explicit(&glo_freq_slots[prn],
+                                         memory_order_relaxed);
+}
+
+/*
+ * Decode RTCM 1020 (GLONASS ephemeris).
+ *
+ * Layout (RTCM 3.3 section 3.5.84):
+ *   bits  0-11 : message type (1020)
+ *   bits 12-17 : satellite ID (DF096, 6 bits, 1-24)
+ *   bits 18-22 : GLONASS frequency channel (DF097, 5 bits, signed 2's
+ *                complement, valid range -7..+13)
+ *   bits 23+   : remainder of ephemeris (skipped here)
+ *
+ * getbits() returns a uint64_t without sign extension; we manually
+ * sign-extend the 5-bit value (if bit 4 is set, subtract 32) to get
+ * the signed slot number in [-7, +13].
+ */
+int rtcm_obs_decode_1020(struct packet *p,
+                         unsigned int *prn_out, int *freq_n_out) {
+        if (p == NULL || p->datalen < 6 + 3)   /* need at least 23 bits payload */
+                return -1;
+
+        unsigned short type = rtcm_get_type(p);
+        if (type != 1020)
+                return -1;
+
+        unsigned char *d = p->data + 3;
+        unsigned int prn = (unsigned int)getbits(d, 12, 6);
+        uint32_t raw = (uint32_t)getbits(d, 18, 5);
+        int freq_n = (int)raw;
+        if (raw & 0x10)              /* sign bit of 5-bit field */
+                freq_n -= 32;        /* sign-extend: 31 -> -1, 25 -> -7, etc. */
+
+        if (prn < 1 || prn > 24)
+                return -1;
+        if (freq_n < -7 || freq_n > 13)
+                return -1;     /* invalid slot, ignore */
+
+        rtcm_obs_set_glo_freq_slot(prn, freq_n);
+
+        if (prn_out)   *prn_out = prn;
+        if (freq_n_out) *freq_n_out = freq_n;
         return 0;
 }
 
@@ -141,15 +215,24 @@ static int decode_sat_mask(uint64_t mask, unsigned char *prns_out, int max_prns)
  *
  * carrier_freq_hz = 0.0 means "unknown / not in the MVP"; the
  * wavelength lookup will fall back to a system+band default.
+ *
+ * is_glo_fdma: 1 for GLONASS FDMA signals (L1 C/A, L1 P, L2 C/A, L2 P).
+ * For these, freq_hz is the n=0 nominal carrier; the MSM7 decoder
+ * looks up the per-satellite slot n (from RTCM 1020) and replaces
+ * freq_hz with (1602.0 + n*0.5625) MHz on L1 or (1246.0 + n*0.4375)
+ * MHz on L2 before computing the wavelength. CDMA GLONASS signals
+ * (L1OC, L2OC, L3) and all non-GLONASS signals have is_glo_fdma=0
+ * and use freq_hz verbatim.
  */
 struct sig_entry {
         char band;             /* '0' = invalid (skip) */
         char attr;             /* RINEX attribute code */
         double freq_hz;        /* nominal carrier frequency, Hz */
+        int is_glo_fdma;       /* 1 = GLONASS FDMA, freq_hz is n=0 nominal */
 };
 
 /* Sentinel: band=0 means "this signal mask bit is unused". */
-#define SIG_UNUSED { '0', '?', 0.0 }
+#define SIG_UNUSED { '0', '?', 0.0, 0 }
 
 /*
  * GPS signal mask (RTCM 3.3 table 3.5-15):
@@ -175,22 +258,22 @@ struct sig_entry {
  *   bit 15: L1 Z-tracking -> 1W
  */
 static const struct sig_entry GPS_SIG_TABLE[16] = {
-        { '1', 'C', 1575420000.0 },   /* bit 0: L1 C/A          */
-        { '1', 'L', 1575420000.0 },   /* bit 1: L1 L1C pilot    */
-        { '1', 'S', 1575420000.0 },   /* bit 2: L1 L1C data     */
-        { '1', 'X', 1575420000.0 },   /* bit 3: L1 L1C pilot+data */
-        { '2', 'S', 1227600000.0 },   /* bit 4: L2 L2C(M)       */
-        { '2', 'L', 1227600000.0 },   /* bit 5: L2 L2C(L)       */
-        { '2', 'X', 1227600000.0 },   /* bit 6: L2 L2C(M+L)     */
-        { '2', 'P', 1227600000.0 },   /* bit 7: L2 P(Y)         */
-        { '5', 'I', 1176450000.0 },   /* bit 8: L5 I            */
-        { '5', 'Q', 1176450000.0 },   /* bit 9: L5 Q            */
-        { '5', 'X', 1176450000.0 },   /* bit 10: L5 I+Q         */
-        { '2', 'W', 1227600000.0 },   /* bit 11: L2 Z-tracking  */
-        { '2', 'Y', 1227600000.0 },   /* bit 12: L2 Y           */
-        { '2', 'M', 1227600000.0 },   /* bit 13: L2 M           */
-        { '1', 'P', 1575420000.0 },   /* bit 14: L1 P           */
-        { '1', 'W', 1575420000.0 },   /* bit 15: L1 Z-tracking  */
+        { '1', 'C', 1575420000.0, 0 },   /* bit 0: L1 C/A          */
+        { '1', 'L', 1575420000.0, 0 },   /* bit 1: L1 L1C pilot    */
+        { '1', 'S', 1575420000.0, 0 },   /* bit 2: L1 L1C data     */
+        { '1', 'X', 1575420000.0, 0 },   /* bit 3: L1 L1C pilot+data */
+        { '2', 'S', 1227600000.0, 0 },   /* bit 4: L2 L2C(M)       */
+        { '2', 'L', 1227600000.0, 0 },   /* bit 5: L2 L2C(L)       */
+        { '2', 'X', 1227600000.0, 0 },   /* bit 6: L2 L2C(M+L)     */
+        { '2', 'P', 1227600000.0, 0 },   /* bit 7: L2 P(Y)         */
+        { '5', 'I', 1176450000.0, 0 },   /* bit 8: L5 I            */
+        { '5', 'Q', 1176450000.0, 0 },   /* bit 9: L5 Q            */
+        { '5', 'X', 1176450000.0, 0 },   /* bit 10: L5 I+Q         */
+        { '2', 'W', 1227600000.0, 0 },   /* bit 11: L2 Z-tracking  */
+        { '2', 'Y', 1227600000.0, 0 },   /* bit 12: L2 Y           */
+        { '2', 'M', 1227600000.0, 0 },   /* bit 13: L2 M           */
+        { '1', 'P', 1575420000.0, 0 },   /* bit 14: L1 P           */
+        { '1', 'W', 1575420000.0, 0 },   /* bit 15: L1 Z-tracking  */
 };
 
 /*
@@ -224,22 +307,22 @@ static const struct sig_entry GPS_SIG_TABLE[16] = {
  * ~1202.025 MHz (RTCM 3.4 adds it but we mark it unused here).
  */
 static const struct sig_entry GLO_SIG_TABLE[16] = {
-        { '1', 'C', 1602000000.0 },   /* bit 0: L1 C/A (FDMA, n=0 nominal) */
-        { '1', 'P', 1602000000.0 },   /* bit 1: L1 P   (FDMA, n=0 nominal) */
-        { '2', 'C', 1246000000.0 },   /* bit 2: L2 C/A (FDMA, n=0 nominal) */
-        { '2', 'P', 1246000000.0 },   /* bit 3: L2 P   (FDMA, n=0 nominal) */
-        { '1', 'A', 1600995000.0 },   /* bit 4: L1 OCd (CDMA)              */
-        { '1', 'B', 1600995000.0 },   /* bit 5: L1 OCp (CDMA)              */
-        { '1', 'X', 1600995000.0 },   /* bit 6: L1 OCd+OCp                 */
-        { '1', 'D', 1600995000.0 },   /* bit 7: L1 SCd (CDMA)              */
-        { '1', 'E', 1600995000.0 },   /* bit 8: L1 SCp (CDMA)              */
-        { '1', 'Z', 1600995000.0 },   /* bit 9: L1 SCd+SCp                 */
-        { '2', 'I', 1248060000.0 },   /* bit 10: L2 CSI (CDMA)             */
-        { '2', 'B', 1248060000.0 },   /* bit 11: L2 OCp (CDMA)             */
-        { '2', 'X', 1248060000.0 },   /* bit 12: L2 CSI+OCp                */
-        { '2', 'D', 1248060000.0 },   /* bit 13: L2 SCd (CDMA)             */
-        { '2', 'E', 1248060000.0 },   /* bit 14: L2 SCp (CDMA)             */
-        { '2', 'Z', 1248060000.0 },   /* bit 15: L2 SCd+SCp                */
+        { '1', 'C', 1602000000.0, 1 },   /* bit 0: L1 C/A (FDMA, n=0 nominal) */
+        { '1', 'P', 1602000000.0, 1 },   /* bit 1: L1 P   (FDMA, n=0 nominal) */
+        { '2', 'C', 1246000000.0, 1 },   /* bit 2: L2 C/A (FDMA, n=0 nominal) */
+        { '2', 'P', 1246000000.0, 1 },   /* bit 3: L2 P   (FDMA, n=0 nominal) */
+        { '1', 'A', 1600995000.0, 0 },   /* bit 4: L1 OCd (CDMA)              */
+        { '1', 'B', 1600995000.0, 0 },   /* bit 5: L1 OCp (CDMA)              */
+        { '1', 'X', 1600995000.0, 0 },   /* bit 6: L1 OCd+OCp                 */
+        { '1', 'D', 1600995000.0, 0 },   /* bit 7: L1 SCd (CDMA)              */
+        { '1', 'E', 1600995000.0, 0 },   /* bit 8: L1 SCp (CDMA)              */
+        { '1', 'Z', 1600995000.0, 0 },   /* bit 9: L1 SCd+SCp                 */
+        { '2', 'I', 1248060000.0, 0 },   /* bit 10: L2 CSI (CDMA)             */
+        { '2', 'B', 1248060000.0, 0 },   /* bit 11: L2 OCp (CDMA)             */
+        { '2', 'X', 1248060000.0, 0 },   /* bit 12: L2 CSI+OCp                */
+        { '2', 'D', 1248060000.0, 0 },   /* bit 13: L2 SCd (CDMA)             */
+        { '2', 'E', 1248060000.0, 0 },   /* bit 14: L2 SCp (CDMA)             */
+        { '2', 'Z', 1248060000.0, 0 },   /* bit 15: L2 SCd+SCp                */
 };
 
 /*
@@ -262,22 +345,22 @@ static const struct sig_entry GLO_SIG_TABLE[16] = {
  *   bit 15: E6B+C         -> 6X
  */
 static const struct sig_entry GAL_SIG_TABLE[16] = {
-        { '1', 'A', 1575420000.0 },   /* bit 0: E1A            */
-        { '1', 'B', 1575420000.0 },   /* bit 1: E1B            */
-        { '1', 'C', 1575420000.0 },   /* bit 2: E1C            */
-        { '1', 'X', 1575420000.0 },   /* bit 3: E1B+C          */
-        { '1', 'Z', 1575420000.0 },   /* bit 4: E1A+B+C        */
-        { '5', 'I', 1176450000.0 },   /* bit 5: E5aI           */
-        { '5', 'Q', 1176450000.0 },   /* bit 6: E5aQ           */
-        { '5', 'X', 1176450000.0 },   /* bit 7: E5aI+Q         */
-        { '7', 'I', 1207140000.0 },   /* bit 8: E5bI           */
-        { '7', 'Q', 1207140000.0 },   /* bit 9: E5bQ           */
-        { '7', 'X', 1207140000.0 },   /* bit 10: E5bI+Q        */
-        { '8', 'X', 1191795000.0 },   /* bit 11: E5(b+a)       */
-        { '6', 'A', 1278750000.0 },   /* bit 12: E6A           */
-        { '6', 'B', 1278750000.0 },   /* bit 13: E6B           */
-        { '6', 'C', 1278750000.0 },   /* bit 14: E6C           */
-        { '6', 'X', 1278750000.0 },   /* bit 15: E6B+C         */
+        { '1', 'A', 1575420000.0, 0 },   /* bit 0: E1A            */
+        { '1', 'B', 1575420000.0, 0 },   /* bit 1: E1B            */
+        { '1', 'C', 1575420000.0, 0 },   /* bit 2: E1C            */
+        { '1', 'X', 1575420000.0, 0 },   /* bit 3: E1B+C          */
+        { '1', 'Z', 1575420000.0, 0 },   /* bit 4: E1A+B+C        */
+        { '5', 'I', 1176450000.0, 0 },   /* bit 5: E5aI           */
+        { '5', 'Q', 1176450000.0, 0 },   /* bit 6: E5aQ           */
+        { '5', 'X', 1176450000.0, 0 },   /* bit 7: E5aI+Q         */
+        { '7', 'I', 1207140000.0, 0 },   /* bit 8: E5bI           */
+        { '7', 'Q', 1207140000.0, 0 },   /* bit 9: E5bQ           */
+        { '7', 'X', 1207140000.0, 0 },   /* bit 10: E5bI+Q        */
+        { '8', 'X', 1191795000.0, 0 },   /* bit 11: E5(b+a)       */
+        { '6', 'A', 1278750000.0, 0 },   /* bit 12: E6A           */
+        { '6', 'B', 1278750000.0, 0 },   /* bit 13: E6B           */
+        { '6', 'C', 1278750000.0, 0 },   /* bit 14: E6C           */
+        { '6', 'X', 1278750000.0, 0 },   /* bit 15: E6B+C         */
 };
 
 /*
@@ -305,22 +388,22 @@ static const struct sig_entry GAL_SIG_TABLE[16] = {
  * at 1575.42 MHz (same as GPS L1).
  */
 static const struct sig_entry BDS_SIG_TABLE[16] = {
-        { '2', 'I', 1561098000.0 },   /* bit 0: B1I            */
-        { '2', 'Q', 1561098000.0 },   /* bit 1: B1Q            */
-        { '2', 'X', 1561098000.0 },   /* bit 2: B1I+Q          */
-        { '6', 'I', 1268520000.0 },   /* bit 3: B3I            */
-        { '6', 'Q', 1268520000.0 },   /* bit 4: B3Q            */
-        { '6', 'X', 1268520000.0 },   /* bit 5: B3I+Q          */
-        { '7', 'I', 1207140000.0 },   /* bit 6: B2I            */
-        { '7', 'Q', 1207140000.0 },   /* bit 7: B2Q            */
-        { '7', 'X', 1207140000.0 },   /* bit 8: B2I+Q          */
-        { '1', 'C', 1575420000.0 },   /* bit 9: B1C Pilot      */
-        { '1', 'D', 1575420000.0 },   /* bit 10: B1C Data      */
-        { '1', 'X', 1575420000.0 },   /* bit 11: B1C P+D       */
-        { '5', 'P', 1176450000.0 },   /* bit 12: B2a Pilot     */
-        { '5', 'D', 1176450000.0 },   /* bit 13: B2a Data      */
-        { '5', 'X', 1176450000.0 },   /* bit 14: B2a P+D       */
-        { '7', 'D', 1207140000.0 },   /* bit 15: B2b Data      */
+        { '2', 'I', 1561098000.0, 0 },   /* bit 0: B1I            */
+        { '2', 'Q', 1561098000.0, 0 },   /* bit 1: B1Q            */
+        { '2', 'X', 1561098000.0, 0 },   /* bit 2: B1I+Q          */
+        { '6', 'I', 1268520000.0, 0 },   /* bit 3: B3I            */
+        { '6', 'Q', 1268520000.0, 0 },   /* bit 4: B3Q            */
+        { '6', 'X', 1268520000.0, 0 },   /* bit 5: B3I+Q          */
+        { '7', 'I', 1207140000.0, 0 },   /* bit 6: B2I            */
+        { '7', 'Q', 1207140000.0, 0 },   /* bit 7: B2Q            */
+        { '7', 'X', 1207140000.0, 0 },   /* bit 8: B2I+Q          */
+        { '1', 'C', 1575420000.0, 0 },   /* bit 9: B1C Pilot      */
+        { '1', 'D', 1575420000.0, 0 },   /* bit 10: B1C Data      */
+        { '1', 'X', 1575420000.0, 0 },   /* bit 11: B1C P+D       */
+        { '5', 'P', 1176450000.0, 0 },   /* bit 12: B2a Pilot     */
+        { '5', 'D', 1176450000.0, 0 },   /* bit 13: B2a Data      */
+        { '5', 'X', 1176450000.0, 0 },   /* bit 14: B2a P+D       */
+        { '7', 'D', 1207140000.0, 0 },   /* bit 15: B2b Data      */
 };
 
 /*
@@ -332,11 +415,11 @@ static const struct sig_entry BDS_SIG_TABLE[16] = {
  * Bits 1-4 are reserved.
  */
 static const struct sig_entry SBS_SIG_TABLE[16] = {
-        { '1', 'C', 1575420000.0 },   /* bit 0: L1 C/A         */
+        { '1', 'C', 1575420000.0, 0 },   /* bit 0: L1 C/A         */
         SIG_UNUSED, SIG_UNUSED, SIG_UNUSED, SIG_UNUSED,
-        { '5', 'I', 1176450000.0 },   /* bit 5: L5 I           */
-        { '5', 'Q', 1176450000.0 },   /* bit 6: L5 Q           */
-        { '5', 'X', 1176450000.0 },   /* bit 7: L5 I+Q         */
+        { '5', 'I', 1176450000.0, 0 },   /* bit 5: L5 I           */
+        { '5', 'Q', 1176450000.0, 0 },   /* bit 6: L5 Q           */
+        { '5', 'X', 1176450000.0, 0 },   /* bit 7: L5 I+Q         */
         SIG_UNUSED, SIG_UNUSED, SIG_UNUSED, SIG_UNUSED,
         SIG_UNUSED, SIG_UNUSED, SIG_UNUSED, SIG_UNUSED,
 };
@@ -357,9 +440,15 @@ static const struct sig_entry SBS_SIG_TABLE[16] = {
 /*
  * Decode the signal mask into a list of per-signal descriptors.
  *
- * The 32-bit signal mask (DF395) is MSB-first. Only the low 16 bits
- * carry meaning for any constellation in practice. We use the per-
- * system table to map each set bit to (band, attribute, frequency).
+ * The 32-bit signal mask (DF395) is MSB-first in the bitstream: the
+ * first bit read corresponds to spec "bit 0", the last bit read to
+ * "bit 31". When stored in a uint32_t via getbits(), the first bit
+ * read becomes the MSB (bit 31) and the last becomes the LSB (bit 0).
+ *
+ * Per RTCM 3.3, only bits 0-15 (the first 16 bits read = uint32_t
+ * bits 31..16) carry meaning for any constellation; bits 16-31 are
+ * reserved for future use. We therefore iterate the table entries
+ * i=0..15 and check `mask & (1u << (31 - i))` to test spec-bit i.
  *
  * Returns the number of signals found (nsig).
  */
@@ -378,7 +467,7 @@ static int decode_sig_mask(uint32_t mask, enum rtcm_sys sys,
         }
         int nsig = 0;
         for (int i = 0; i < 16 && nsig < max_sigs; i++) {
-                if (mask & (1u << (15 - i))) {
+                if (mask & (1u << (31 - i))) {
                         if (table[i].band != '0') {
                                 sigs_out[nsig++] = table[i];
                         }
@@ -510,22 +599,26 @@ int rtcm_obs_decode_msm7(struct packet *p, struct rtcm_obs_epoch *epoch) {
         if (nsat == 0 || nsig == 0)
                 return -1;
 
-        if (nsat * nsig > 64)
-                return -1;  /* per RTCM spec */
-
-        /* DF396: cell mask (nsat*nsig bits) */
+        /* Per RTCM 3.3 spec, the cell mask has nsat*nsig bits but the
+         * number of SET bits (observed cells) is at most 64. We allow
+         * nsat*nsig up to 64*16 = 1024 bits, stored in a 128-byte
+         * bit array. The decoder will silently skip cells beyond
+         * RTCM_OBS_MAX_CELLS (defensive cap). */
         int cell_mask_bits = nsat * nsig;
+        if (cell_mask_bits > 1024)
+                return -1;
         if (pos + cell_mask_bits > len_bits) return -1;
-        uint64_t cell_mask = 0;
+
+        /* Read cell mask into a byte array (MSB-first within each byte
+         * of the conceptual bitstream, but for cell-presence lookup we
+         * just store bits in their natural order: bit i of the cell
+         * mask = bit (i & 7) of cell_mask[i >> 3]). */
+        unsigned char cell_mask[128] = {0};
         for (int i = 0; i < cell_mask_bits; i++) {
                 if (getbits(d, pos + i, 1))
-                        cell_mask |= (1ULL << (cell_mask_bits - 1 - i));
+                        cell_mask[i >> 3] |= (1u << (i & 7));
         }
         pos += cell_mask_bits;
-
-        int ncell = count_set_u64(cell_mask);
-        if (ncell > RTCM_OBS_MAX_CELLS)
-                return -1;
 
         /* Per-satellite section:
          *   DF397 (8 bits each) : rough range in ms
@@ -561,11 +654,15 @@ int rtcm_obs_decode_msm7(struct packet *p, struct rtcm_obs_epoch *epoch) {
         pos += 14 * nsat;  /* skip for MVP */
 
         /* Per-cell section:
-         *   DF405 (20 bits): fine pseudorange
-         *   DF406 (24 bits): fine phase range
-         *   DF407 (10 bits): lock time indicator
-         *   DF408 (10 bits): CNR (0.25 dB-Hz)
-         *   (DF420 etc. skipped for MVP)
+         *   DF405 (20 bits): fine pseudorange        (MSM4/6/7)
+         *   DF406 (24 bits): fine phase range        (MSM5/6/7)
+         *   DF407 (10 bits): lock time indicator     (all MSM)
+         *   DF408 (10 bits): CNR (0.25 dB-Hz)        (MSM4/5/6/7)
+         *   DF404 ( 1 bit ): half-cycle ambiguity    (MSM4/5/6/7)
+         *   DF420 (15 bits): fine phase range rate   (MSM7 only)
+         * Total: 80 bits per cell in MSM7.
+         * We skip DF420 (not needed for RINEX obs). Failing to skip
+         * it would mis-align every cell after the first.
          */
 
         /* Decode cells in order of (sat, sig) pairs where cell_mask bit is set.
@@ -577,7 +674,9 @@ int rtcm_obs_decode_msm7(struct packet *p, struct rtcm_obs_epoch *epoch) {
         for (int s = 0; s < nsat && cell_idx < RTCM_OBS_MAX_CELLS; s++) {
                 for (int g = 0; g < nsig && cell_idx < RTCM_OBS_MAX_CELLS; g++) {
                         int cell_bit = s * nsig + g;
-                        if (!(cell_mask & (1ULL << (cell_mask_bits - 1 - cell_bit))))
+                        /* Look up bit `cell_bit` in the cell_mask byte array. */
+                        int present = (cell_mask[cell_bit >> 3] >> (cell_bit & 7)) & 1;
+                        if (!present)
                                 continue;
 
                         /* DF405: fine pseudorange (20 bits, sign-magnitude, 0.5 mm) */
@@ -600,12 +699,14 @@ int rtcm_obs_decode_msm7(struct packet *p, struct rtcm_obs_epoch *epoch) {
                         unsigned int cnr = (unsigned int)getbits(d, pos, 10);
                         pos += 10;
 
-                        /* Skip DF407b (lock time extension, 2 bits) and
-                         * DF404 (half-cycle ambiguity, 1 bit) for MSM7.
-                         * The remaining fields per cell are DF404 (1 bit)
-                         * and possibly DF420 (1 bit) — see RTCM 3.3 3.5.4.7.
-                         */
-                        pos += 1;  /* DF404 half-cycle */
+                        /* DF404: half-cycle ambiguity (1 bit). */
+                        pos += 1;
+
+                        /* DF420: fine phase range rate (15 bits, MSM7 only).
+                         * Skipping this would break alignment for cell N+1
+                         * because MSM7 packs 80 bits per cell. */
+                        if (pos + 15 > len_bits) return -1;
+                        pos += 15;
 
                         /* Compute pseudorange in meters.
                          *   PR = DF397 * 1e-3 (s) * c
@@ -629,8 +730,25 @@ int rtcm_obs_decode_msm7(struct packet *p, struct rtcm_obs_epoch *epoch) {
                         double phase_range_m = (double)(ph_sign * ph_mag) * 0.5e-3;
 
                         /* Convert phase range (meters) to phase (cycles) using
-                         * the carrier frequency for this signal. */
+                         * the carrier frequency for this signal.
+                         *
+                         * For GLONASS FDMA signals (L1 C/A, L1 P, L2 C/A, L2 P)
+                         * the per-satellite carrier depends on the frequency
+                         * slot n (-7..+13), which is read from the process-wide
+                         * slot table populated by rtcm_obs_decode_1020(). If no
+                         * 1020 message has been seen for this PRN yet, we fall
+                         * back to the n=0 nominal (sigs[g].freq_hz).
+                         */
                         double freq_hz = sigs[g].freq_hz;
+                        if (sigs[g].is_glo_fdma) {
+                                int n = rtcm_obs_get_glo_freq_slot(sat_prns[s]);
+                                if (n != 0) {
+                                        if (sigs[g].band == '1')
+                                                freq_hz = 1602.0e6 + (double)n * 0.5625e6;
+                                        else  /* band == '2' */
+                                                freq_hz = 1246.0e6 + (double)n * 0.4375e6;
+                                }
+                        }
                         double wavelength = wavelength_for_freq(freq_hz);
                         double phase_cycles;
                         if (wavelength > 0.0) {

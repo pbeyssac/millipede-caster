@@ -147,17 +147,21 @@ int rinex_writer_init(struct mbuf *out,
          * (3 obs types: C pseudorange, L phase, S SNR), chosen as the
          * most common signal of that constellation:
          *   G : L1 C/A    -> C1C L1C S1C
-         *   R : L1 C/A    -> C1C L1C S1C  (GLONASS, FDMA n=0 nominal)
+         *   R : L1 C/A    -> C1C L1C S1C  (GLONASS, FDMA slot adjusted at decode)
          *   E : E1B       -> C1B L1B S1B
          *   C : B1I       -> C2I L2I S2I  (BeiDou band 2 = B1I at 1561.098 MHz)
+         *   J : L1 C/A    -> C1C L1C S1C  (QZSS, same signal codes as GPS)
+         *   S : L1 C/A    -> C1C L1C S1C  (SBAS)
          * The RINEX 3.04 spec requires the SYS / # / OBS TYPES lines to
          * come in alphabetical system order (C, E, G, J, R, S). We emit
-         * G/R/E/C in that spirit; declaring a system with no actual
+         * them in that order; declaring a system with no actual
          * observations in the file is allowed. */
-        mbuf_puts(out, "G    3 C1C L1C S1C                                      SYS / # / OBS TYPES\n");
-        mbuf_puts(out, "R    3 C1C L1C S1C                                      SYS / # / OBS TYPES\n");
-        mbuf_puts(out, "E    3 C1B L1B S1B                                      SYS / # / OBS TYPES\n");
         mbuf_puts(out, "C    3 C2I L2I S2I                                      SYS / # / OBS TYPES\n");
+        mbuf_puts(out, "E    3 C1B L1B S1B                                      SYS / # / OBS TYPES\n");
+        mbuf_puts(out, "G    3 C1C L1C S1C                                      SYS / # / OBS TYPES\n");
+        mbuf_puts(out, "J    3 C1C L1C S1C                                      SYS / # / OBS TYPES\n");
+        mbuf_puts(out, "R    3 C1C L1C S1C                                      SYS / # / OBS TYPES\n");
+        mbuf_puts(out, "S    3 C1C L1C S1C                                      SYS / # / OBS TYPES\n");
 
         /* Line 11: INTERVAL — assume 1 second (MVP) */
         mbuf_puts(out, "     1.000                                                INTERVAL\n");
@@ -307,7 +311,10 @@ int rinex_build_from_packets(struct mbuf *out,
         if (out == NULL || packets == NULL)
                 return -1;
 
-        /* Pass 1: find the latest 1005/1006 to get the station position. */
+        /* Pass 1: find the latest 1005/1006 to get the station position,
+         * and feed every RTCM 1020 (GLONASS ephemeris) into the slot
+         * table so that subsequent MSM7 GLONASS decoding can resolve
+         * FDMA carriers per satellite. */
         double ecef_x = NAN, ecef_y = NAN, ecef_z = NAN;
         unsigned int station_id = 0;
         for (size_t i = 0; i < npackets; i++) {
@@ -322,6 +329,9 @@ int rinex_build_from_packets(struct mbuf *out,
                                 ecef_y = y;
                                 ecef_z = z;
                         }
+                } else if (type == 1020) {
+                        /* Populate GLONASS FDMA slot table; ignore errors. */
+                        (void)rtcm_obs_decode_1020(p, NULL, NULL);
                 }
         }
 
@@ -330,13 +340,18 @@ int rinex_build_from_packets(struct mbuf *out,
                               ecef_x, ecef_y, ecef_z) != 0)
                 return -1;
 
-        /* Pass 2: decode and emit each MSM7 epoch. */
+        /* Pass 2: decode and emit each MSM7 epoch.
+         *
+         * MSM7 message types span 1071-1137 (last digit 7), covering
+         * GPS (1077), GLONASS (1087), Galileo (1097), QZSS (1107),
+         * SBAS (1117), BeiDou (1127), NavIC (1137). rtcm_obs_decode_msm7
+         * will reject any system it can't handle. */
         for (size_t i = 0; i < npackets; i++) {
                 struct packet *p = packets[i];
                 if (p == NULL || !p->is_rtcm)
                         continue;
                 unsigned short type = rtcm_get_type(p);
-                if (type < 1071 || type > 1127 || (type % 10) != 7)
+                if (type < 1071 || type > 1137 || (type % 10) != 7)
                         continue;
 
                 struct rtcm_obs_epoch epoch;

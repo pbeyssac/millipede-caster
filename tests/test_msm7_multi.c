@@ -145,10 +145,12 @@ static struct packet *build_msm7(unsigned short msg_type,
         bw_put(&bw, sat_mask, 64);
 
         /* DF395: signal mask (32 bits, MSB-first). Set only the requested bit.
-         * Note: the high 16 bits are reserved/unused, we set bits in the low 16. */
+         * The decoder reads spec-bit i as `1u << (31 - i)` (MSB-first), so
+         * we encode `sig_mask_bit` the same way: spec-bit `sig_mask_bit`
+         * -> uint32_t bit (31 - sig_mask_bit). */
         uint32_t sig_mask = 0;
         if (sig_mask_bit < 16) {
-                sig_mask = 1u << (15 - sig_mask_bit);
+                sig_mask = 1u << (31 - sig_mask_bit);
         }
         bw_put(&bw, sig_mask, 32);
 
@@ -204,6 +206,44 @@ static struct packet *build_msm7(unsigned short msg_type,
         /* DF404: half-cycle (1 bit) */
         bw_put(&bw, 0, 1);
 
+        /* DF420: fine phase range rate (15 bits, MSM7 only).
+         * Mandatory in MSM7 — without it the next cell's bit alignment
+         * would be off by 15 bits. */
+        bw_put(&bw, 0, 15);
+
+        size_t payload_len = (bw.bitpos + 7) / 8;
+        return make_packet(payload, payload_len);
+}
+
+/* ---- Build a synthetic RTCM 1020 (GLONASS ephemeris, slot only) ------------ */
+
+/*
+ * Build a minimal RTCM 1020 frame that just carries the satellite PRN
+ * (DF096, 6 bits) and frequency channel number (DF097, 5 bits signed
+ * 2's complement). The rest of the ephemeris is left zero — the
+ * decoder only reads the first 23 payload bits, so this is enough.
+ *
+ * For negative n (e.g. -1), the 5-bit field is two's complement:
+ *   -1 -> 31 (0b11111)
+ *   -7 -> 25 (0b11001)
+ *    1 ->  1 (0b00001)
+ *    4 ->  4 (0b00100)
+ */
+static struct packet *build_1020(unsigned char prn, int freq_n) {
+        unsigned char payload[64] = {0};
+        struct bitwriter bw;
+        bw_init(&bw, payload, sizeof payload);
+
+        /* DF002: message type = 1020 (12 bits) */
+        bw_put(&bw, 1020, 12);
+        /* DF096: satellite ID (6 bits) */
+        bw_put(&bw, prn & 0x3F, 6);
+        /* DF097: frequency channel (5 bits, 2's complement) */
+        uint32_t n5 = (uint32_t)(freq_n & 0x1F);
+        bw_put(&bw, n5, 5);
+        /* Pad the rest with zeros (ephemeris fields, unused by decoder) */
+        bw_put(&bw, 0, 64);
+
         size_t payload_len = (bw.bitpos + 7) / 8;
         return make_packet(payload, payload_len);
 }
@@ -257,18 +297,126 @@ int main(void) {
         /* BeiDou 1127, sat C03 (bit 2), B3I (bit 3) */
         err += run_one("BeiDou B3I", 1127, 3, 2, 3, 24000000.0, 24000000.5, 185);
 
+        /* QZSS 1107, sat J01 (bit 0), L1 C/A (bit 0) */
+        err += run_one("QZSS L1 C/A", 1107, 1, 0, 0, 25000000.0, 25000000.5, 200);
+
+        /* SBAS 1117, sat S20 (bit 19), L1 C/A (bit 0).
+         * SBAS PRNs in RTCM MSM7 are encoded as mask bit (PRN-120),
+         * so PRN 120 -> bit 0, PRN 133 -> bit 13, etc. We use S20
+         * here, but the decoder stores the mask-bit index + 1 as the
+         * PRN, so the cell will show sat_prn=20. The RINEX writer
+         * then emits "S20". */
+        err += run_one("SBAS L1 C/A", 1117, 20, 19, 0, 25000000.0, 25000000.5, 195);
+
+        /* ---- RTCM 1020 unit tests: PRN + slot parsing ---- */
+        printf("\n=== RTCM 1020 parsing ===\n");
+        {
+                /* Reset the slot table to a known state. */
+                for (unsigned p = 1; p <= 24; p++)
+                        rtcm_obs_set_glo_freq_slot(p, 0);
+
+                /* Build a 1020 for PRN=3, n=4 (positive slot). */
+                struct packet *e1 = build_1020(3, 4);
+                unsigned prn; int n;
+                if (rtcm_obs_decode_1020(e1, &prn, &n) != 0) {
+                        printf("  FAIL: rtcm_obs_decode_1020 returned -1\n");
+                        err++;
+                } else if (prn != 3 || n != 4) {
+                        printf("  FAIL: expected prn=3 n=4, got prn=%u n=%d\n", prn, n);
+                        err++;
+                } else {
+                        printf("  OK: PRN=3 n=+4 -> slot=%d (L1 freq=%.4f MHz)\n",
+                               rtcm_obs_get_glo_freq_slot(3),
+                               (1602.0 + 4 * 0.5625));
+                }
+                free_packet(e1);
+
+                /* Build a 1020 for PRN=7, n=-1 (negative slot, 2's complement). */
+                struct packet *e2 = build_1020(7, -1);
+                if (rtcm_obs_decode_1020(e2, &prn, &n) != 0) {
+                        printf("  FAIL: rtcm_obs_decode_1020 (n=-1) returned -1\n");
+                        err++;
+                } else if (prn != 7 || n != -1) {
+                        printf("  FAIL: expected prn=7 n=-1, got prn=%u n=%d\n", prn, n);
+                        err++;
+                } else {
+                        printf("  OK: PRN=7 n=-1 -> slot=%d (L1 freq=%.4f MHz)\n",
+                               rtcm_obs_get_glo_freq_slot(7),
+                               (1602.0 + (-1) * 0.5625));
+                }
+                free_packet(e2);
+        }
+
+        /* ---- GLONASS FDMA slot applied to MSM7 ---- */
+        printf("\n=== GLONASS FDMA slot applied to MSM7 ===\n");
+        {
+                /* Pre-seed the slot table: PRN=3 has n=4. */
+                rtcm_obs_set_glo_freq_slot(3, 4);
+
+                /* Decode an MSM7 for GLONASS PRN=3 L1 C/A.
+                 * Without slot lookup the carrier would be 1602.000 MHz.
+                 * With n=4 it should be 1602 + 4*0.5625 = 1604.250 MHz. */
+                struct packet *p = build_msm7(1087, 0x123, 100000,
+                                              3,  /* sat_prn */
+                                              2,  /* sat_mask_bit (PRN=3 -> bit index 2) */
+                                              0,  /* sig_mask_bit (L1 C/A) */
+                                              22000000.0, 22000000.5, 180);
+                struct rtcm_obs_epoch ep;
+                if (rtcm_obs_decode_msm7(p, &ep) != 0) {
+                        printf("  FAIL: decode_msm7 returned -1\n");
+                        err++;
+                } else {
+                        double expected_mhz = 1602.0 + 4 * 0.5625;   /* 1604.250 */
+                        double got_mhz = ep.cells[0].carrier_freq_hz / 1e6;
+                        printf("  PRN=3 n=+4: carrier=%.3f MHz (expected %.3f)\n",
+                               got_mhz, expected_mhz);
+                        if (fabs(got_mhz - expected_mhz) > 0.001) {
+                                printf("  FAIL: frequency mismatch\n");
+                                err++;
+                        } else {
+                                printf("  OK: FDMA slot correctly applied\n");
+                        }
+                }
+                free_packet(p);
+
+                /* Same test but for an unknown PRN (slot=0): should fall
+                 * back to the n=0 nominal 1602.000 MHz. */
+                rtcm_obs_set_glo_freq_slot(15, 0);   /* unknown */
+                struct packet *p2 = build_msm7(1087, 0x123, 100000,
+                                               15, 14, 0,
+                                               22000000.0, 22000000.5, 180);
+                struct rtcm_obs_epoch ep2;
+                if (rtcm_obs_decode_msm7(p2, &ep2) != 0) {
+                        printf("  FAIL: decode_msm7 (PRN=15 unknown) returned -1\n");
+                        err++;
+                } else {
+                        double got_mhz = ep2.cells[0].carrier_freq_hz / 1e6;
+                        printf("  PRN=15 n=0 (unknown): carrier=%.3f MHz (expected 1602.000)\n",
+                               got_mhz);
+                        if (fabs(got_mhz - 1602.0) > 0.001) {
+                                printf("  FAIL: should fall back to 1602.000 MHz\n");
+                                err++;
+                        } else {
+                                printf("  OK: fallback to n=0 nominal\n");
+                        }
+                }
+                free_packet(p2);
+        }
+
         /* End-to-end: build a RINEX file from one packet of each constellation. */
-        printf("\n=== RINEX file generation ===\n");
-        struct packet *packets[4];
+        printf("\n=== RINEX file generation (6 systems) ===\n");
+        struct packet *packets[6];
         packets[0] = build_msm7(1077, 0x123, 100000, 1, 0, 0, 25000000.0, 25000000.5, 200);
         packets[1] = build_msm7(1087, 0x123, 100000, 1, 0, 0, 22000000.0, 22000000.5, 180);
         packets[2] = build_msm7(1097, 0x123, 100000, 12, 11, 1, 23000000.0, 23000000.5, 190);
         packets[3] = build_msm7(1127, 0x123, 100000, 1, 0, 0, 24000000.0, 24000000.5, 185);
+        packets[4] = build_msm7(1107, 0x123, 100000, 1, 0, 0, 25000000.0, 25000000.5, 200);
+        packets[5] = build_msm7(1117, 0x123, 100000, 20, 19, 0, 25000000.0, 25000000.5, 195);
 
         struct mbuf out;
         if (mbuf_init(&out, 8192) < 0) { perror("mbuf_init"); return 1; }
 
-        int rc = rinex_build_from_packets(&out, packets, 4, "TESTBASE");
+        int rc = rinex_build_from_packets(&out, packets, 6, "TESTBASE");
         if (rc != 0) {
                 printf("  FAIL: rinex_build_from_packets returned %d\n", rc);
                 err++;
@@ -288,11 +436,15 @@ int main(void) {
                         "R    3 C1C L1C S1C",
                         "E    3 C1B L1B S1B",
                         "C    3 C2I L2I S2I",
+                        "J    3 C1C L1C S1C",
+                        "S    3 C1C L1C S1C",
                         "END OF HEADER",
                         "G01",
                         "R01",
                         "E12",
                         "C01",
+                        "J01",
+                        "S20",
                         NULL,
                 };
                 for (int i = 0; must_contain[i]; i++) {
@@ -305,7 +457,7 @@ int main(void) {
                 }
         }
 
-        for (int i = 0; i < 4; i++) free_packet(packets[i]);
+        for (int i = 0; i < 6; i++) free_packet(packets[i]);
         mbuf_free(&out);
 
         printf("\n==== %s ====\n", err ? "FAIL" : "PASS");

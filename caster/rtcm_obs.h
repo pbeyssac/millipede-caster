@@ -32,10 +32,14 @@
  *   - GLONASS uses FDMA: each satellite has its own carrier frequency
  *     derived from the frequency-slot number n (-7..+13). The slot
  *     number is NOT in the MSM7 message; it comes from RTCM 1020
- *     ephemeris or an external slot table. As an MVP, the decoder uses
- *     the nominal central frequencies (n=0). This produces phase values
- *     that are off by n*0.5625/1602 ≈ 0.035% per slot. For real PPK
- *     work the caller must multiply the phase by (f_sat / f_nominal).
+ *     ephemeris. The decoder maintains a process-wide slot table
+ *     populated by rtcm_obs_decode_1020(); MSM7 GLONASS cells then
+ *     look up the per-satellite slot and use the exact carrier:
+ *         f_L1 = (1602.0 + n * 0.5625) MHz
+ *         f_L2 = (1246.0 + n * 0.4375) MHz
+ *     If no 1020 message has been seen for a given PRN, the decoder
+ *     falls back to the nominal n=0 frequency (a 0.035% phase error
+ *     per slot).
  *
  * The decoder is purely functional: it takes a struct packet* and
  * writes into a caller-provided rtcm_obs_epoch struct. It does NOT
@@ -185,6 +189,32 @@ struct rtcm_obs_epoch {
  * in meters.
  */
 int rtcm_obs_decode_1005(struct packet *p, double *x, double *y, double *z);
+
+/*
+ * Decode an RTCM 1020 message (GLONASS ephemeris) and update the
+ * process-wide GLONASS frequency-slot table.
+ *
+ * Only the first 18 payload bits are used (DF002 message type, DF096
+ * satellite ID, DF097 frequency channel number); the rest of the
+ * ephemeris is skipped. The slot table is consulted by
+ * rtcm_obs_decode_msm7() when decoding GLONASS cells.
+ *
+ * If prn_out / freq_n_out are non-NULL, they receive the decoded
+ * values (prn: 1-24, freq_n: -7..+13).
+ *
+ * Returns 0 on success, -1 on error (wrong type, truncated, etc.).
+ */
+int rtcm_obs_decode_1020(struct packet *p,
+                         unsigned int *prn_out, int *freq_n_out);
+
+/*
+ * Direct accessor for the GLONASS frequency-slot table.
+ * rtcm_obs_set_glo_freq_slot() records the slot n (-7..+13) for the
+ * given GLONASS PRN (1-24). rtcm_obs_get_glo_freq_slot() returns the
+ * stored slot, or 0 if none has been recorded yet.
+ */
+void rtcm_obs_set_glo_freq_slot(unsigned int prn, int freq_n);
+int  rtcm_obs_get_glo_freq_slot(unsigned int prn);
 
 /*
  * Decode an RTCM MSM7 message into an observation epoch.

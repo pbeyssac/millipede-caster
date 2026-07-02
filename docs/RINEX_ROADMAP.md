@@ -5,12 +5,14 @@
 | Phase                          | Status      | Notes                                              |
 |--------------------------------|-------------|----------------------------------------------------|
 | `rtcm_ringbuffer` module       | ✅ MVP done | `caster/rtcm_ringbuffer.{c,h}` + `/api/v1/rtcm/ringbuffer` |
-| RTCM parser (1005 + MSM7)      | ✅ extended | `caster/rtcm_obs.{c,h}` — GPS (1077), GLONASS (1087), Galileo (1097), BeiDou (1127) |
-| RINEX 3.04 writer              | ✅ extended | `caster/rinex.{c,h}` — MIXED file marker, G/R/E/C obs types |
+| RTCM parser (1005 + MSM7)      | ✅ extended | `caster/rtcm_obs.{c,h}` — GPS (1077), GLONASS (1087), Galileo (1097), QZSS (1107), SBAS (1117), BeiDou (1127), NavIC (1137) |
+| RTCM 1020 GLONASS ephemeris    | ✅ added    | `rtcm_obs_decode_1020()` populates a process-wide FDMA slot table; MSM7 GLONASS cells look up the per-satellite slot n and adjust L1/L2 carriers (1602 + n*0.5625 / 1246 + n*0.4375 MHz) |
+| RINEX 3.04 writer              | ✅ extended | `caster/rinex.{c,h}` — MIXED file marker, 6 SYS / # / OBS TYPES (C/E/G/J/R/S) |
 | HTTP endpoint + streaming      | ✅ MVP done | `GET /api/v1/rinex?mountpoint=...&from=...&to=...` |
 | Config + docs                  | ⏳ partial  | compile-time defaults for now; YAML keys later     |
 | Integration tests (RTCM→RINEX) | ✅ MVP done | `tests/test-rinex.py` (5/5 PASS, header validated) |
-| Multi-constellation unit test  | ✅ added    | `tests/test_msm7_multi.c` builds synthetic 1077/1087/1097/1127 packets and validates decode + RINEX emit |
+| Multi-constellation unit test  | ✅ extended | `tests/test_msm7_multi.c` builds synthetic 1077/1087/1097/1107/1117/1127 packets, validates decode + RTCM 1020 + FDMA slot resolution + RINEX emit |
+| Real-data integration test     | ✅ added    | `tests/test_real_ntrip.c` consumes RTCM frames captured from a public NTRIP caster (RTK2GO). Validated against BangorCH: 4 constellations decoded (GPS 10 sats, GLONASS 8 sats with FDMA spread 7.19 MHz, Galileo 10 sats, BeiDou 6 sats) + RINEX file emitted |
 
 ## Goal
 
