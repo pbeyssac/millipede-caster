@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <strings.h>
 
 #include <json-c/json_object.h>
 
@@ -77,8 +78,69 @@ void nodes_add_node(struct nodes *this, const char *hostname, json_object *j) {
 	P_RWLOCK_UNLOCK(&this->lock);
 }
 
+/*
+ * Execute a received node update from a peer.
+ *
+ * Expected JSON payload:
+ *   {
+ *     "hostname": "<peer hostname>",
+ *     "endpoints": [ { "host": "...", "port": ..., "tls": ... }, ... ],
+ *     "status": "UP" | "DOWN"            // optional, defaults to UP
+ *   }
+ *
+ * Returns an HTTP status code (200 on success, 4xx on error).
+ */
 int node_update_execute(struct caster_state *caster, struct json_object *json) {
-	fprintf(stderr, "nodes: %s\n", json_object_get_string(json));
+	if (json == NULL) {
+		logfmt(&caster->flog, LOG_WARNING, "node_update_execute: null payload");
+		return 400;
+	}
+
+	json_object *jhostname = json_object_object_get(json, "hostname");
+	const char *hostname = jhostname ? json_object_get_string(jhostname) : NULL;
+	if (hostname == NULL || *hostname == '\0') {
+		logfmt(&caster->flog, LOG_WARNING, "node_update_execute: missing hostname");
+		return 400;
+	}
+
+	json_object *jendpoints = json_object_object_get(json, "endpoints");
+	if (jendpoints == NULL) {
+		logfmt(&caster->flog, LOG_WARNING, "node_update_execute: missing endpoints for %s", hostname);
+		return 400;
+	}
+
+	/*
+	 * Determine the requested state if any. Defaults to UP since a peer
+	 * that sends a node update is announcing itself as reachable.
+	 */
+	enum node_state new_state = NODE_UP;
+	json_object *jstatus = json_object_object_get(json, "status");
+	if (jstatus != NULL) {
+		const char *status = json_object_get_string(jstatus);
+		if (status != NULL) {
+			if (!strcasecmp(status, "UP"))
+				new_state = NODE_UP;
+			else if (!strcasecmp(status, "DOWN"))
+				new_state = NODE_DOWN;
+			else if (!strcasecmp(status, "INIT"))
+				new_state = NODE_INIT;
+			else {
+				logfmt(&caster->flog, LOG_WARNING,
+					"node_update_execute: unknown status '%s' for %s", status, hostname);
+				return 400;
+			}
+		}
+	}
+
+	/* Take a reference for the node table (nodes_add_node takes ownership) */
+	json_object *jendpoints_copy = json_object_get(jendpoints);
+	nodes_add_node(caster->nodes, hostname, jendpoints_copy);
+
+	/* Update the node state if it already exists in the table */
+	node_set_state(caster->nodes, hostname, new_state);
+
+	logfmt(&caster->flog, LOG_INFO, "node_update_execute: updated node %s state=%s",
+		hostname, node_status[new_state]);
 	return 200;
 }
 

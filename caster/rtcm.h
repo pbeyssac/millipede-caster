@@ -55,6 +55,7 @@ struct hash_table *rtcm_filter_dict_parse(struct rtcm_filter *this, const char *
 void rtcm_filter_free(struct rtcm_filter *this);
 struct rtcm_filter *rtcm_filter_new(const char *pass, const char *convert, enum rtcm_conversion conversion);
 int rtcm_filter_check_mountpoint(struct caster_dynconfig *dyn, const char *mountpoint);
+struct rtcm_filter *rtcm_filter_get(struct caster_dynconfig *dyn, const char *mountpoint);
 int rtcm_filter_pass(struct rtcm_filter *this, struct packet *packet);
 struct packet *rtcm_filter_convert(struct rtcm_filter *this, struct ntrip_state *st, struct packet *p);
 struct rtcm_info *rtcm_info_new();

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Millipede Caster — Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="" />
+</head>
+<body>
+  <!-- Login overlay -->
+  <div id="login-overlay" class="overlay">
+    <div class="login-card">
+      <h1>Millipede Caster</h1>
+      <p class="subtitle">NTRIP caster administration</p>
+      <form id="login-form">
+        <label>
+          <span>Username</span>
+          <input type="text" id="login-user" autocomplete="username" required>
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" id="login-pass" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Sign in</button>
+        <p id="login-error" class="error" hidden></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" hidden>
+    <header>
+      <div class="brand">
+        <span class="logo">⌬</span>
+        <h1>Millipede Caster</h1>
+      </div>
+      <nav>
+        <button data-view="dashboard" class="active">Dashboard</button>
+        <button data-view="sources">Sources</button>
+        <button data-view="clients">Clients</button>
+        <button data-view="map">Map</button>
+        <button data-view="rtcm">RTCM</button>
+        <button data-view="logs">Logs</button>
+      </nav>
+      <div class="user-box">
+        <span id="user-display"></span>
+        <button id="logout" title="Sign out">⎋</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Dashboard -->
+      <section id="view-dashboard" class="view active">
+        <div class="cards">
+          <div class="card">
+            <div class="card-label">Sources</div>
+            <div class="card-value" id="kpi-sources">—</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Clients</div>
+            <div class="card-value" id="kpi-clients">—</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Total bytes in</div>
+            <div class="card-value" id="kpi-bytes-in">—</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Total bytes out</div>
+            <div class="card-value" id="kpi-bytes-out">—</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Uptime</div>
+            <div class="card-value" id="kpi-uptime">—</div>
+          </div>
+        </div>
+
+        <h2>Active sources</h2>
+        <div id="dashboard-sources" class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Mountpoint</th><th>From</th><th>Bytes in</th><th>Started</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Sources -->
+      <section id="view-sources" class="view">
+        <h2>NTRIP sources</h2>
+        <div class="toolbar">
+          <button id="reload-sources">Reload</button>
+          <span class="hint" id="sources-hint"></span>
+        </div>
+        <div id="sources-table" class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Mountpoint</th><th>From</th><th>Bytes in</th>
+                <th>Sent bytes</th><th>User-Agent</th><th>Started</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Clients -->
+      <section id="view-clients" class="view">
+        <h2>NTRIP clients</h2>
+        <div class="toolbar">
+          <button id="reload-clients">Reload</button>
+          <span class="hint" id="clients-hint"></span>
+        </div>
+        <div id="clients-table" class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>From</th><th>Mountpoint</th><th>Bytes out</th>
+                <th>User-Agent</th><th>Started</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Map -->
+      <section id="view-map" class="view">
+        <h2>Base stations map</h2>
+        <div class="toolbar">
+          <button id="map-refresh">Refresh</button>
+          <label class="checkbox">
+            <input type="checkbox" id="map-autofit" checked> Auto-fit
+          </label>
+          <span class="hint" id="map-hint"></span>
+        </div>
+        <div id="leaflet-map" class="leaflet-map"></div>
+        <p class="hint">
+          Positions are fetched from <code>/api/v1/sourcetables</code>. Click a
+          marker to see the mountpoint details. Live (currently connected)
+          sources are shown in green, declared-but-offline bases in grey.
+        </p>
+      </section>
+
+      <!-- RTCM -->
+      <section id="view-rtcm" class="view">
+        <h2>RTCM frequency tracker</h2>
+        <div class="toolbar">
+          <input type="text" id="rtcm-filter" placeholder="Filter by mountpoint…" class="filter-input">
+          <label class="checkbox">
+            <input type="checkbox" id="rtcm-anomalies-only"> Only anomalies
+          </label>
+          <span class="hint" id="rtcm-hint"></span>
+        </div>
+        <div id="rtcm-table" class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mountpoint</th><th>Type</th><th>Rate (Hz)</th>
+                <th>Total</th><th>First seen</th><th>Last seen</th><th>State</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="hint">
+          The "expected" rate is 1 Hz for 107x/108x/109x/112x MSM messages,
+          0.1 Hz for 1005/1006 station position, 1 Hz for 1230 GLONASS biases.
+          Rates shown are computed over a sliding 60-second window.
+        </p>
+      </section>
+
+      <!-- Logs -->
+      <section id="view-logs" class="view">
+        <h2>Live logs <span id="logs-status" class="status">connecting…</span></h2>
+        <div class="toolbar">
+          <label class="checkbox">
+            <input type="checkbox" id="logs-autoscroll" checked> Auto-scroll
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="logs-pause"> Pause
+          </label>
+          <button id="logs-clear">Clear</button>
+          <input type="text" id="logs-filter" placeholder="Filter…" class="filter-input">
+          <span class="hint" id="logs-hint"></span>
+        </div>
+        <pre id="logs-output"></pre>
+      </section>
+    </main>
+
+    <footer>
+      <span>Millipede NTRIP Caster — <a href="https://github.com/nicolasroduit/millipede-caster" target="_blank">documentation</a></span>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>

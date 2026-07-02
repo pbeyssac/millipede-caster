@@ -1,7 +1,17 @@
 #ifndef __CONF_H__
 #define __CONF_H__
 
-#define	DEBUG		1
+/*
+ * DEBUG defaults to 0 for production builds.
+ * Define DEBUG=1 (e.g. with -DDEBUG=1 in CFLAGS or a Debug CMake build)
+ * for development builds which enable memory allocation tracking and
+ * junk-filling. Keeping DEBUG at 0 in production avoids the runtime
+ * overhead and prevents leaking sensitive data (e.g. passwords) through
+ * DEBUG/EDEBUG logs.
+ */
+#ifndef DEBUG
+#define	DEBUG		0
+#endif
 #define	DEBUG_EVENT	0
 
 #include <pthread.h>

@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install cmake libcyaml-dev libjson-c-dev libevent-dev lcov -y
+          sudo apt-get install cmake libcyaml-dev libjson-c-dev libevent-dev libyaml-dev lcov -y
 
       - name: Create makefile
         run: |

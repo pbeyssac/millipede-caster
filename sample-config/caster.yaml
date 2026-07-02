@@ -10,19 +10,19 @@
 # Default port: 2101
 #
 listen:
-  - port:		2101
-    ip:			127.0.0.1
-  - port:		2101
-    ip:			::1
+  - port:               2101
+    ip:                 127.0.0.1
+  - port:               2101
+    ip:                 ::1
 
 #
 # Example configuration for a TLS IPv6 port
 #
-# - port:			2443
-#   ip:				::0
-#   tls:			true
-#   tls_full_certificate_chain:	fullchain.pem
-#   tls_private_key:		privkey.pem
+# - port:                       2443
+#   ip:                         ::0
+#   tls:                        true
+#   tls_full_certificate_chain: fullchain.pem
+#   tls_private_key:            privkey.pem
 
 #
 # Optional caster from which we can get and announce sources.
@@ -32,107 +32,107 @@ listen:
 # to enable access to mountpoints on the remote caster.
 #
 #proxy:
-#  - table_refresh_delay:	600
-#    host:			maincaster.fr
-#    port:			2101
-#    filter_file:		sourcetable-filter.json
+#  - table_refresh_delay:       600
+#    host:                      maincaster.fr
+#    port:                      2101
+#    filter_file:               sourcetable-filter.json
 
 #
 # Optional syslog configuration
 #
 #syslog:
-#  - facility:	local0
-#    log_level:	DEBUG
+#  - facility:  local0
+#    log_level: DEBUG
 
 #
 # Optional Graylog log server configuration.
 #
 #graylog:
-#  - host:			graylogserver.example.com
-#    port:			7777
-#    uri:			'/gelf'
-#    tls:			true
-#    log_level:			INFO
+#  - host:                      graylogserver.example.com
+#    port:                      7777
+#    uri:                       '/gelf'
+#    tls:                       true
+#    log_level:                 INFO
 #    #
 #    # How many seconds to wait to reconnect when the connection is lost
-#    retry_delay:		30
+#    retry_delay:               30
 #    #
 #    # Maximum queue size in memory. Data dumped to the drain file when
 #    # the queue size is exceeded.
-#    queue_max_size:		1000000
+#    queue_max_size:            1000000
 #    #
 #    # Drain file name template.
-#    drainfile:			'/tmp/%Y%m%d-%H%M%S.log'
+#    drainfile:                 '/tmp/%Y%m%d-%H%M%S.log'
 #    #
 #    # Maximal size for a bulk POST -- 0 to disable bulk mode.
-#    bulk_max_size:		62000
+#    bulk_max_size:             62000
 #    #
 #    # Value for the Authorization: header
-#    authorization:		'7c9a4e662915fb065fa991660e27f99e212f59be57a293aa2a23de6c8bd44fbc'
+#    authorization:             '7c9a4e662915fb065fa991660e27f99e212f59be57a293aa2a23de6c8bd44fbc'
 #    #
 #
 
 #
 # Credentials to connect to remote hosts, especially for the proxy mode.
 #
-host_auth_file:		/usr/local/etc/millipede/host.auth
+host_auth_file:         /usr/local/etc/millipede/host.auth
 
 #
 # Blocklist file path (optional)
 #
-blocklist_file:	blocklist
+blocklist_file: blocklist
 
 #
 # Source credentials for local sources and their STR lines
 #
-source_auth_file:	/usr/local/etc/millipede/source.auth
-sourcetable_file:	/usr/local/etc/millipede/sourcetable.dat
+source_auth_file:       /usr/local/etc/millipede/source.auth
+sourcetable_file:       /usr/local/etc/millipede/sourcetable.dat
 
 #
 # Log files
 #
-access_log:		/var/log/millipede/access.log
-log:			/var/log/millipede/caster.log
+access_log:             /var/log/millipede/access.log
+log:                    /var/log/millipede/caster.log
 
 #
 # Log levels, syslog-like:
-#	EMERG
-#	ALERT
-#	CRIT
-#	ERR
-#	WARNING
-#	NOTICE
-#	INFO
-#	DEBUG	=> WARNING: leaks passwords to the logs
+#       EMERG
+#       ALERT
+#       CRIT
+#       ERR
+#       WARNING
+#       NOTICE
+#       INFO
+#       DEBUG   => WARNING: leaks passwords to the logs
 # Extension over syslog levels:
-#	EDEBUG	=> WARNING: leaks passwords to the logs
+#       EDEBUG  => WARNING: leaks passwords to the logs
 #
-log_level:		INFO
+log_level:              INFO
 
 #
 # Distance hysteresis (in meters) to avoid spurious base change on the virtual base.
 #
-hysteresis_m:		500.0
+hysteresis_m:           500.0
 
 #
 # Sample RTCM filter configuration
 #
 # Currently limited to 1 filter with 1 conversion.
 #
-# apply		mountpoint to apply to
-# pass		list of RTCM types to pass through
+# apply         mountpoint to apply to
+# pass          list of RTCM types to pass through
 # convert section
-#	types		list of RTCM types to convert
-#	conversion	type of conversion, msm7_3 or msm7_4
-#		msm7_4 = convert MSM7 packets to MSM4
-#		msm7_3 = convert MSM7 packets to MSM3
+#       types           list of RTCM types to convert
+#       conversion      type of conversion, msm7_3 or msm7_4
+#               msm7_4 = convert MSM7 packets to MSM4
+#               msm7_3 = convert MSM7 packets to MSM3
 #
 # rtcm_filter:
-#    - apply:		NEAR4
-#      pass:		1005,1006,1008,1019,1020,1032,1033,1042,1046,1074,1084,1094,1124,1230
+#    - apply:           NEAR4
+#      pass:            1005,1006,1008,1019,1020,1032,1033,1042,1046,1074,1084,1094,1124,1230
 #      convert:
-#        - types:	1077,1087,1097,1107,1117,1127
-#          conversion:	msm7_4
+#        - types:       1077,1087,1097,1107,1117,1127
+#          conversion:  msm7_4
 #
 
 # default size set for sending buffers (SO_SNDBUF), 112 KB
@@ -142,4 +142,18 @@ backlog_socket: 114688
 backlog_evbuffer: 16384
 
 # admin user for the /adm section
-admin_user:	admin
+admin_user:     admin
+
+# Optional bearer token for the /adm API. When set, clients may authenticate
+# with "Authorization: Bearer <token>" or with "?token=<token>" in the URL
+# (the latter is required for EventSource/SSE since browsers can't set custom
+# headers there). Generate one with: openssl rand -hex 32
+# admin_token:   <your-random-token-here>
+
+#
+# Web admin UI — uncomment to serve the admin dashboard at /admin/
+# After running `install.sh`, the web files are at /usr/local/share/millipede/web/
+#
+#webroots:
+#  - uri:           /admin/
+#    path:          /usr/local/share/millipede/web/

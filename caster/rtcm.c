@@ -9,6 +9,8 @@
 #include "bitfield.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
+#include "rtcm_freq.h"
+#include "rtcm_ringbuffer.h"
 
 /*
  * RTCM handling module.
@@ -720,6 +722,18 @@ int rtcm_filter_check_mountpoint(struct caster_dynconfig *dyn, const char *mount
 }
 
 /*
+ * Return the rtcm_filter that applies to a given mountpoint, or NULL if none.
+ *
+ * The returned pointer is owned by the dynconfig and must not be freed by
+ * the caller. The pointer is valid as long as the dynconfig is referenced.
+ */
+struct rtcm_filter *rtcm_filter_get(struct caster_dynconfig *dyn, const char *mountpoint) {
+	if (dyn->rtcm_filter_dict == NULL)
+		return NULL;
+	return (struct rtcm_filter *)hash_table_get(dyn->rtcm_filter_dict, mountpoint);
+}
+
+/*
  * Return the RTCM cache as a JSON object.
  */
 json_object *rtcm_info_json(struct rtcm_info *this) {
@@ -797,7 +811,7 @@ static void rtcm_handler(struct ntrip_state *st, struct packet *p, void *arg1) {
 /*
  * Handle receipt and retransmission of all complete RTCM packets.
  * Return 0 if more data is needed,
- *	1 if at least one packet has been processed.
+ *      1 if at least one packet has been processed.
  */
 int rtcm_packet_handle(struct ntrip_state *st) {
 	unsigned short len_rtcm;
@@ -857,6 +871,21 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			ntrip_log(st, LOG_DEBUG, "RTCM source %s size %d type %d", st->mountpoint, len_rtcm, type);
 			//rtcm_packet_dump(st, rtcmp);
 			rtcm_handler(st, rtcmp, st->rtcm_info);
+			/* Update the per-mountpoint RTCM frequency tracker.
+			 * Only track real source sessions (those that own a
+			 * livesource and a mountpoint); fetched / proxied
+			 * sources are also tracked since they go through the
+			 * same rtcm_packet_handle() path. */
+			if (st->caster->rtcm_freq && st->mountpoint)
+				rtcm_freq_record(st->caster->rtcm_freq,
+						 st->mountpoint, type, NULL);
+			/* Record the raw RTCM packet in the per-mountpoint
+			 * ring buffer for future RINEX on-the-fly generation.
+			 * Takes its own reference on rtcmp; the caller's
+			 * packet_decref() below still releases the original. */
+			if (st->caster->rtcm_ringbuffer && st->mountpoint)
+				rtcm_ringbuffer_record(st->caster->rtcm_ringbuffer,
+						       st->mountpoint, rtcmp, NULL);
 		} else
 			ntrip_log(st, LOG_INFO, "RTCM: bad checksum!");
 

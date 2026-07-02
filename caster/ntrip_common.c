@@ -18,6 +18,7 @@
 #include "livesource.h"
 #include "ntrip_common.h"
 #include "rtcm.h"
+#include "ws_log.h"
 
 static void ntrip_deferred_free(struct ntrip_state *this, char *orig);
 
@@ -119,6 +120,8 @@ struct ntrip_state *ntrip_new(struct caster_state *caster, struct bufferevent *b
 	this->node = NULL;
 	this->syncer_id = NULL;
 	this->nograylog = 0;
+	this->sec_websocket_key = NULL;
+	atomic_store(&this->log_stream_sub, NULL);
 
 	this->tmpconfig = NULL;
 	if (new_config != NULL) {
@@ -344,6 +347,8 @@ static void _ntrip_common_free(struct ntrip_state *this) {
 	strfree(this->content_type);
 	strfree((char *)this->user_agent);
 	strfree(this->query_string);
+	strfree(this->sec_websocket_key);
+	this->sec_websocket_key = NULL;
 }
 
 /*
@@ -372,6 +377,16 @@ void ntrip_clear_request(struct ntrip_state *this) {
  */
 static void _ntrip_free(struct ntrip_state *this, char *orig, int unlink) {
 	ntrip_log(this, LOG_EDEBUG, "FREE %s", orig);
+
+	/* Clean up SSE log stream subscription if active. */
+	if (this->caster->log_stream) {
+		void *sub = atomic_exchange(&this->log_stream_sub, NULL);
+		if (sub)
+			log_stream_unsubscribe(this->caster->log_stream, sub);
+	}
+
+	/* Clean up WebSocket state if this connection had been upgraded. */
+	ws_log_state_cleanup(this);
 
 	strfree(this->mountpoint);
 	strfree(this->uri);

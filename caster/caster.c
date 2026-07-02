@@ -7,6 +7,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -133,9 +134,14 @@ dynconfig_free_rtcm_filters(struct caster_dynconfig *dyn) {
 		hash_table_free(dyn->rtcm_filter_dict);
 		dyn->rtcm_filter_dict = NULL;
 	}
-	if (dyn->rtcm_filter)
-		rtcm_filter_free(dyn->rtcm_filter);
+	if (dyn->rtcm_filter) {
+		for (int i = 0; i < dyn->rtcm_filter_count; i++)
+			if (dyn->rtcm_filter[i])
+				rtcm_filter_free(dyn->rtcm_filter[i]);
+		free(dyn->rtcm_filter);
+	}
 	dyn->rtcm_filter = NULL;
+	dyn->rtcm_filter_count = 0;
 }
 
 static void
@@ -313,13 +319,16 @@ caster_new(const char *config_file, int nbase) {
 		free(this);
 		return NULL;
 	}
-
 	this->dns_base = dns_base;
 	TAILQ_INIT(&this->ntrips.queue);
 	TAILQ_INIT(&this->ntrips.free_queue);
 	this->ntrips.n = 0;
 	this->ntrips.nfree = 0;
 	this->rtcm_cache = hash_table_new(509, (void(*)(void *))rtcm_info_free);
+	this->rtcm_freq = rtcm_freq_tracker_new();
+	this->rtcm_ringbuffer = rtcm_ringbuffer_tracker_new(
+		RTCM_RB_DEFAULT_RETENTION_MIN, RTCM_RB_DEFAULT_MAX_BYTES);
+	this->log_stream = log_stream_new();
 	this->hostname[sizeof(this->hostname)-1] = '\0';
 	TAILQ_INIT(&this->sourcetablestack.list);
 	return this;
@@ -451,6 +460,11 @@ void caster_free(struct caster_state *this) {
 
 	hash_table_free(this->ntrips.ipcount);
 	hash_table_free(this->rtcm_cache);
+	rtcm_freq_tracker_free(this->rtcm_freq);
+	rtcm_ringbuffer_tracker_free(this->rtcm_ringbuffer);
+	if (this->log_stream_timer_event)
+		event_free(this->log_stream_timer_event);
+	log_stream_free(this->log_stream);
 
 	evdns_base_free(this->dns_base, 1);
 
@@ -772,14 +786,24 @@ static int
 caster_reload_rtcm_filters(struct caster_state *caster, struct config *new_config, struct caster_dynconfig *newdyn) {
 	if (new_config->rtcm_filter_count == 0)
 		return 0;
-	if (new_config->rtcm_filter_count != 1)
-		return -1;
 
 	if (newdyn->rtcm_filter_dict)
 		hash_table_free(newdyn->rtcm_filter_dict);
-	newdyn->rtcm_filter_dict = hash_table_new(5, NULL);
+	/*
+	 * Use hash_table_free_null as the free callback so the hash table
+	 * does NOT free the filter pointers stored as values (they are owned
+	 * by the rtcm_filter array below and freed separately).
+	 */
+	newdyn->rtcm_filter_dict = hash_table_new(5, hash_table_free_null);
 	if (newdyn->rtcm_filter_dict == NULL)
 		return -1;
+
+	/* Allocate the array of filter pointers */
+	struct rtcm_filter **filters = (struct rtcm_filter **)calloc(new_config->rtcm_filter_count, sizeof(struct rtcm_filter *));
+	if (filters == NULL) {
+		logfmt(&caster->flog, LOG_ERR, "Can't allocate rtcm_filter array from %s", caster->config_file);
+		return -1;
+	}
 
 	for (int i = 0; i < new_config->rtcm_filter_count; i++) {
 		struct rtcm_filter *rtcm_filter;
@@ -790,20 +814,68 @@ caster_reload_rtcm_filters(struct caster_state *caster, struct config *new_confi
 		);
 		if (rtcm_filter == NULL) {
 			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
+			for (int j = 0; j < i; j++)
+				if (filters[j])
+					rtcm_filter_free(filters[j]);
+			free(filters);
 			return -1;
 		}
-		struct hash_table *h = rtcm_filter_dict_parse(rtcm_filter, new_config->rtcm_filter[i].apply);
-		if (h == NULL) {
-			logfmt(&caster->flog, LOG_ERR, "Can't parse rtcm_filter configuration from %s", caster->config_file);
-			rtcm_filter_free(rtcm_filter);
+		filters[i] = rtcm_filter;
+
+		/*
+		 * Parse the comma-separated list of mountpoints this filter
+		 * applies to, and store the filter pointer as the value for
+		 * each mountpoint in the dictionary. This allows multiple
+		 * rtcm_filter blocks in the configuration, each with its own
+		 * set of mountpoints, pass types and conversion rules.
+		 */
+		const char *apply = new_config->rtcm_filter[i].apply;
+		if (apply == NULL || *apply == '\0') {
+			logfmt(&caster->flog, LOG_ERR, "Empty rtcm_filter apply list from %s", caster->config_file);
+			for (int j = 0; j <= i; j++)
+				if (filters[j])
+					rtcm_filter_free(filters[j]);
+			free(filters);
 			return -1;
 		}
-		hash_table_update(newdyn->rtcm_filter_dict, h);
-		hash_table_free(h);
-		if (newdyn->rtcm_filter)
-			rtcm_filter_free(newdyn->rtcm_filter);
-		newdyn->rtcm_filter = rtcm_filter;
+		const char *p = apply;
+		do {
+			while (*p && isspace((unsigned char)*p)) p++;
+			const char *key = p;
+			while (*p && *p != ',') p++;
+			if (p == key)
+				break;
+			int len = p - key;
+			if (*p) p++;
+			while (len && isspace((unsigned char)key[len-1])) len--;
+			if (!len)
+				continue;
+			char *dupkey = (char *)strmalloc(len+1);
+			if (dupkey == NULL) {
+				for (int j = 0; j <= i; j++)
+					if (filters[j])
+						rtcm_filter_free(filters[j]);
+				free(filters);
+				return -1;
+			}
+			memcpy(dupkey, key, len);
+			dupkey[len] = '\0';
+			int e = hash_table_add(newdyn->rtcm_filter_dict, dupkey, rtcm_filter);
+			strfree(dupkey);
+			if (e == -2) {
+				/* Out of memory */
+				for (int j = 0; j <= i; j++)
+					if (filters[j])
+						rtcm_filter_free(filters[j]);
+				free(filters);
+				return -1;
+			}
+			/* Duplicate key (e == -1): the first filter wins, silently ignore */
+		} while (*p);
 	}
+
+	newdyn->rtcm_filter = filters;
+	newdyn->rtcm_filter_count = new_config->rtcm_filter_count;
 	return 0;
 }
 
@@ -1079,6 +1151,22 @@ int caster_main(char *config_file) {
 	if (caster_start(caster, caster->config ,1)) {
 		caster_free(caster);
 		return 1;
+	}
+
+	/* Start the SSE log stream periodic timer (1 Hz) on the main event base. */
+	if (caster->log_stream) {
+		struct timeval one_sec = { .tv_sec = 1, .tv_usec = 0 };
+		caster->log_stream_timer_event = event_new(caster->base[0], -1,
+			EV_PERSIST, log_stream_timer, caster->log_stream);
+		if (caster->log_stream_timer_event == NULL
+		    || event_add(caster->log_stream_timer_event, &one_sec) < 0) {
+			logfmt(&caster->flog, LOG_WARNING,
+				"Could not start log stream timer (SSE logs disabled)");
+			if (caster->log_stream_timer_event) {
+				event_free(caster->log_stream_timer_event);
+				caster->log_stream_timer_event = NULL;
+			}
+		}
 	}
 
 	event_base_dispatch(caster->base[0]);

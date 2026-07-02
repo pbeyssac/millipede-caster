@@ -1,12 +1,12 @@
 FROM gcc:14-bookworm AS builder
 
-RUN apt update && apt install cmake libcyaml-dev libjson-c-dev -y
+RUN apt update && apt install cmake libcyaml-dev libjson-c-dev libevent-dev libyaml-dev libssl-dev libzstd-dev -y
 
 COPY . /app
 WORKDIR /app
 
 RUN mkdir -p log && touch log/caster.log
-RUN cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release
+RUN cmake -S . -B $(pwd)/build -DCMAKE_BUILD_TYPE=Release -DSTATIC_BUILD=ON
 RUN cmake --build $(pwd)/build
 
 

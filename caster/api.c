@@ -7,7 +7,10 @@
 #include "livesource.h"
 #include "nodes.h"
 #include "ntrip_common.h"
+#include "rinex.h"
 #include "rtcm.h"
+#include "rtcm_freq.h"
+#include "rtcm_ringbuffer.h"
 #include "sourcetable.h"
 
 /*
@@ -165,7 +168,7 @@ struct mime_content *api_drop_json(struct caster_state *caster, struct request *
 	char result[40];
 	int r = 0;
 	long long id = -1;
-	char *idval = (char *)hash_table_get(req->hash, "id");
+	char *idval = req->hash ? (char *)hash_table_get(req->hash, "id") : NULL;
 
 	if (idval && sscanf(idval, "%lld", &id) == 1)
 		r = ntrip_drop_by_id(caster, id);
@@ -183,9 +186,184 @@ struct mime_content *api_sync_json(struct caster_state *caster, struct request *
 		req->status = 400;
 	} else if (!strcmp(type, "sourcetable")) {
 		req->status = sourcetable_update_execute(caster, req->json);
+	} else if (!strcmp(type, "node")) {
+		req->status = node_update_execute(caster, req->json);
 	} else
 		req->status = livesource_update_execute(caster, caster->livesources, req);
 	char *s = mystrdup("");
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	return m;
+}
+
+/*
+ * Return the RTCM frequency tracker as a JSON object.
+ *
+ * Optional query string parameter:
+ *   mountpoint=<name>   restrict the response to a single mountpoint
+ */
+struct mime_content *api_rtcm_freq_json(struct caster_state *caster, struct request *req) {
+	json_object *j;
+	char *mountpoint = req->hash ? (char *)hash_table_get(req->hash, "mountpoint") : NULL;
+	if (mountpoint)
+		j = rtcm_freq_mountpoint_json(caster->rtcm_freq, mountpoint);
+	else
+		j = rtcm_freq_tracker_json(caster->rtcm_freq);
+	char *s = mystrdup(j ? json_object_to_json_string(j) : "{}");
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	if (j)
+		json_object_put(j);
+	return m;
+}
+
+/*
+ * Return the RTCM ring buffer stats as a JSON object.
+ *
+ * Optional query string parameter:
+ *   mountpoint=<name>   restrict the response to a single mountpoint
+ *
+ * Returns per-mountpoint stats: current packet count, byte usage,
+ * capacity, first/last seen timestamps, and cumulative eviction count.
+ * The actual RTCM bytes are NOT returned by this endpoint — a future
+ *   GET /api/v1/rinex?mountpoint=...&from=...&to=...
+ * endpoint will use rtcm_ringbuffer_extract_range() to emit RINEX.
+ */
+struct mime_content *api_rtcm_ringbuffer_json(struct caster_state *caster, struct request *req) {
+	json_object *j;
+	char *mountpoint = req->hash ? (char *)hash_table_get(req->hash, "mountpoint") : NULL;
+	if (mountpoint)
+		j = rtcm_ringbuffer_mountpoint_json(caster->rtcm_ringbuffer, mountpoint);
+	else
+		j = rtcm_ringbuffer_tracker_json(caster->rtcm_ringbuffer);
+	char *s = mystrdup(j ? json_object_to_json_string(j) : "{}");
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	if (j)
+		json_object_put(j);
+	return m;
+}
+
+/*
+ * Generate a RINEX 3.04 observation file on the fly from the caster's
+ * recent RTCM ring buffer.
+ *
+ * Query parameters:
+ *   mountpoint=<name>   (required) source mountpoint
+ *   from=<iso8601>      (optional) start time, default = ring buffer oldest
+ *   to=<iso8601>        (optional) end time, default = ring buffer newest
+ *
+ * Returns:
+ *   200 OK with Content-Type: application/octet-stream and
+ *     Content-Disposition: attachment; filename="<mountpoint>.obs"
+ *     Body is a complete RINEX 3.04 file.
+ *   400 Bad Request if mountpoint is missing
+ *   404 Not Found if the mountpoint is unknown or has no RTCM data
+ *
+ * MVP limitations:
+ *   - The whole RINEX file is built in memory (struct mbuf) before
+ *     being returned. For windows > 1 hour at 1 Hz this can use ~10 MB
+ *     of RAM per request. A streamed chunked version is a follow-up.
+ *   - Only GPS (1071) and Galileo (1094) MSM7 messages are decoded.
+ *   - The from/to ISO8601 parser only accepts "YYYY-MM-DDTHH:MM:SSZ".
+ */
+static int parse_iso8601(const char *s, struct timeval *out) {
+	if (s == NULL || out == NULL)
+		return -1;
+	int y, mo, d, h, mi, se;
+	if (sscanf(s, "%d-%d-%dT%d:%d:%dZ", &y, &mo, &d, &h, &mi, &se) != 6)
+		return -1;
+	struct tm tm;
+	memset(&tm, 0, sizeof tm);
+	tm.tm_year = y - 1900;
+	tm.tm_mon = mo - 1;
+	tm.tm_mday = d;
+	tm.tm_hour = h;
+	tm.tm_min = mi;
+	tm.tm_sec = se;
+	time_t t = timegm(&tm);
+	if (t == (time_t)-1)
+		return -1;
+	out->tv_sec = t;
+	out->tv_usec = 0;
+	return 0;
+}
+
+struct mime_content *api_rinex(struct caster_state *caster, struct request *req) {
+	char *mountpoint = req->hash ? (char *)hash_table_get(req->hash, "mountpoint") : NULL;
+	if (mountpoint == NULL) {
+		char *s = mystrdup("{\"error\":\"mountpoint parameter required\"}\n");
+		req->status = 400;
+		return mime_new(s, -1, "application/json", 1);
+	}
+
+	char *from_str = req->hash ? (char *)hash_table_get(req->hash, "from") : NULL;
+	char *to_str = req->hash ? (char *)hash_table_get(req->hash, "to") : NULL;
+	struct timeval from_tv, to_tv;
+	struct timeval *from_p = NULL, *to_p = NULL;
+	if (from_str) {
+		if (parse_iso8601(from_str, &from_tv) == 0)
+			from_p = &from_tv;
+	}
+	if (to_str) {
+		if (parse_iso8601(to_str, &to_tv) == 0)
+			to_p = &to_tv;
+	}
+
+	/* Extract packets from the ring buffer. */
+	size_t npackets = 0;
+	struct rtcm_rb_entry *entries = rtcm_ringbuffer_extract_range(
+		caster->rtcm_ringbuffer, mountpoint, from_p, to_p, &npackets);
+	if (entries == NULL || npackets == 0) {
+		char *s = mystrdup("{\"error\":\"no RTCM data for mountpoint in requested window\"}\n");
+		req->status = 404;
+		return mime_new(s, -1, "application/json", 1);
+	}
+
+	/* Build an array of packet pointers for rinex_build_from_packets(). */
+	struct packet **packets = (struct packet **)calloc(npackets, sizeof(*packets));
+	if (packets == NULL) {
+		for (size_t i = 0; i < npackets; i++)
+			if (entries[i].packet)
+				packet_decref(entries[i].packet);
+		free(entries);
+		char *s = mystrdup("{\"error\":\"out of memory\"}\n");
+		req->status = 503;
+		return mime_new(s, -1, "application/json", 1);
+	}
+	for (size_t i = 0; i < npackets; i++)
+		packets[i] = entries[i].packet;
+
+	/* Build the RINEX file. */
+	struct mbuf out;
+	if (mbuf_init(&out, 8192) < 0) {
+		free(packets);
+		for (size_t i = 0; i < npackets; i++)
+			if (entries[i].packet)
+				packet_decref(entries[i].packet);
+		free(entries);
+		char *s = mystrdup("{\"error\":\"out of memory\"}\n");
+		req->status = 503;
+		return mime_new(s, -1, "application/json", 1);
+	}
+
+	int rc = rinex_build_from_packets(&out, packets, npackets, mountpoint);
+
+	/* Release our references on the packets (ring buffer still holds its own). */
+	for (size_t i = 0; i < npackets; i++)
+		if (entries[i].packet)
+			packet_decref(entries[i].packet);
+	free(entries);
+	free(packets);
+
+	if (rc != 0) {
+		mbuf_free(&out);
+		char *s = mystrdup("{\"error\":\"RINEX generation failed\"}\n");
+		req->status = 500;
+		return mime_new(s, -1, "application/json", 1);
+	}
+
+	/* Transfer ownership of out.data to the mime_content.
+	 * mime_new with use_strfree=1 will free() the string when the
+	 * mime_content is destroyed. */
+	struct mime_content *m = mime_new(out.data, (int)out.len,
+		"application/octet-stream", 1);
 	return m;
 }
