@@ -9,6 +9,7 @@
 #include "ntrip_common.h"
 #include "rtcm.h"
 #include "rtcm_freq.h"
+#include "rtcm_ringbuffer.h"
 #include "sourcetable.h"
 
 /*
@@ -197,7 +198,7 @@ struct mime_content *api_sync_json(struct caster_state *caster, struct request *
  * Return the RTCM frequency tracker as a JSON object.
  *
  * Optional query string parameter:
- *   mountpoint=<name>	 restrict the response to a single mountpoint
+ *   mountpoint=<name>   restrict the response to a single mountpoint
  */
 struct mime_content *api_rtcm_freq_json(struct caster_state *caster, struct request *req) {
 	json_object *j;
@@ -206,6 +207,32 @@ struct mime_content *api_rtcm_freq_json(struct caster_state *caster, struct requ
 		j = rtcm_freq_mountpoint_json(caster->rtcm_freq, mountpoint);
 	else
 		j = rtcm_freq_tracker_json(caster->rtcm_freq);
+	char *s = mystrdup(j ? json_object_to_json_string(j) : "{}");
+	struct mime_content *m = mime_new(s, -1, "application/json", 1);
+	if (j)
+		json_object_put(j);
+	return m;
+}
+
+/*
+ * Return the RTCM ring buffer stats as a JSON object.
+ *
+ * Optional query string parameter:
+ *   mountpoint=<name>   restrict the response to a single mountpoint
+ *
+ * Returns per-mountpoint stats: current packet count, byte usage,
+ * capacity, first/last seen timestamps, and cumulative eviction count.
+ * The actual RTCM bytes are NOT returned by this endpoint — a future
+ *   GET /api/v1/rinex?mountpoint=...&from=...&to=...
+ * endpoint will use rtcm_ringbuffer_extract_range() to emit RINEX.
+ */
+struct mime_content *api_rtcm_ringbuffer_json(struct caster_state *caster, struct request *req) {
+	json_object *j;
+	char *mountpoint = req->hash ? (char *)hash_table_get(req->hash, "mountpoint") : NULL;
+	if (mountpoint)
+		j = rtcm_ringbuffer_mountpoint_json(caster->rtcm_ringbuffer, mountpoint);
+	else
+		j = rtcm_ringbuffer_tracker_json(caster->rtcm_ringbuffer);
 	char *s = mystrdup(j ? json_object_to_json_string(j) : "{}");
 	struct mime_content *m = mime_new(s, -1, "application/json", 1);
 	if (j)

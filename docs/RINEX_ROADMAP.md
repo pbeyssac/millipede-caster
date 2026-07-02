@@ -1,5 +1,15 @@
 # RINEX / PPK on-the-fly generation — Roadmap
 
+## Status
+
+| Phase                          | Status      | Notes                                              |
+|--------------------------------|-------------|----------------------------------------------------|
+| `rtcm_ringbuffer` module       | ✅ MVP done | `caster/rtcm_ringbuffer.{c,h}` + `/api/v1/rtcm/ringbuffer` |
+| RINEX 3.04 writer (G+E MSM7)   | ⏳ TODO     | ~2 days                                            |
+| HTTP endpoint + streaming      | ⏳ TODO     | `/api/v1/rinex?mount=...&from=...&to=...`          |
+| Config + docs                  | ⏳ partial  | compile-time defaults for now; YAML keys later     |
+| Integration tests (RTCM→RINEX) | ⏳ TODO     |                                                    |
+
 ## Goal
 
 Provide an HTTP endpoint that generates RINEX observation files on demand
@@ -62,17 +72,57 @@ discards packet contents. We need a new ring buffer that keeps the raw
 RTCM packets themselves for the last N minutes (default: 30 min, capped
 at e.g. 64 MiB per mountpoint to bound memory).
 
+**✅ Implemented in `caster/rtcm_ringbuffer.{c,h}` (MVP):**
+
 ```c
-struct rtcm_ringbuffer {
-    struct packet *packets[RINGBUFFER_CAPACITY];
-    struct timeval timestamps[RINGBUFFER_CAPACITY];
-    int head, tail;
+struct rtcm_rb_mountpoint {
     P_MUTEX_T lock;
+    char *mountpoint;
+    struct rtcm_rb_slot *slots;   /* dynamic circular buffer */
+    size_t capacity, head, count;
+    size_t total_bytes;
+    struct timeval first_seen, last_seen;
+    unsigned long long total_packets, evicted_packets;
 };
 ```
 
-Each `livesource` gets one `rtcm_ringbuffer`. The packet destructor
-reuses `packet_free()` from `caster/packet.c`.
+The implementation uses a **dynamic circular buffer** (growable array
+with head/count indices) rather than the fixed-size array sketched
+above, so sparse sources don't waste memory. Capacity starts at
+`RTCM_RB_INITIAL_SLOTS` (64) and doubles on demand up to
+`RTCM_RB_MAX_SLOTS` (65536).
+
+Eviction policy (checked on every insert):
+1. **Time-based**: drop slots whose `ts.tv_sec < now - retention_seconds`.
+2. **Memory-based**: drop oldest slots while
+   `total_bytes + packet->datalen > max_bytes_per_mountpoint`.
+3. **Capacity fallback**: if the ring is full and at `RTCM_RB_MAX_SLOTS`,
+   drop the oldest entry to make room.
+
+Each stored packet is `packet_incref()`'d on insert and
+`packet_decref()`'d on eviction, so the ring buffer coexists cleanly
+with the existing packet lifecycle.
+
+**Stats endpoint**: `GET /api/v1/rtcm/ringbuffer[?mountpoint=X]` returns
+per-mountpoint JSON: `packets`, `bytes`, `capacity_slots`, `first_seen`,
+`last_seen`, `total_packets`, `evicted_packets`. Tested in
+`tests/test-rtcm-ringbuffer.py` (5/5 PASS, 307 packets stored byte-exact).
+
+**Range extraction API** (ready, not yet exposed via HTTP):
+`rtcm_ringbuffer_extract_range(tracker, mountpoint, from, to, &count)`
+returns a heap-allocated array of `(packet*, timeval)` entries with
+each packet incref'd. This will be called by the future
+`/api/v1/rinex` endpoint.
+
+**Known MVP limitations** (to fix in follow-up PRs):
+- Config keys (`rinex.ringbuffer_minutes`, `rinex.ringbuffer_max_mb`)
+  are not yet wired into the YAML schema — defaults are compile-time
+  (`RTCM_RB_DEFAULT_RETENTION_MIN=30`, `RTCM_RB_DEFAULT_MAX_BYTES=64MiB`).
+  Adding runtime config requires recreating the tracker on reload.
+- `rtcm_ringbuffer_remove()` is not called from `livesource_del()`, so
+  buffers for disconnected sources persist until caster restart. This
+  matches `rtcm_freq`'s existing behavior (latent bug in both modules).
+  A periodic sweep timer (e.g. every 60s) is the cleanest fix.
 
 ### Endpoint
 

@@ -326,6 +326,8 @@ caster_new(const char *config_file, int nbase) {
 	this->ntrips.nfree = 0;
 	this->rtcm_cache = hash_table_new(509, (void(*)(void *))rtcm_info_free);
 	this->rtcm_freq = rtcm_freq_tracker_new();
+	this->rtcm_ringbuffer = rtcm_ringbuffer_tracker_new(
+		RTCM_RB_DEFAULT_RETENTION_MIN, RTCM_RB_DEFAULT_MAX_BYTES);
 	this->log_stream = log_stream_new();
 	this->hostname[sizeof(this->hostname)-1] = '\0';
 	TAILQ_INIT(&this->sourcetablestack.list);
@@ -459,6 +461,7 @@ void caster_free(struct caster_state *this) {
 	hash_table_free(this->ntrips.ipcount);
 	hash_table_free(this->rtcm_cache);
 	rtcm_freq_tracker_free(this->rtcm_freq);
+	rtcm_ringbuffer_tracker_free(this->rtcm_ringbuffer);
 	if (this->log_stream_timer_event)
 		event_free(this->log_stream_timer_event);
 	log_stream_free(this->log_stream);

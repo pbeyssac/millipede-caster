@@ -10,6 +10,7 @@
 #include "ntrip_common.h"
 #include "rtcm.h"
 #include "rtcm_freq.h"
+#include "rtcm_ringbuffer.h"
 
 /*
  * RTCM handling module.
@@ -810,7 +811,7 @@ static void rtcm_handler(struct ntrip_state *st, struct packet *p, void *arg1) {
 /*
  * Handle receipt and retransmission of all complete RTCM packets.
  * Return 0 if more data is needed,
- *	1 if at least one packet has been processed.
+ *      1 if at least one packet has been processed.
  */
 int rtcm_packet_handle(struct ntrip_state *st) {
 	unsigned short len_rtcm;
@@ -878,6 +879,13 @@ int rtcm_packet_handle(struct ntrip_state *st) {
 			if (st->caster->rtcm_freq && st->mountpoint)
 				rtcm_freq_record(st->caster->rtcm_freq,
 						 st->mountpoint, type, NULL);
+			/* Record the raw RTCM packet in the per-mountpoint
+			 * ring buffer for future RINEX on-the-fly generation.
+			 * Takes its own reference on rtcmp; the caller's
+			 * packet_decref() below still releases the original. */
+			if (st->caster->rtcm_ringbuffer && st->mountpoint)
+				rtcm_ringbuffer_record(st->caster->rtcm_ringbuffer,
+						       st->mountpoint, rtcmp, NULL);
 		} else
 			ntrip_log(st, LOG_INFO, "RTCM: bad checksum!");
 

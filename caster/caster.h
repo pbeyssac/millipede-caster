@@ -21,6 +21,7 @@
 #include "queue.h"
 #include "rtcm.h"
 #include "rtcm_freq.h"
+#include "rtcm_ringbuffer.h"
 #include "sourcetable.h"
 #include "syncer.h"
 #include "util.h"
@@ -30,13 +31,13 @@
  * Descriptor for a listener
  */
 struct listener {
-	union sock sockaddr;			// Listening address
-	struct evconnlistener *listener;	// libevent structure
+	union sock sockaddr;                    // Listening address
+	struct evconnlistener *listener;        // libevent structure
 	struct caster_state *caster;
 
-	int tls;			// is TLS activated?
-	SSL_CTX *ssl_server_ctx;	// TLS context, certs etc.
-	char *hostname;			// hostname for TLS/SNI
+	int tls;                        // is TLS activated?
+	SSL_CTX *ssl_server_ctx;        // TLS context, certs etc.
+	char *hostname;                 // hostname for TLS/SNI
 	_Atomic int refcnt;
 };
 
@@ -56,7 +57,7 @@ struct caster_dynconfig {
 
 	/* Graylog senders */
 	struct graylog_sender **graylog;
-	int graylog_count;	/* 0 or 1 */
+	int graylog_count;      /* 0 or 1 */
 
 	/* Sourcetable fetcher configuration */
 	struct sourcetable_fetch_args **sourcetable_fetchers;
@@ -67,9 +68,9 @@ struct caster_dynconfig {
 	int syncers_count;
 
 	/* RTCM filtering */
-	struct rtcm_filter **rtcm_filter;	// array of filters (one per rtcm_filter config block)
-	int rtcm_filter_count;			// number of filters
-	struct hash_table *rtcm_filter_dict;	// mountpoint => filter pointer
+	struct rtcm_filter **rtcm_filter;       // array of filters (one per rtcm_filter config block)
+	int rtcm_filter_count;                  // number of filters
+	struct hash_table *rtcm_filter_dict;    // mountpoint => filter pointer
 
 	struct caster_state *caster;
 };
@@ -83,10 +84,10 @@ struct caster_state {
 		P_RWLOCK_T lock;
 		struct general_ntripq free_queue;
 		P_RWLOCK_T free_lock;
-		long long next_id;	// must never wrap
-		int n;		// number of items in queue
-		int nfree;	// number of items in free_queue
-		struct hash_table *ipcount;	// count by IP
+		long long next_id;      // must never wrap
+		int n;          // number of items in queue
+		int nfree;      // number of items in free_queue
+		struct hash_table *ipcount;     // count by IP
 	} ntrips;
 	P_RWLOCK_T quotalock;
 
@@ -110,6 +111,9 @@ struct caster_state {
 	/* RTCM frequency tracker (per-mountpoint, per-type sliding window) */
 	struct rtcm_freq_tracker *rtcm_freq;
 
+	/* RTCM ring buffer (per-mountpoint raw packet retention for RINEX) */
+	struct rtcm_ringbuffer_tracker *rtcm_ringbuffer;
+
 	/* Real-time log stream (SSE) */
 	struct log_stream *log_stream;
 	struct event *log_stream_timer_event;
@@ -119,7 +123,7 @@ struct caster_state {
 	// Serialize simultaneous reloads
 	P_MUTEX_T configreload;
 
-	SSL_CTX *ssl_client_ctx;	// TLS context for fetchers
+	SSL_CTX *ssl_client_ctx;        // TLS context for fetchers
 
 	struct timeval start_date;
 

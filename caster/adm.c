@@ -274,6 +274,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 			{"/api/v1/net", "GET", api_ntrip_list_json},
 			{"/api/v1/rtcm", "GET", api_rtcm_json},
 			{"/api/v1/rtcm/frequencies", "GET", api_rtcm_freq_json},
+			{"/api/v1/rtcm/ringbuffer", "GET", api_rtcm_ringbuffer_json},
 			{"/api/v1/mem","GET", api_mem_json},
 			{"/api/v1/nodes","GET", api_nodes_json},
 			{"/api/v1/livesources", "GET", livesource_list_json},
