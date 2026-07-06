@@ -66,3 +66,15 @@ struct auth_entry *auth_lookup(struct auth_entry *auth, const char *key) {
 struct auth_entry *auth_lookupi(struct auth_entry *auth, const char *key) {
 	return _auth_lookup(auth, key, 1);
 }
+
+struct auth_entry *auth_lookup_with_user(struct auth_entry *auth, const char *key, const char *user, int case_insensitive) {
+	while (auth->user != NULL) {
+		if (
+			!(case_insensitive?strcasecmp:strcmp)(auth->key, key) &&
+			(!user || !(case_insensitive?strcasecmp:strcmp)(auth->user, user))
+		)
+			return auth;
+		auth++;
+	}
+	return NULL;
+}

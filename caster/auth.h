@@ -16,4 +16,6 @@ void auth_free(struct auth_entry *this);
 struct auth_entry *auth_lookup(struct auth_entry *auth, const char *key);
 struct auth_entry *auth_lookupi(struct auth_entry *auth, const char *key);
 
+struct auth_entry *auth_lookup_with_user(struct auth_entry *auth, const char *key, const char *user, int case_insensitive);
+
 #endif
