@@ -14,9 +14,7 @@ PORT=2103
 
 err = 0
 
-rtcm_1006 = b"\xd3\x00\x15\x3e\xe0\x00\x03\x89\xc8\x55\xac\xd7\x80\x71\x2a\x81\xc9\x8b\x20\x8b\x7f\x54\x00\x00\x7c\x4f\x32"
-
-source_stream = testlib.SourceStream((HOST, PORT), "C77", "test1:testpw!", 20000000000000, packet_delay=1, packet=rtcm_1006)
+source_stream = testlib.SourceStream((HOST, PORT), "C77", "test1:testpw!", 20000000000000, packet_delay=1, packet=testlib.rtcm_1006)
 source_stream.start()
 time.sleep(.1)
 client_stream = testlib.ClientStream((HOST, PORT), "V", 200000000,
