@@ -15,7 +15,7 @@ PORT=2103
 
 err = 0
 
-gr = testlib.HttpServer(HOST, 9998, b'^POST /gelf HTTP/1\.1\r\n(?s:.)*Content-Length: (\d+)\r\n', 1000, timeout=200)
+gr = testlib.HttpServer(HOST, 9998, b'^POST /gelf HTTP/1\\.1\r\n(?s:.)*Content-Length: (\\d+)\r\n', 1000, timeout=200)
 
 gr.start()
 

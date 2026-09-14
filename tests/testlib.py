@@ -149,7 +149,7 @@ class SourceServer(object):
     sl.bind(self.host)
     sl.listen(200)
 
-    str_request = b'^GET (/.*) HTTP/1\.[01]'
+    str_request = b'^GET (/.*) HTTP/1\\.[01]'
     self.re_request = re.compile(str_request)
 
     sl.setblocking(False)
@@ -227,7 +227,7 @@ def API_reload(host, port):
   except TimeoutError:
     return 1
   s.close()
-  if not re.compile(b'^HTTP/1\.1 200 OK\r\nServer: NTRIP Millipede Server .*\r\nDate: .*\r\nNtrip-Version: Ntrip/2\.0\r\nContent-Length: \d+\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{"result": 0}').match(d):
+  if not re.compile(b'^HTTP/1\\.1 200 OK\r\nServer: NTRIP Millipede Server .*\r\nDate: .*\r\nNtrip-Version: Ntrip/2\\.0\r\nContent-Length: \\d+\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{"result": 0}').match(d):
     return 1
   return 0
 
