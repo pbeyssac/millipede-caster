@@ -173,9 +173,16 @@ static int livesource_kill_subscribers_unlocked(struct livesource *this, int kil
 			killed++;
 		} else if (kill_backlogged == 0 && virtual) {
 			/*
-			 * Try to resubscribe virtual sources to a new source
+			 * Try to resubscribe virtual sources to a new source.
+			 *
+			 * In unthreaded mode the call to ntripsrv_redo_virtual_pos() runs inline,
+			 * so we need to unsubscribe before the call, instead of relying on the
+			 * call to _livesource_del_subscriber_unlocked() in the next if.
 			 */
+			_livesource_del_subscriber_unlocked(st);
 			joblist_append_ntrip_locked(st->caster->joblist, st, &ntripsrv_redo_virtual_pos);
+			bufferevent_unlock(bev);
+			continue;
 		}
 
 		if (kill_backlogged == 0 || backlogged) {
