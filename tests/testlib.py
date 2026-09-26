@@ -14,7 +14,7 @@ rtcm_1006 = b"\xd3\x00\x15\x3e\xe0\x00\x03\x89\xc8\x55\xac\xd7\x80\x71\x2a\x81\x
 # Source stream to server on a given mountpoint, user+password, number of samples
 #
 class SourceStream(object):
-  def __init__(self, host, mountpoint, userpass, n, start_delay=0, packet_delay=1, packet=None, post=True):
+  def __init__(self, host, mountpoint, userpass, n, start_delay=0, packet_delay=1, packet=None, start_packet=None, post=True):
     self._stop = False
     self._ok = False
     self.host = host
@@ -25,6 +25,7 @@ class SourceStream(object):
     self.start_delay = start_delay
     self.packet_delay = packet_delay
     self.packet = packet
+    self.start_packet = start_packet
     self.post = post
     self.status = None
     self.httpreply = None
@@ -49,6 +50,11 @@ class SourceStream(object):
     self.status = httpreply[1]
     self.httpreply = sdata.split(b'\r', 1)[0]
     self._ok = True
+
+    if self.start_packet:
+      ssource.sendall(self.start_packet)
+      time.sleep(self.packet_delay)
+
     for i in range(self.n):
       if self._stop:
         break
@@ -77,6 +83,7 @@ class ClientStream(object):
     self.firstline = firstline.encode('ascii')
     self._stop = False
     self.re_expect = None
+    self.ok = 0
   def set_expect(self, re_expect):
     self.re_expect = None if re_expect is None else re.compile(re_expect.encode('ascii'))
   def start(self):
@@ -106,6 +113,7 @@ class ClientStream(object):
         print(".", end='')
       elif self.re_expect.match(data):
         print(".", end='')
+        self.ok += 1
       else:
         print("Got", data)
         print("X", end='')
