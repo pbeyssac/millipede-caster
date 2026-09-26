@@ -73,6 +73,7 @@ class ClientStream(object):
     self.host = host
     self.n = n
     self.err = 0
+    self.err_recv = 0
     self.firstline = firstline.encode('ascii')
     self._stop = False
     self.re_expect = None
@@ -108,7 +109,7 @@ class ClientStream(object):
       else:
         print("Got", data)
         print("X", end='')
-        self.err += 1
+        self.err_recv += 1
       sys.stdout.flush()
     if self.n:
       print()
