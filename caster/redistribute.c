@@ -174,6 +174,8 @@ redistribute_source_stream_with_config(struct redistribute_cb_args *this, struct
 		if (http_headers_add_auth(&this->task->headers, user, password) < 0)
 			erra = 1;
 	}
+	if (json != NULL)
+		json_object_put(json);
 
 	if (this->task->host == NULL || this->task->uri == NULL || erra) {
 		strfree(this->task->host);
