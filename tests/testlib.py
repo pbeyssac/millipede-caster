@@ -328,7 +328,7 @@ def TestServerAlive(host, port):
   s.settimeout(.1)
   try:
     s.connect((host, port))
-    s.sendall(b'GET /TEST1 HTTP/1.1\r\nUser-Agent: NTRIP test\r\nNtrip-Version: Ntrip/2.0\r\n\r\n')
+    s.sendall(b'GET /TEST404 HTTP/1.1\r\nUser-Agent: NTRIP test\r\nNtrip-Version: Ntrip/2.0\r\n\r\n')
   except TimeoutError:
     return 1
   except ConnectionRefusedError:
