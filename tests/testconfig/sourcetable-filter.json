@@ -1,0 +1,7 @@
+{
+    "description": "sample configuration for a proxy filter + auth with a remote sourcetable and mountpoints",
+    "sources": {
+      "*": { "action": "drop" },
+      "TEST1": { "user": "user1", "password": "password1", "action": "keep" },
+    }
+}
