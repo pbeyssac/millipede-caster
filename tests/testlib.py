@@ -258,6 +258,8 @@ class HttpServer(object):
     self.maxaccept = maxaccept
     self.timeout = timeout
     self._stop = False
+    # Request bodies received, in order
+    self.bodies = []
     self.replies = [
       b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 4\r\n\r\nABCD',
       b'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 0\r\n\r\n',
@@ -310,6 +312,7 @@ class HttpServer(object):
             while len(data) < length:
               d = s.recv(10240)
               data += d
+            self.bodies.append(data[:length])
             s.send(self.replies[self.nr % len(self.replies)])
             self.nr += 1
             data = b''

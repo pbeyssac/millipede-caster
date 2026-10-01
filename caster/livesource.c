@@ -507,7 +507,7 @@ static struct livesource *livesource_find_unlocked(struct caster_state *this, st
 			return NULL;
 		}
 		assert(r != -1);
-		if (*jp)
+		if (jp)
 			*jp = livesource_update_json(np, this, LIVESOURCE_UPDATE_ADD);
 		this->livesources->serial++;
 		ntrip_log(st, LOG_INFO, "Trying to subscribe to on-demand source %s", mountpoint);
