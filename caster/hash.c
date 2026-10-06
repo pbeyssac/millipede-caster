@@ -312,6 +312,8 @@ struct hash_table *hash_from_urlencoding(char *urlencoding) {
 			return NULL;
 		}
 		if (hash_table_add(h, keyval, eq2) < 0) {
+			/* duplicate key or out of memory: the value was not added */
+			strfree(eq2);
 			hash_table_free(h);
 			return NULL;
 		}

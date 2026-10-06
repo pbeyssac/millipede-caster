@@ -44,6 +44,44 @@ static int urldecode_test() {
 	return fail;
 }
 
+/*
+ * hash_from_urlencoding(): key=value pairs from a query string or a form. A repeated key makes it
+ * fail; the value it had copied for that key leaked (visible under LeakSanitizer).
+ */
+static int hash_from_urlencoding_test() {
+	int fail = 0;
+	puts("hash_from_urlencoding");
+	struct utest {
+		char *send;
+		int ok;
+		char *key, *expect;
+	};
+	struct utest testlist[] = {
+		{"user=admin&password=%3dadminpw...", 1, "password", "=adminpw..."},
+		{"a&b=", 1, "a", ""},
+		{"x=1;y=2", 1, "y", "2"},
+		{"a=1&a=2", 0, NULL, NULL},
+		{"user=admin&password=x&user=y", 0, NULL, NULL},
+		{NULL, 0, NULL, NULL}
+	};
+	for (struct utest *t = testlist; t->send; t++) {
+		char *src = (char *)strdup(t->send);
+		struct hash_table *h = hash_from_urlencoding(src);
+		const char *v = h && t->key ? (const char *)hash_table_get(h, t->key) : NULL;
+		if ((h != NULL) == t->ok && (!t->ok || (v && !strcmp(v, t->expect))))
+			putchar('.');
+		else {
+			printf("\nFAIL: %s\n", t->send);
+			fail++;
+		}
+		if (h)
+			hash_table_free(h);
+		free(src);
+	}
+	putchar('\n');
+	return fail;
+}
+
 static int b64_test() {
 	puts("b64encode/b64decode");
 	struct b64test {
