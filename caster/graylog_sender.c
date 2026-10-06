@@ -58,6 +58,10 @@ struct graylog_sender *graylog_sender_new(struct caster_state *caster,
 	int status_timeout, int retry_delay, int max_retry_delay,
 	int bulk_max_size, int queue_max_size, const char *authkey, const char *drainfilename) {
 
+	// Fix max_retry_delay and retry_delay if insane
+	max_retry_delay = max_retry_delay > 0 ? max_retry_delay : 1;
+	retry_delay = retry_delay > 0 ? retry_delay : 1;
+
 	struct graylog_sender *this = (struct graylog_sender *)malloc(sizeof(struct graylog_sender));
 	if (this == NULL)
 		return NULL;

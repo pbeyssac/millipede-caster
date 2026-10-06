@@ -62,6 +62,10 @@ struct ntrip_task *ntrip_task_new(struct caster_state *caster,
 	REFCNT_INIT(this);
 	this->port = port;
 	this->status_timeout = 0;		// only used with mimeq/task_send_next_request()
+
+	// fix refresh_delay if insane.
+	refresh_delay = refresh_delay > 0 ? refresh_delay : 1;
+
 	this->refresh_delay = refresh_delay;
 	this->max_retry_delay = refresh_delay;
 	this->current_retry_delay = refresh_delay;

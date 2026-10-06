@@ -1,0 +1,20 @@
+listen:
+  - port:		2103
+    ip:			::1
+
+graylog:
+  - host:			::1
+    port:			9997
+    uri:			'/gelf'
+    tls:			false
+    authorization:	'29daf8491eaec44418e4f898cefa17d581964943f423b023c0d47a2e475beb65'
+    log_level:		INFO
+
+host_auth_file:		host.auth
+source_auth_file:	source.auth
+sourcetable_file:	sourcetable.dat
+access_log:		../test-access.log
+log:			../test-caster.log
+
+log_level:		INFO
+admin_user:		admin
