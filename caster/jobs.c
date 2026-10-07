@@ -660,17 +660,17 @@ static int jobs_tryjoin_threads(struct joblist *this, int *joined) {
 	int nlive = 0;
 	int j = 0;
 	for (int i = 0; i < this->nthreads; i++) {
-		if (this->threads[i] != NULL) {
-			int r = pthread_tryjoin_np(this->threads[i], NULL);
-			if (r == 0) {
-				this->threads[i] = NULL;
-				j++;
-			} else if (r == EBUSY)
-				nlive++;
-			else
-				logfmt(&this->caster->flog, LOG_ERR, "pthread_tryjoin_np(%d) returned %d", i, r);
+		int r = pthread_tryjoin_np(this->threads[i], NULL);
+		if (r == EBUSY) {
+			this->threads[nlive++] = this->threads[i];
+			continue;
 		}
+		if (r == 0)
+			j++;
+		else
+			logfmt(&this->caster->flog, LOG_ERR, "pthread_tryjoin_np(%d) returned %d", i, r);
 	}
+	this->nthreads = nlive;
 	if (joined)
 		*joined = j;
 	return nlive;
