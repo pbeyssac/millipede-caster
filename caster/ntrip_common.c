@@ -588,32 +588,36 @@ int ntrip_drop_by_id(struct caster_state *caster, long long id) {
 
 	struct ntrip_state *st;
 
+	/* To avoid infinite loops, never kill an id more than once */
+	long long restart_id = 0;
+
     restart:
 	P_RWLOCK_WRLOCK(&caster->ntrips.lock);
 	TAILQ_FOREACH(st, &caster->ntrips.queue, nextg) {
 		struct bufferevent *bev = st->bev;
-		bufferevent_lock(bev);
-		if (id && st->id > id) {
-			bufferevent_unlock(bev);
+
+		if (st->id < restart_id)
+			continue;
+		if (id && st->id > id)
 			break;
-		}
+
 		if (id == 0 || st->id == id) {
+			bufferevent_lock(bev);
+			restart_id = st->id + 1;
 			ntrip_notify_close(st);
 			ntrip_decref_end(st, "ntrip_drop_by_id");
 			r += 1;
 			bufferevent_unlock(bev);
 			if (id)
 				break;
-			else {
-				// Restart from the head, as
-				// TAILQ_FOREACH_SAFE does not
-				// protect us from all deletion cases
-				// caused by ntrip_notify_close().
-				P_RWLOCK_UNLOCK(&caster->ntrips.lock);
-				goto restart;
-			}
+
+			// Restart from the head, skipping already done ids.
+			// TAILQ_FOREACH_SAFE is not a solution: does not
+			// protect us from all deletion cases
+			// caused by ntrip_notify_close().
+			P_RWLOCK_UNLOCK(&caster->ntrips.lock);
+			goto restart;
 		}
-		bufferevent_unlock(bev);
 	}
 	P_RWLOCK_UNLOCK(&caster->ntrips.lock);
 	return r;
