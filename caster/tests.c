@@ -838,6 +838,7 @@ int main(int argc, const char **argv) {
 	fail += b64_test();
 	fail += test_ip_analyze_prefixquota();
 	fail += urldecode_test();
+	fail += hash_from_urlencoding_test();
 	fail += test_getbits();
 	fail += test_setbits();
 	fail += test_rtcm_typeset_parse();
