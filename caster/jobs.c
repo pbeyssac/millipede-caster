@@ -629,13 +629,13 @@ int jobs_start_threads(struct joblist *this, int nthreads, int neventloops) {
 	}
 	pthread_attr_destroy(&attr);
 
+	this->threads = p;
 	if (err) {
 		this->nthreads = i;
 		jobs_stop_threads(this);
 		return -1;
 	}
 
-	this->threads = p;
 	this->nthreads = nthreads;
 	return 0;
 }
