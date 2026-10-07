@@ -1,0 +1,19 @@
+listen:
+  - port:		2103
+    ip:			::1
+
+host_auth_file:		host.auth
+source_auth_file:	source.auth
+sourcetable_file:	sourcetable.dat
+access_log:		../test-access.log
+log:			../test-caster.log
+
+log_level:		INFO
+admin_user:		admin
+
+rtcm_filter:
+  - apply:		TEST1
+    pass:		1005,1006,1008,1019,1020,1032,1033,1042,1046,1074,1084,1094,1124,1230
+    convert:
+      - types:		1077,1087,1097,1107,1117,1127
+        conversion:	msm7_4

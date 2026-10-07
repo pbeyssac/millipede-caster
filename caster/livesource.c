@@ -342,9 +342,14 @@ int livesource_send_subscribers(struct livesource *this, struct packet *packet, 
 		p = packet;
 		if (atomic_load(&st->use_rtcm_filter)) {
 			bufferevent_lock(bev);
-			if (!rtcm_filter_pass(st->config->dyn->rtcm_filter, packet)) {
+			/*
+			 * use_rtcm_filter was decided when the client subscribed; st->config follows
+			 * reloads since, and a reload may have removed the rtcm_filter block.
+			 */
+			struct rtcm_filter *filter = st->config->dyn->rtcm_filter;
+			if (filter != NULL && !rtcm_filter_pass(filter, packet)) {
 				if (!pconv)
-					pconv = rtcm_filter_convert(st->config->dyn->rtcm_filter, st, packet);
+					pconv = rtcm_filter_convert(filter, st, packet);
 				p = pconv;
 			}
 			bufferevent_unlock(bev);
