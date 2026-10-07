@@ -584,7 +584,7 @@ void *jobs_start_routine(void *arg) {
 	struct caster_state *caster = start_args->caster;
 	struct event_base *event_base = start_args->event_base;
 	pthread_setspecific(caster->thread_id, (void *)(start_args->thread_id));
-	printf("started thread %lu as %s worker\n", start_args->thread_id, do_eventloop?"event":"generic");
+	logfmt(&caster->flog, LOG_INFO, "started thread %lu as %s worker", start_args->thread_id, do_eventloop?"event":"generic");
 	free(start_args);
 	if (do_eventloop)
 		event_base_loop(event_base, EVLOOP_NO_EXIT_ON_EMPTY);
@@ -608,7 +608,7 @@ int jobs_start_threads(struct joblist *this, int nthreads, int neventloops) {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, stacksize);
-	printf("Setting thread stack size to %zu bytes\n", stacksize);
+	logfmt(&this->caster->flog, LOG_INFO, "Setting thread stack size to %zu bytes", stacksize);
 
 	int i;
 	for (i = 0; i < nthreads; i++) {
