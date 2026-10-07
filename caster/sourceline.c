@@ -24,7 +24,7 @@ struct sourceline *sourceline_new(const char *host, unsigned short port, int tls
 	this->value = dupvalue;
 	this->port = port;
 	this->tls = tls;
-	atomic_store(&this->refcnt, 1);
+	REFCNT_INIT(this);
 	return this;
 }
 
