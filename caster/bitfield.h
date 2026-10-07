@@ -94,9 +94,11 @@ static inline int getbit(unsigned char *d, int beg) {
 }
 
 /*
- * Set a single bit
+ * Set a single bit.
+ *
+ * Originally setbit(), renamed to avoid a conflict with system includes.
  */
-static inline void setbit(unsigned char *d, int beg) {
+static inline void bitfield_setbit(unsigned char *d, int beg) {
 	d[beg>>3] |= 1<<(beg&7);
 }
 
