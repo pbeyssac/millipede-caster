@@ -143,7 +143,7 @@ static const cyaml_strval_t rtcm_conversion_strings[] = {
 static const cyaml_schema_field_t bind_fields_schema[] = {
 	CYAML_FIELD_STRING_PTR(
 		"ip", CYAML_FLAG_POINTER, struct config_bind, ip, 0, CYAML_UNLIMITED),
-	CYAML_FIELD_INT(
+	CYAML_FIELD_UINT(
 		"port", CYAML_FLAG_OPTIONAL, struct config_bind, port),
 	CYAML_FIELD_INT(
 		"queue_size", CYAML_FLAG_OPTIONAL, struct config_bind, queue_size),
@@ -168,7 +168,7 @@ static const cyaml_schema_field_t proxy_fields_schema[] = {
 		"table_refresh_delay", CYAML_FLAG_DEFAULT, struct config_proxy, table_refresh_delay),
 	CYAML_FIELD_STRING_PTR(
 		"host", CYAML_FLAG_POINTER, struct config_proxy, host, 0, CYAML_UNLIMITED),
-	CYAML_FIELD_INT(
+	CYAML_FIELD_UINT(
 		"port", CYAML_FLAG_DEFAULT, struct config_proxy, port),
 	CYAML_FIELD_INT(
 		"priority", CYAML_FLAG_OPTIONAL, struct config_proxy, priority),
@@ -187,7 +187,7 @@ static const cyaml_schema_value_t proxy_schema = {
 static const cyaml_schema_field_t node_fields_schema[] = {
 	CYAML_FIELD_STRING_PTR(
 		"host", CYAML_FLAG_POINTER, struct config_node, host, 0, CYAML_UNLIMITED),
-	CYAML_FIELD_INT(
+	CYAML_FIELD_UINT(
 		"port", CYAML_FLAG_DEFAULT, struct config_node, port),
 	CYAML_FIELD_BOOL(
 		"tls", CYAML_FLAG_OPTIONAL, struct config_node, tls),
@@ -206,7 +206,7 @@ static const cyaml_schema_value_t node_schema = {
 static const cyaml_schema_field_t endpoint_fields_schema[] = {
 	CYAML_FIELD_STRING_PTR(
 		"host", CYAML_FLAG_POINTER, struct config_endpoint, host, 0, CYAML_UNLIMITED),
-	CYAML_FIELD_INT(
+	CYAML_FIELD_UINT(
 		"port", CYAML_FLAG_DEFAULT, struct config_endpoint, port),
 	CYAML_FIELD_BOOL(
 		"tls", CYAML_FLAG_OPTIONAL, struct config_endpoint, tls),
@@ -227,7 +227,7 @@ static const cyaml_schema_field_t graylog_fields_schema[] = {
 		"queue_max_size", CYAML_FLAG_OPTIONAL, struct config_graylog, queue_max_size),
 	CYAML_FIELD_STRING_PTR(
 		"host", CYAML_FLAG_POINTER, struct config_graylog, host, 0, CYAML_UNLIMITED),
-	CYAML_FIELD_INT(
+	CYAML_FIELD_UINT(
 		"port", CYAML_FLAG_DEFAULT, struct config_graylog, port),
 	CYAML_FIELD_STRING_PTR(
 		"uri", CYAML_FLAG_POINTER, struct config_graylog, uri, 0, CYAML_UNLIMITED),
