@@ -15,7 +15,7 @@ PORT=2103
 
 err = 0
 
-sy = testlib.HttpServer(HOST, 9999, b'^POST /adm/api/v1/sync HTTP/1\.1\r\n(?s:.)*Content-Length: (\d+)\r\n', 1000, timeout=200, keepalive=True)
+sy = testlib.HttpServer(HOST, 9999, b'^POST /adm/api/v1/sync HTTP/1\\.1\r\n(?s:.)*Content-Length: (\\d+)\r\n', 1000, timeout=200, keepalive=True)
 
 sy.start()
 
