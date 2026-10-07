@@ -4,8 +4,10 @@
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <pthread.h>
+#if __has_include(<pthread_np.h>)
+  #include <pthread_np.h>
+#endif
 #include <sched.h>
-#include <signal.h>
 #include <unistd.h>
 
 #include "conf.h"
@@ -33,6 +35,7 @@ struct joblist *joblist_new(struct caster_state *caster) {
 		this->caster = caster;
 		this->nthreads = 0;
 		this->threads = NULL;
+		this->stop = 0;
 		STAILQ_INIT(&this->ntrip_queue);
 		STAILQ_INIT(&this->append_queue);
 		STAILQ_INIT(&this->jobq);
@@ -107,6 +110,16 @@ void joblist_free(struct joblist *this) {
 }
 
 /*
+ * Wake-up all threads waiting for work.
+ */
+static void jobs_cond_broadcast(struct joblist *this) {
+	P_MUTEX_LOCK(&this->condlock);
+	if (pthread_cond_broadcast(&this->condjob) < 0)
+		caster_log_error(this->caster, "pthread_cond_broadcast");
+	P_MUTEX_UNLOCK(&this->condlock);
+}
+
+/*
  * Run jobs in a job list, on a FIFO basis.
  *
  * Simultaneously run by all workers.
@@ -121,7 +134,7 @@ void joblist_run(struct joblist *this) {
 	P_MUTEX_LOCK(&this->mutex);
 
 	/*
-	 * Now run jobs forever.
+	 * Now run jobs until we are explicitly asked to stop.
 	 */
 	while(1) {
 		/*
@@ -170,9 +183,6 @@ void joblist_run(struct joblist *this) {
 				bufferevent_lock(bev);
 				ntrip_decref(j->ntrip_unlocked_content.st, "joblist_run");
 				bufferevent_unlock(bev);
-			} else if (j->type == JOB_STOP_THREAD) {
-				logfmt(&this->caster->flog, LOG_INFO, "Exiting thread %d", (long)pthread_getspecific(this->caster->thread_id));
-				pthread_exit(NULL);
 			} else
 				abort();
 			free(j);
@@ -194,11 +204,16 @@ void joblist_run(struct joblist *this) {
 				if (j != NULL)
 					/* jobq wasn't empty last time we checked, restart */
 					continue;
+
 				/*
 				 * All queues empty => wait.
 				 */
 				P_MUTEX_UNLOCK(&this->mutex);
 				P_MUTEX_LOCK(&this->condlock);
+				if (this->stop) {
+					P_MUTEX_UNLOCK(&this->condlock);
+					return;
+				}
 				if (pthread_cond_wait(&this->condjob, &this->condlock) != 0)
 					caster_log_error(this->caster, "pthread_cond_wait");
 				P_MUTEX_UNLOCK(&this->condlock);
@@ -213,9 +228,7 @@ void joblist_run(struct joblist *this) {
 			this->ntrip_njobs = this->append_ntrip_njobs;
 			this->append_ntrip_njobs = tmpn;
 			P_MUTEX_UNLOCK(&this->append_mutex);
-			P_MUTEX_LOCK(&this->condlock);
-			pthread_cond_broadcast(&this->condjob);
-			P_MUTEX_UNLOCK(&this->condlock);
+			jobs_cond_broadcast(this);
 		}
 
 		/*
@@ -278,11 +291,13 @@ void joblist_run(struct joblist *this) {
 		bufferevent_unlock(bev);
 
 		ntrip_deferred_run(this->caster);
+
 		/*
 		 * Lock the list again for the next job.
 		 */
 		P_MUTEX_LOCK(&this->mutex);
 	}
+	P_MUTEX_UNLOCK(&this->mutex);
 }
 
 static int job_equal(struct job *j1, struct job *j2) {
@@ -548,12 +563,6 @@ void joblist_append_ntrip_unlocked_content(
 		cb(st, content_cb, req);
 }
 
-void joblist_append_stop(struct joblist *this) {
-	struct job tmpj;
-	tmpj.type = JOB_STOP_THREAD;
-	_joblist_append_generic(this, NULL, &tmpj);
-}
-
 /*
  * Drain the job queue for a ntrip_state
  *
@@ -584,12 +593,16 @@ void *jobs_start_routine(void *arg) {
 	struct caster_state *caster = start_args->caster;
 	struct event_base *event_base = start_args->event_base;
 	pthread_setspecific(caster->thread_id, (void *)(start_args->thread_id));
-	logfmt(&caster->flog, LOG_INFO, "started thread %lu as %s worker", start_args->thread_id, do_eventloop?"event":"generic");
+
+	logfmt(&caster->flog, LOG_INFO, "started thread %lu as %s worker",
+		start_args->thread_id, do_eventloop?"event":"generic");
 	free(start_args);
 	if (do_eventloop)
 		event_base_loop(event_base, EVLOOP_NO_EXIT_ON_EMPTY);
 	else
 		joblist_run(caster->joblist);
+	logfmt(&caster->flog, LOG_INFO, "Exiting thread %lu (%s)",
+		(long)pthread_getspecific(caster->thread_id), do_eventloop?"event":"generic");
 	return NULL;
 }
 
@@ -640,27 +653,80 @@ int jobs_start_threads(struct joblist *this, int nthreads, int neventloops) {
 	return 0;
 }
 
-void jobs_stop_threads(struct joblist *this) {
+/*
+ * Join and clear terminated threads, return the number of alive threads.
+ */
+static int jobs_tryjoin_threads(struct joblist *this, int *joined) {
+	int nlive = 0;
+	int j = 0;
 	for (int i = 0; i < this->nthreads; i++) {
-		joblist_append_stop(this);
+		if (this->threads[i] != NULL) {
+			int r = pthread_tryjoin_np(this->threads[i], NULL);
+			if (r == 0) {
+				this->threads[i] = NULL;
+				j++;
+			} else if (r == EBUSY)
+				nlive++;
+			else
+				logfmt(&this->caster->flog, LOG_ERR, "pthread_tryjoin_np(%d) returned %d", i, r);
+		}
+	}
+	if (joined)
+		*joined = j;
+	return nlive;
+}
+
+/*
+ * Stop the workers. Generic workers exit once the job queues are empty, event loop workers once
+ * their loop ends.
+ *
+ * Bounded: a worker still running after MAX_STOP_WAIT_MS seconds is left alone -- it may hold
+ * any lock, and only the end of the process stops it safely -- and kept in this->threads.
+ *
+ * Returns the number of threads still running
+ */
+#define MAX_STOP_WAIT_MS	30000
+int jobs_stop_threads(struct joblist *this) {
+	int nlive = this->nthreads;
+
+	/*
+	 * base[0] is the main thread, already done, that's why we have been called.
+	 * Do the others.
+	 */
+	for (int i = 1; i < this->caster->nbase; i++)
+		event_base_loopexit(this->caster->base[i], NULL);
+
+	// Delay 1 millisecond
+	struct timespec t = { .tv_sec = 0, .tv_nsec = 1000000 };
+
+	/* Set the stop flag */
+	P_MUTEX_LOCK(&this->condlock);
+	this->stop = 1;
+	P_MUTEX_UNLOCK(&this->condlock);
+
+	/* Wait for all threads to finish cleanly */
+	for (int count = 0; count < MAX_STOP_WAIT_MS && nlive; count++) {
+		/* Wake-up waiting threads */
+		jobs_cond_broadcast(this);
 		sched_yield();
+		int joined;
+		nlive = jobs_tryjoin_threads(this, &joined);
+		if (joined != 0)
+			logfmt(&this->caster->flog, LOG_INFO, "%d thread(s) stopped, waiting", joined);
+		if (nlive != 0)
+			nanosleep(&t, NULL);
+	};
+
+	/* Give up on potential remaining threads */
+	if (nlive != 0) {
+		logfmt(&this->caster->flog, LOG_ERR, "%d threads remaining, giving up", nlive);
+		return nlive;
 	}
 
-	int r, nlive;
+	logfmt(&this->caster->flog, LOG_NOTICE, "All threads stopped, exiting");
 
-	do {
-		nlive = 0;
-		for (int i = 0; i < this->nthreads; i++) {
-			r = pthread_kill(this->threads[i], 0);
-			if (r == 0)
-				nlive++;
-		}
-		if (nlive != 0) {
-			logfmt(&this->caster->flog, LOG_INFO, "%d thread(s) still active, waiting", nlive);
-			sleep(1);
-		}
-	} while (nlive);
 	free(this->threads);
 	this->threads = NULL;
 	this->nthreads = 0;
+	return 0;
 }

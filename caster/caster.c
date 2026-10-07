@@ -455,7 +455,7 @@ static int caster_start_graylog(struct caster_state *this, struct config *new_co
 /*
  * Stop all caster activity, then free the structures.
  */
-void caster_free(struct caster_state *this) {
+int caster_free(struct caster_state *this) {
 	if (this->config) {
 		/* Stop accepting incoming connections */
 		dynconfig_free_listeners(this->config->dyn);
@@ -472,13 +472,14 @@ void caster_free(struct caster_state *this) {
 	ntrip_drop_by_id(this, 0);
 
 	/* Wait for the threads to finish their tasks */
-	if (threads)
-		jobs_stop_threads(this->joblist);
+	if (threads && jobs_stop_threads(this->joblist) != 0)
+		return -1;
 
 	caster_clear_signals(this);
 	log_free(&this->flog);
 	log_free(&this->alog);
 	_caster_common_free(this);
+	return 0;
 }
 
 /*
@@ -812,13 +813,12 @@ static struct config *caster_load_config(struct caster_state *this) {
 static void
 signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	struct caster_signal_cb_info *info = user_data;
-	struct timeval delay = { 0, 0 };
 
 	printf("Caught %s signal; exiting.\n", info->signame);
 	logfmt(&info->caster->flog, LOG_INFO, "Caught %s signal; exiting.", info->signame);
 
-	for (int i = 0; i < info->caster->nbase; i++)
-		event_base_loopexit(info->caster->base[i], &delay);
+	// Exit the main thread loop only: it will run the general termination.
+	event_base_loopexit(info->caster->base[0], NULL);
 }
 
 static int caster_start(struct caster_state *this, struct config *new_config, int lock) {
@@ -1083,6 +1083,5 @@ int caster_main(char *config_file) {
 	event_base_dispatch(caster->base[0]);
 
 	logfmt(&caster->flog, LOG_NOTICE, "Stopping caster");
-	caster_free(caster);
-	return 0;
+	return caster_free(caster) < 0 ? 1:0;
 }

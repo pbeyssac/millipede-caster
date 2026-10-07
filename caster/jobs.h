@@ -15,8 +15,7 @@ enum job_type {
 	JOB_NTRIP_PACKET,
 	JOB_NTRIP_UNLOCKED,
 	JOB_NTRIP_UNLOCKED_CONTENT,
-	JOB_REDISTRIBUTE,
-	JOB_STOP_THREAD
+	JOB_REDISTRIBUTE
 };
 
 struct ntrip_state;
@@ -157,6 +156,9 @@ struct joblist {
 	/* Pointer to threads */
 	pthread_t *threads;
 	int nthreads;		// number of threads
+
+	/* Set by jobs_stop_threads(): workers exit once the queues are empty. Protected by condlock. */
+	char stop;		// Flag: stop
 };
 
 struct joblist *joblist_new(struct caster_state *caster);
@@ -177,10 +179,9 @@ void joblist_append_ntrip_unlocked_content(
 	struct ntrip_state *st,
 	struct mime_content *(*content_cb)(struct caster_state *caster, struct request *req),
 	struct request *req);
-void joblist_append_stop(struct joblist *this);
 void joblist_drain(struct ntrip_state *st);
 void *jobs_start_routine(void *arg);
 int jobs_start_threads(struct joblist *this, int nthreads, int neventloops);
-void jobs_stop_threads(struct joblist *this);
+int jobs_stop_threads(struct joblist *this);
 
 #endif
