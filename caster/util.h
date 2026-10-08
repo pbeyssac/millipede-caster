@@ -36,7 +36,7 @@ struct mime_content {
 	char *s;
 	const char *mime_type;
 	size_t len;
-	int use_strfree, is_packet;
+	int use_strfree;
 	struct packet *packet;
 };
 STAILQ_HEAD(mimeq, mime_content);
