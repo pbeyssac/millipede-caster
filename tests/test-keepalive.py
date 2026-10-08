@@ -13,9 +13,9 @@ PORT=2103
 
 tests = [
   (b'GET / HTTP/1.1\r\nHost: devcaster.ntrip.eu.org:2101\r\nConnection: keep-alive\r\nContent-Length: 0\r\n\r\n',
-   b'^HTTP/1\.1 200 OK\r\n'),
+   b'^HTTP/1\\.1 200 OK\r\n'),
   (b'BADREQ\r\n',
-   b'^HTTP/1\.1 400 Bad Request\r\n')
+   b'^HTTP/1\\.1 400 Bad Request\r\n')
 ]
 
 err = 0
