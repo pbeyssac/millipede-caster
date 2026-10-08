@@ -10,6 +10,7 @@
 #include "conf.h"
 #include "ip.h"
 #include "json.h"
+#include "livesource.h"
 #include "log.h"
 #include "rtcm.h"
 #include "util.h"
@@ -814,6 +815,63 @@ static void sourcetable_test(struct sourcetable *sourcetable) {
 }
 #endif
 
+static int test_livesource_convert_state() {
+	int fail = 0;
+	puts("test_livesource_convert_state");
+	struct test {
+		const char *str;
+		enum livesource_state expect;
+	};
+	struct test testlist[] = {
+		{"INVALID", LIVESOURCE_STATE_INVALID},
+		{"***", LIVESOURCE_STATE_INVALID},
+		{"INIT", LIVESOURCE_INIT},
+		{"FETCH_PENDING", LIVESOURCE_FETCH_PENDING},
+		{"RUNNING", LIVESOURCE_RUNNING},
+		{NULL, 0}
+	};
+
+	for (struct test *t = testlist; t->str; t++) {
+		enum livesource_state r = livesource_convert_state(t->str);
+		if (r != t->expect) {
+			fail++;
+			printf("\nFAIL: livesource state \"%s\" got %d, expected %d\n",
+				t->str, r, t->expect);
+		} else
+			putchar('.');
+	}
+	putchar('\n');
+	return fail;
+}
+
+static int test_livesource_convert_type() {
+	int fail = 0;
+	puts("test_livesource_convert_type");
+	struct test {
+		const char *str;
+		enum livesource_type expect;
+	};
+	struct test testlist[] = {
+		{"INVALID", LIVESOURCE_TYPE_INVALID},
+		{"***", LIVESOURCE_TYPE_INVALID},
+		{"DIRECT", LIVESOURCE_TYPE_DIRECT},
+		{"FETCHED", LIVESOURCE_TYPE_FETCHED},
+		{NULL, 0}
+	};
+
+	for (struct test *t = testlist; t->str; t++) {
+		enum livesource_type r = livesource_convert_type(t->str);
+		if (r != t->expect) {
+			fail++;
+			printf("\nFAIL: livesource type \"%s\" got %d, expected %d\n",
+				t->str, r, t->expect);
+		} else
+			putchar('.');
+	}
+	putchar('\n');
+	return fail;
+}
+
 /*
  * Regression test for json_get_authentication mountpoint lookup.
  */
@@ -914,5 +972,7 @@ int main(int argc, const char **argv) {
 	fail += test_json_get_authentication();
 	fail += file_parse_test(test_dir);
 	fail += test_prefix_table_empty(test_dir);
+	fail += test_livesource_convert_state();
+	fail += test_livesource_convert_type();
 	return fail != 0;
 }

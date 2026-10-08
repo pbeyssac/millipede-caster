@@ -9,12 +9,14 @@
 #include "sourceline.h"
 
 enum livesource_state {
+	LIVESOURCE_STATE_INVALID = 0,
 	LIVESOURCE_INIT,
 	LIVESOURCE_FETCH_PENDING,
 	LIVESOURCE_RUNNING
 };
 
 enum livesource_type {
+	LIVESOURCE_TYPE_INVALID = 0,
 	LIVESOURCE_TYPE_DIRECT,
 	LIVESOURCE_TYPE_FETCHED
 };
@@ -118,6 +120,8 @@ struct mime_content *livesource_list_json(struct caster_state *caster, struct re
 
 json_object *livesource_full_update_json(struct caster_state *caster, struct livesources *this);
 json_object *livesource_checkserial_json(struct livesources *this);
+enum livesource_state livesource_convert_state(const char *state);
+enum livesource_type livesource_convert_type(const char *type);
 void livesources_remote_replace(struct caster_state *caster, const char *hostname, struct livesources_remote *new_remote);
 int livesource_update_execute(struct caster_state *caster, struct livesources *this, struct request *req);
 

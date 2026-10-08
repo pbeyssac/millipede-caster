@@ -394,3 +394,26 @@ class SyncPoster(object):
 
   def close(self):
     self.s.close()
+
+
+def admin_get(host, port, uri):
+  """GET an /adm endpoint on its own connection. Return the body, or None."""
+  s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+  s.settimeout(5)
+  try:
+    s.connect((host, port))
+    s.sendall(('GET %s?user=admin&password=%%3dadminpw... HTTP/1.1\r\n'
+      'Content-Length: 0\r\nConnection: close\r\n\r\n' % uri).encode())
+    d = b''
+    while True:
+      r = s.recv(65536)
+      if not r:
+        break
+      d += r
+  except (OSError, TimeoutError):
+    return None
+  finally:
+    s.close()
+  if not d.startswith(b'HTTP/1.1 200') or b'\r\n\r\n' not in d:
+    return None
+  return d.split(b'\r\n\r\n', 1)[1]

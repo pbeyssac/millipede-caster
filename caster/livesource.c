@@ -21,8 +21,8 @@
 #include "queue.h"
 #include "util.h"
 
-static const char *livesource_states[4] = {"INIT", "FETCH_PENDING", "RUNNING", NULL};
-static const char *livesource_types[3] = {"DIRECT", "FETCHED", NULL};
+static const char *livesource_states[] = {"INVALID", "INIT", "FETCH_PENDING", "RUNNING", NULL};
+static const char *livesource_types[] = {"INVALID", "DIRECT", "FETCHED", NULL};
 static const char *livesource_update_types[4] = {"none", "add", "del", "update"};
 
 static void livesource_free(struct livesource *this);
@@ -733,22 +733,39 @@ static json_object *livesource_update_json(struct livesource *this,
  * Update receipt routines.
  */
 
-static enum livesource_state convert_state(const char *state) {
-	const char **statep = livesource_states;
-	for (int i = 0; *statep; i++) {
+/*
+ * Convert a state to its index, or LIVESOURCE_STATE_INVALID if unknown or absent.
+ */
+enum livesource_state livesource_convert_state(const char *state) {
+	const char **statep = &livesource_states[1];
+	if (state == NULL)
+		return LIVESOURCE_STATE_INVALID;
+	for (int i = 1; *statep; i++) {
 		if (!strcmp(*statep++, state))
 			return i;
 	}
-	return -1;
+	return LIVESOURCE_STATE_INVALID;
 }
 
-static enum livesource_type convert_type(const char *type) {
-	const char **typep = livesource_types;
-	for (int i = 0; *typep; i++) {
+/*
+ * Convert a type to its index, or LIVESOURCE_TYPE_INVALID if unknown or absent.
+ */
+enum livesource_type livesource_convert_type(const char *type) {
+	const char **typep = &livesource_types[1];
+	if (type == NULL)
+		return LIVESOURCE_TYPE_INVALID;
+	for (int i = 1; *typep; i++) {
 		if (!strcmp(*typep++, type))
 			return i;
 	}
-	return -1;
+	return LIVESOURCE_TYPE_INVALID;
+}
+
+static void convert_state_type_from_json(json_object *j, enum livesource_state *state, enum livesource_type *type) {
+	const char *jtype = json_object_get_string(json_object_object_get(j, "type"));
+	const char *jstate = json_object_get_string(json_object_object_get(j, "state"));
+	*state = livesource_convert_state(jstate);
+	*type = livesource_convert_type(jtype);
 }
 
 /*
@@ -799,11 +816,17 @@ static int livesource_update_execute_diff(struct caster_state *caster, struct li
 			logfmt(&caster->flog, LOG_NOTICE, "update failed: %s exists", mountpoint);
 			return 404;
 		}
+		enum livesource_state state;
+		enum livesource_type type;
+		convert_state_type_from_json(ls , &state, &type);
+
+		if (state == LIVESOURCE_STATE_INVALID || type == LIVESOURCE_TYPE_INVALID) {
+			logfmt(&caster->flog, LOG_WARNING, "update failed: unknown state or type for %s", mountpoint);
+			return 503;
+		}
 		lr = livesource_remote_new(mountpoint);
-		const char *lstype = json_object_get_string(json_object_object_get(ls, "type"));
-		const char *lsstate = json_object_get_string(json_object_object_get(ls, "state"));
-		lr->state = convert_state(lsstate);
-		lr->type = convert_type(lstype);
+		lr->state = state;
+		lr->type = type;
 		r = hash_table_add(lrlist->hash, mountpoint, lr);
 		assert(r != -1);
 		if (r == -2) {
@@ -823,10 +846,15 @@ static int livesource_update_execute_diff(struct caster_state *caster, struct li
 			logfmt(&caster->flog, LOG_NOTICE, "update failed: mountpoint %s does not exist", mountpoint);
 			return 503;
 		}
-		const char *lstype = json_object_get_string(json_object_object_get(ls, "type"));
-		const char *lsstate = json_object_get_string(json_object_object_get(ls, "state"));
-		lr->state = convert_state(lsstate);
-		lr->type = convert_type(lstype);
+		enum livesource_state state;
+		enum livesource_type type;
+		convert_state_type_from_json(ls , &state, &type);
+		if (state == LIVESOURCE_STATE_INVALID || type == LIVESOURCE_TYPE_INVALID) {
+			logfmt(&caster->flog, LOG_NOTICE, "update failed: unknown state or type for %s", mountpoint);
+			return 503;
+		}
+		lr->state = state;
+		lr->type = type;
 	} else {
 		logfmt(&caster->flog, LOG_NOTICE, "update failed: unknown type %s", type);
 		return 503;
@@ -877,12 +905,20 @@ static struct livesources_remote *livesource_process_fulltable(struct caster_sta
 	while (!json_object_iter_equal(&it, &itEnd)) {
 		const char *mountpoint = json_object_iter_peek_name(&it);
 		struct json_object *ls = json_object_iter_peek_value(&it);
-		const char *lstype = json_object_get_string(json_object_object_get(ls, "type"));
-		const char *lsstate = json_object_get_string(json_object_object_get(ls, "state"));
+		enum livesource_state state;
+		enum livesource_type type;
+		convert_state_type_from_json(ls, &state, &type);
+		if (state == LIVESOURCE_STATE_INVALID || type == LIVESOURCE_TYPE_INVALID) {
+			logfmt(&caster->flog, LOG_WARNING,
+				"livesource %s from %s: unknown state or type, ignoring",
+				mountpoint, hostname);
+			json_object_iter_next(&it);
+			continue;
+		}
 
 		struct livesource_remote *lr = livesource_remote_new(mountpoint);
-		lr->state = convert_state(lsstate);
-		lr->type = convert_type(lstype);
+		lr->state = state;
+		lr->type = type;
 
 		int r = hash_table_add(remote->hash, mountpoint, lr);
 		assert(r != -1);
