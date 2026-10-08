@@ -808,6 +808,10 @@ static int livesource_update_execute_diff(struct caster_state *caster, struct li
 		return 404;
 	}
 	const char *mountpoint = json_object_get_string(json_object_object_get(ls, "mountpoint"));
+	if (mountpoint == NULL) {
+		logfmt(&caster->flog, LOG_NOTICE, "'mountpoint' not found");
+		return 404;
+	}
 
 	struct livesource_remote *lr = (struct livesource_remote *)hash_table_get(lrlist->hash, mountpoint);
 
