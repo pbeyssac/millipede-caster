@@ -246,8 +246,10 @@ static int _cmp_prefix(const void *p1, const void *p2) {
  * Sort the prefix tables
  */
 void prefix_table_sort(struct prefix_table *this) {
-	qsort(this->v6_table.entries, this->v6_table.nentries, sizeof(this->v6_table.entries[0]), _cmp_prefix);
-	qsort(this->v4_table.entries, this->v4_table.nentries, sizeof(this->v4_table.entries[0]), _cmp_prefix);
+	if (this->v6_table.nentries)
+		qsort(this->v6_table.entries, this->v6_table.nentries, sizeof(this->v6_table.entries[0]), _cmp_prefix);
+	if (this->v4_table.nentries)
+		qsort(this->v4_table.entries, this->v4_table.nentries, sizeof(this->v4_table.entries[0]), _cmp_prefix);
 }
 
 /*

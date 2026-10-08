@@ -723,6 +723,71 @@ static int file_parse_test(const char *test_dir) {
 	return fail;
 }
 
+/*
+ * Prefix tables with an empty address family: completely empty, only IPv4 or only
+ * IPv6 prefixes. Sorting must not pass a NULL entries array to qsort(), which is undefined
+ * behaviour even for 0 elements (fatal under -fsanitize=undefined, at startup and on reload).
+ */
+static int test_prefix_table_empty(const char *test_dir) {
+	struct log flog;
+	log_init(&flog, NULL, &log_cb, -1, -1, -1, -1, &flog);
+
+	int fail = 0;
+	puts("test_prefix_table_empty");
+
+	struct test {
+		const char *parse;
+		int expect;
+	};
+
+	struct test test_none[] = {
+		{"192.168.1.1", -1},
+		{"9:9::9:9", -1},
+		{NULL, 0}
+	};
+	struct test test_v4[] = {
+		{"10.1.2.3", 5},
+		{"192.168.1.1", -1},
+		{"9:9::9:9", -1},
+		{NULL, 0}
+	};
+	struct test test_v6[] = {
+		{"9:9::9:9", 7},
+		{"10.1.2.3", -1},
+		{NULL, 0}
+	};
+
+	struct prefix_table *tables[3];
+	struct test *tests[3] = { test_none, test_v4, test_v6 };
+
+	tables[0] = prefix_table_new();
+
+	tables[1] = prefix_table_new();
+	prefix_table_add(tables[1], prefix_quota_parse("10.0.0.0/8", "5"));
+	prefix_table_sort(tables[1]);
+
+	tables[2] = prefix_table_new();
+	prefix_table_add(tables[2], prefix_quota_parse("9:9::/32", "7"));
+	prefix_table_sort(tables[2]);
+
+	for (int i = 0; i < 3; i++) {
+		union sock addr;
+		for (struct test *tl = tests[i]; tl->parse; tl++) {
+			ip_convert(tl->parse, &addr);
+			int quota = prefix_table_get_quota(tables[i], &addr);
+			if (quota != tl->expect) {
+				fail++;
+				printf("FAIL on table %d, %s: %d instead of %d\n", i, tl->parse, quota, tl->expect);
+			} else
+				putchar('.');
+		}
+		prefix_table_free(tables[i]);
+	}
+
+	putchar('\n');
+	return fail;
+}
+
 #if 0
 static void sourcetable_test(struct sourcetable *sourcetable) {
 	char *ggalist[] = {
@@ -848,5 +913,6 @@ int main(int argc, const char **argv) {
 	fail += timeval_from_iso_date_test();
 	fail += test_json_get_authentication();
 	fail += file_parse_test(test_dir);
+	fail += test_prefix_table_empty(test_dir);
 	return fail != 0;
 }
