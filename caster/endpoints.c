@@ -47,7 +47,7 @@ struct endpoint *endpoints_from_json(json_object *j, int *pn) {
 		json_object *jtls = json_object_object_get(ji, "tls");
 		json_object *jport = json_object_object_get(ji, "port");
 		if (jport == NULL || host == NULL || jtls == NULL) {
-			endpoints_free(pe, i-1);
+			endpoints_free(pe, i);
 			pe = NULL;
 			break;
 		}
