@@ -34,6 +34,11 @@ void endpoints_free(struct endpoint *pe, int n) {
 
 struct endpoint *endpoints_from_json(json_object *j, int *pn) {
 	int i;
+
+	/* Check we have an array before calling json_object_array_length(). */
+	if (!json_object_is_type(j, json_type_array))
+		return NULL;
+
 	int n = json_object_array_length(j);
 	struct endpoint *pe = (struct endpoint *)malloc(sizeof(struct endpoint)*n);
 	for (i = 0; i < n; i++) {

@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 
 import base64
+import json
 import re
 import socket
 import sys
@@ -351,3 +352,45 @@ def TestServerAlive(host, port):
   if not data.startswith(b'HTTP/1.1 404 Not Found'):
     return 1
   return 0
+
+#
+# One sync connection to the caster's /adm/api/v1/sync, kept open the way a node keeps it:
+# the caster destroys a node's livesource table as soon as its connection closes
+# (ntripsrv.c), so a test that opens a connection per update sees an empty table on the
+# next one.
+#
+class SyncPoster(object):
+  def __init__(self, host, port):
+    self.s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    self.s.settimeout(5)
+    self.s.connect((host, port))
+    self.buf = b''
+
+  def post(self, body, auth):
+    """POST one update. Return the HTTP status, or 0 if the caster did not answer."""
+    b = json.dumps(body).encode()
+    try:
+      self.s.sendall(b'POST /adm/api/v1/sync HTTP/1.1\r\nAuthorization: internal ' + auth
+        + b'\r\nContent-Type: application/json\r\nContent-Length: '
+        + str(len(b)).encode() + b'\r\n\r\n' + b)
+      while b'\r\n\r\n' not in self.buf:
+        d = self.s.recv(65536)
+        if not d:
+          return 0
+        self.buf += d
+      head, self.buf = self.buf.split(b'\r\n\r\n', 1)
+      m = re.search(b'Content-Length: (\\d+)', head)
+      n = int(m.group(1)) if m else 0
+      while len(self.buf) < n:
+        d = self.s.recv(65536)
+        if not d:
+          break
+        self.buf += d
+      self.buf = self.buf[n:]
+      m = re.match(b'HTTP/1\\.1 (\\d+)', head)
+      return int(m.group(1)) if m else 0
+    except (OSError, TimeoutError):
+      return 0
+
+  def close(self):
+    self.s.close()

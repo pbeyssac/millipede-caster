@@ -849,6 +849,14 @@ static struct livesources_remote *livesource_process_fulltable(struct caster_sta
 	if (lslist == NULL || jserial == NULL || start_date == NULL || hostname == NULL || jendpoints == NULL)
 		return NULL;
 
+	/*
+	 * Protect against a peer sending anything other than an object under "livesources".
+	 */
+	if (!json_object_is_type(lslist, json_type_object)) {
+		logfmt(&caster->flog, LOG_WARNING, "livesource table from %s: 'livesources' is not an object", hostname);
+		return NULL;
+	}
+
 	int endpoint_count;
 
 	struct endpoint *pe = endpoints_from_json(jendpoints, &endpoint_count);
