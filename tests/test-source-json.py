@@ -3,8 +3,9 @@
 import re
 import socket
 import sys
-
-import requests
+import urllib.parse
+import urllib.request
+import json
 
 #
 # send/expect tests
@@ -39,8 +40,12 @@ for tests in test_series:
     ssource.sendall(send)
     data = sclient.recv(1024)
 
-    r = requests.get("http://[%s]:%d/adm/api/v1/net" % (HOST, PORT), params={'user': 'admin', 'password': '=adminpw...'})
-    j = [m for m in r.json().values() if 'mountpoint' in m and m['mountpoint'] == 'TEST1']
+    url = "http://[%s]:%d/adm/api/v1/net" % (HOST, PORT)
+    params = urllib.parse.urlencode({'user': 'admin', 'password': '=adminpw...'})
+    with urllib.request.urlopen("%s?%s" % (url, params)) as r:
+      data = json.loads(r.read().decode())
+
+    j = [m for m in date.values() if 'mountpoint' in m and m['mountpoint'] == 'TEST1']
     j = j[0]
 
     print(".", end='')
