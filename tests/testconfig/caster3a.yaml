@@ -1,0 +1,31 @@
+listen:
+  - port:		2103
+    ip:			::1
+  - port:		2103
+    ip:			127.0.0.1
+
+node:
+  - host:		::1
+    port:		2103
+    authorization:      '29daf8491eaec44418e4f898cefa17d581964943f423b023c0d47a2e475beb65'
+    tls:		false
+    retry_delay:	2
+
+syncer_auth:		'29daf8491eaec44418e4f898cefa17d581964943f423b023c0d47a2e475beb65'
+
+host_auth_file:		host.auth
+source_auth_file:	source-wildcard.auth
+sourcetable_file:	sourcetable.dat
+blocklist_file:		blocklist2
+access_log:		../test-access.log
+log:			../test-caster.log
+
+ntripcli_default_write_timeout:	10
+ntripcli_default_read_timeout:	10
+ntripsrv_default_write_timeout:	10
+ntripsrv_default_read_timeout:	10
+
+idle_max_delay:		5
+
+log_level:		EDEBUG
+admin_user:		admin

@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
+import os
 import sys
-import time
 
 
 import testlib
@@ -25,7 +25,7 @@ try:
    s = os.path.getsize('test-access.log')
 except:
    s = None
-if s != 0:
+if s == 0:
   print("FAIL")
   err += 1
 
