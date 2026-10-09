@@ -1,13 +1,14 @@
 #!/bin/sh
 
-export nfail
+VALGRIND_PATH=`command -v valgrind`
+TMP=tmp
 
-VALGRIND_PATH=/usr/local/bin/valgrind
-
-VALGRIND_ARGS_HELGRIND="--tool=helgrind -s --log-file=tmp/valgrind-helgrind.%p.log --gen-suppressions=all --suppressions=valgrind.suppressions"
-VALGRIND_ARGS_MEMCHECK="--tool=memcheck -s --leak-check=full --log-file=tmp/valgrind-memcheck.%p.log --gen-suppressions=all --suppressions=valgrind.suppressions"
+VALGRIND_ARGS_HELGRIND="--tool=helgrind -s --log-file=${TMP}/valgrind-helgrind.%p.log --gen-suppressions=all --suppressions=valgrind.suppressions"
+VALGRIND_ARGS_MEMCHECK="--tool=memcheck -s --leak-check=full --log-file=${TMP}/valgrind-memcheck.%p.log --gen-suppressions=all --suppressions=valgrind.suppressions"
 CASTER_ARGS1="-t12"
 CASTER_ARGS2=""
+
+export nfail
 
 keeperr() {
 	ID="$1"
@@ -22,28 +23,28 @@ start() {
 	TYPE="$1"
 	shift
 	ARGS=$*
-	ln ../caster/caster tmp/castertmp
+	ln ../caster/caster ${TMP}/castertmp
 	rm -f test-caster.log test-access.log
 
 	case "$TYPE" in
 	"memcheck")
-		echo -n "Starting ${VALGRIND_PATH} ${VALGRIND_ARGS_MEMCHECK} tmp/castertmp ${ARGS}"
-		${VALGRIND_PATH} ${VALGRIND_ARGS_MEMCHECK} tmp/castertmp ${ARGS} &
+		echo -n "Starting ${VALGRIND_PATH} ${VALGRIND_ARGS_MEMCHECK} ${TMP}/castertmp ${ARGS}"
+		${VALGRIND_PATH} ${VALGRIND_ARGS_MEMCHECK} ${TMP}/castertmp ${ARGS} &
 		sleep 5
 		;;
 	"helgrind")
-		echo -n "Starting ${VALGRIND_PATH} ${VALGRIND_ARGS_HELGRIND} tmp/castertmp ${ARGS}"
-		${VALGRIND_PATH} ${VALGRIND_ARGS_HELGRIND} tmp/castertmp ${ARGS} &
+		echo -n "Starting ${VALGRIND_PATH} ${VALGRIND_ARGS_HELGRIND} ${TMP}/castertmp ${ARGS}"
+		${VALGRIND_PATH} ${VALGRIND_ARGS_HELGRIND} ${TMP}/castertmp ${ARGS} &
 		sleep 5
 		;;
 	*)
-		echo -n "Starting tmp/castertmp ${ARGS}"
-		tmp/castertmp ${ARGS} &
+		echo -n "Starting ${TMP}/castertmp ${ARGS}"
+		${TMP}/castertmp ${ARGS} &
 		;;
 	esac
 	PID=$!
-	RUNBIN=tmp/caster.${PID}
-	mv -f tmp/castertmp ${RUNBIN}
+	RUNBIN=${TMP}/caster.${PID}
+	mv -f ${TMP}/castertmp ${RUNBIN}
 	echo " PID=${PID}"
 	sleep ${DELAY_START}
         t=0
@@ -59,7 +60,7 @@ run() {
 	PID=$2
 	shift 2
 	list=$*
-	OUT=tmp/out.${PID}
+	OUT=${TMP}/out.${PID}
 	for file in $list; do
 		echo -n Test: $file
 		if ! ./${file} >${OUT} 2>&1; then
@@ -72,8 +73,8 @@ run() {
 		fi
 		if ! kill -0 ${PID} 2>/dev/null; then
 			echo ${PID} died unexpectedly when running ${file}
-			touch tmp/${file}.${PID}.die
-			keeperr ${file} tmp/${file}.${PID}.die
+			touch ${TMP}/${file}.${PID}.die
+			keeperr ${file} ${TMP}/${file}.${PID}.die
 			cleanup $TYPE $PID
 			return
 		fi
@@ -89,8 +90,8 @@ checknotrunning() {
 	fi
 	echo FAIL: caster ${PID} running, should not be.
 	kill -TERM ${PID} 2>/dev/null
-	touch tmp/${ID}.${PID}.notdead
-	keeperr ${ID} tmp/${ID}.${PID}.notdead
+	touch ${TMP}/${ID}.${PID}.notdead
+	keeperr ${ID} ${TMP}/${ID}.${PID}.notdead
 	nfail=`expr $nfail + 1`
 	return 1
 }
@@ -101,8 +102,8 @@ checkrunning() {
 		return 0
 	fi
 	echo FAIL: caster ${PID} not running, should be.
-	touch tmp/${ID}.${PID}.die
-	keeperr ${ID} tmp/${ID}.${PID}.die
+	touch ${TMP}/${ID}.${PID}.die
+	keeperr ${ID} ${TMP}/${ID}.${PID}.die
 	nfail=`expr $nfail + 1`
 	return 1
 }
@@ -126,7 +127,7 @@ cleanup() {
 	mv -f test-caster.log test-caster.${PID}.log 2>/dev/null
 	mv -f test-access.log test-access.${PID}.log 2>/dev/null
 
-	if [ "${TYPE}" = "normal" ] || grep "ERROR SUMMARY: 0 errors from 0 contexts" tmp/valgrind*.${PID}.log >/dev/null 2>&1; then
+	if [ "${TYPE}" = "normal" ] || grep "ERROR SUMMARY: 0 errors from 0 contexts" ${TMP}/valgrind*.${PID}.log >/dev/null 2>&1; then
 		export normal_or_ok=1
 	else
 		export normal_or_ok=0
@@ -135,13 +136,13 @@ cleanup() {
 	if [ ! -f caster.${PID}.core -a ! -f castertmp.${PID}.core -a ! -f valgrind*.${PID}.log.core.${PID} \
 	    -a "$normal_or_ok" = "1" ]; then
 		rm -f ${RUNBIN} 
-		rm -f tmp/valgrind*.${PID}.log
+		rm -f ${TMP}/valgrind*.${PID}.log
 		rm -f test-caster.${PID}.log
 		rm -f test-access.${PID}.log
 	else
 		mv -f ${RUNBIN} caster.${PID}.core castertmp.${PID}.core valgrind*.${PID}.log.core.${PID} cores 2>/dev/null
 		mv -f test-caster.${PID}.log test-access.${PID}.log logs 2>/dev/null
-		mv -f tmp/valgrind*.${PID}.log logs 2>/dev/null
+		mv -f ${TMP}/valgrind*.${PID}.log logs 2>/dev/null
 	fi
 }
 
@@ -157,9 +158,10 @@ done
 if [ "$excode" != 0 ]; then exit $excode; fi
 
 rm -f test-caster.log test-access.log
-mkdir tmp errs logs cores 2>/dev/null
+mkdir ${TMP} errs logs cores 2>/dev/null
 
-for caster_args in "${CASTER_ARGS1}" "${CASTER_ARSG2}"; do
+totalfail=0
+for caster_args in "${CASTER_ARGS1}" "${CASTER_ARGS2}"; do
     for type in helgrind memcheck normal; do
 	nfail=0
 
@@ -201,7 +203,9 @@ for caster_args in "${CASTER_ARGS1}" "${CASTER_ARSG2}"; do
 	run ${type} ${PID} test-sync-badtable.py test-sync-state-type.py ./test-sync-baddiff.py
 
     done
+    echo FAILS $nfail
+    totalfail=`expr $totalfail + $nfail`
 done
 
-echo FAILS $nfail
-exit $nfail
+echo TOTAL FAILS $totalfail$
+exit $totalfail
