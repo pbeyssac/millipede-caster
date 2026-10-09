@@ -1,0 +1,328 @@
+{
+   <OpenSSL3-helgrind1>
+   Helgrind:UnlockUnlocked
+   fun:mutex_unlock_WRK
+   ...
+   fun:OPENSSL_cleanup
+   ...
+}
+{
+   <OpenSSL-memcheck1>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:pthread_cond_init
+   obj:/lib/libcrypto.so.35
+   obj:/lib/libcrypto.so.35
+   obj:/lib/libcrypto.so.35
+   obj:/lib/libcrypto.so.35
+   obj:/lib/libcrypto.so.35
+   obj:/lib/libcrypto.so.35
+   fun:pthread_once
+   fun:CRYPTO_THREAD_run_once
+   fun:OSSL_LIB_CTX_get0_global_default
+   obj:/lib/libcrypto.so.35
+}
+{
+   <OpenSSL-memcheck2>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:pthread_cond_init
+   obj:/lib/libcrypto.so.35
+   obj:/lib/libcrypto.so.35
+   fun:pthread_once
+   fun:CRYPTO_THREAD_run_once
+   obj:/lib/libcrypto.so.35
+   fun:CONF_module_add
+   fun:OPENSSL_load_builtin_modules
+   obj:/lib/libcrypto.so.35
+   fun:pthread_once
+   fun:CRYPTO_THREAD_run_once
+}
+{
+   <gprof1>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   fun:.mcount
+   ...
+   fun:mythread_wrapper
+   obj:/lib/libthr.so.3
+}
+{
+   <gprof2>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   fun:.mcount
+   ...
+   fun:mythread_wrapper
+}
+{
+   <gprof3>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   fun:.mcount
+   ...
+   fun:main
+}
+{
+   <gprof5>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   fun:.mcount
+   ...
+}
+{
+   <gprof6>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   fun:.mcount
+   ...
+   fun:mythread_wrapper
+   obj:/lib/libthr.so.3
+}
+{
+   <gprof7>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   fun:.mcount
+   ...
+   fun:caster_main
+}
+{
+   <event_assign1>
+   Helgrind:Race
+   fun:event_assign
+   fun:bufferevent_socket_new
+   ...
+}
+{
+   <event_assign2>
+   Helgrind:Race
+   fun:event_assign
+   fun:event_new
+   fun:ntrip_task_reschedule
+   ...
+}
+{
+   <event_assign3>
+   Helgrind:Race
+   fun:event_assign
+   ...
+   fun:_ntrip_free
+   ...
+}
+{
+   <event_assign4>
+   Helgrind:Race
+   fun:event_assign
+   ...
+   fun:ntripcli_start
+   ...
+}
+{
+   <event_assign5>
+   Helgrind:Race
+   fun:event_assign
+   fun:event_base_once
+   fun:signal_cb
+   ...
+}
+{
+   <event_free1>
+   Helgrind:Race
+   fun:event_free
+   fun:ntrip_task_stop
+   ...
+}
+{
+   <event_free2>
+   Helgrind:Race
+   fun:event_free
+   fun:caster_free
+   ...
+}
+{
+   <even_add1>
+   Helgrind:Race
+   fun:event_add_nolock_
+   fun:event_add
+   obj:/usr/local/lib/libevent_core-2.1.so.7.0.1
+   ...
+   fun:ntripsrv_listener_cb
+   ...
+}
+{
+   <event_add2>
+   Helgrind:Race
+   fun:event_add_nolock_
+   ...
+   fun:event_base_loop
+   ...
+}
+{
+   <event_add3>
+   Helgrind:Race
+   fun:event_add_nolock_
+   fun:event_add
+   fun:ntrip_task_reschedule
+   ...
+}
+{
+   <event_add4>
+   Helgrind:Race
+   fun:event_add_nolock_
+   ...
+   fun:ntripcli_start
+   ...
+}
+{
+   <event_add5>
+   Helgrind:Race
+   fun:event_add_nolock_
+   fun:event_add
+   ...
+   fun:ntripcli_readcb
+   ...
+}
+{
+   <event_add6>
+   Helgrind:Race
+   fun:event_add_nolock_
+   fun:event_add
+   ...
+   fun:connect_cb
+   ...
+}
+{
+   <event_add7>
+   Helgrind:Race
+   fun:event_add_nolock_
+   fun:event_add
+   ...
+   fun:ntripsrv_readcb
+   ...
+}
+{
+   <event_add8>
+   Helgrind:Race
+   fun:event_add_nolock_
+   fun:event_add
+   ...
+   fun:livesource_send_subscribers
+   ...
+}
+{
+   <event_del_nolock1>
+   Helgrind:Race
+   fun:event_del_nolock_
+   ...
+   fun:caster_main
+   fun:main
+}
+{
+   <event_del_nolock2>
+   Helgrind:Race
+   fun:event_del_nolock_
+   ...
+}
+{
+   <event_debug_unassign1>
+   Helgrind:Race
+   fun:event_debug_unassign
+   ...
+   fun:main
+}
+{
+   <event_debug_unassign2>
+   Helgrind:Race
+   fun:event_debug_unassign
+   ...
+   fun:jobs_start_routine
+   ...
+}
+{
+   <event_debug_unassign3>
+   Helgrind:Race
+   fun:event_debug_unassign
+   fun:evconnlistener_free
+   ...
+}
+{
+   <even_free1>
+   Helgrind:Race
+   fun:event_free
+   fun:_ntrip_task_restart_cb
+   ...
+}
+{
+   <stdio1>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   fun:fflush_unlocked
+   ...
+}
+{
+   <stdio2>
+   Helgrind:Race
+   ...
+   fun:vfprintf_l
+   ...
+}
+{
+   <stdio3>
+   Helgrind:Race
+   ...
+   fun:fread_unlocked
+   ...
+}
+{
+   <stdio3>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   obj:/lib/libc.so.7
+   fun:fread_unlocked
+   ...
+}
+{
+   <stdio4>
+   Helgrind:Race
+   fun:setvbuf
+   ...
+}
+{
+   <stdio5>
+   Helgrind:Race
+   fun:fopen
+   ...
+}
+{
+   <stdio6>
+   Helgrind:Race
+   ...
+   fun:getdelim
+   ...
+}
+{
+   <stdio7>
+   Helgrind:Race
+   ...
+   fun:fputs
+   fun:logfmt_file
+   ...
+}
+{
+   <stdio9>
+   Helgrind:Race
+   obj:/lib/libc.so.7
+   obj:/lib/libc.so.7
+   fun:getdelim
+   ...
+}
+{
+   <config1>
+   Helgrind:Race
+   fun:ntrip_log
+   fun:ntrip_deferred_free2
+   ...
+}
