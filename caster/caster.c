@@ -171,7 +171,7 @@ dynconfig_free_syncers(struct caster_dynconfig *dyn) {
 		return;
 	for (int i = 0; i < dyn->syncers_count; i++) {
 		if (dyn->syncers[i] != NULL) {
-			syncer_free(dyn->syncers[i]);
+			syncer_decref(dyn->syncers[i]);
 			dyn->syncers[i] = NULL;
 		}
 	}
@@ -372,16 +372,20 @@ static int caster_reload_syncers(struct caster_state *this, struct config *confi
 
 	if (olddyn != NULL && olddyn->syncers != NULL && olddyn->syncers_count == newdyn->syncers_count) {
 		newdyn->syncers_count = olddyn->syncers_count;
+		/*
+		 * Share the syncer rather than take it out of the old configuration: worker threads
+		 * may still read olddyn->syncers[] until their reference to it is dropped.
+		 */
 		for (int i = 0; i < newdyn->syncers_count; i++) {
 			newdyn->syncers[i] = olddyn->syncers[i];
-			olddyn->syncers[i] = NULL;
+			syncer_incref(newdyn->syncers[i]);
 		}
 	} else {
 		for (int i = 0; i < newdyn->syncers_count; i++) {
 			newdyn->syncers[i] = syncer_new(this, config->node, config->node_count, "/adm/api/v1/sync", 0);
 			if (newdyn->syncers[i] == NULL) {
 				for (int j = 0; j < i; j++)
-					syncer_free(newdyn->syncers[j]);
+					syncer_decref(newdyn->syncers[j]);
 				free(newdyn->syncers);
 				return -1;
 			}

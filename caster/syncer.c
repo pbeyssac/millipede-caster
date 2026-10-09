@@ -250,6 +250,7 @@ struct syncer *syncer_new(struct caster_state *caster,
 	this->caster = caster;
 	this->task = NULL;
 	this->ntask = 0;
+	REFCNT_INIT(this);
 
 	if (syncer_reload(this, node, node_count, uri, bulk_max_size) < 0) {
 		free(this);
@@ -257,6 +258,9 @@ struct syncer *syncer_new(struct caster_state *caster,
 	}
 	return this;
 }
+
+REFCNT_INCREF_BODY(syncer_incref, struct syncer);
+REFCNT_DECREF_BODY(syncer_decref, struct syncer, syncer_free);
 
 void syncer_free(struct syncer *this) {
 	for (int i = 0; i < this->ntask; i++) {

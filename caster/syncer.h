@@ -9,6 +9,9 @@ struct syncer {
 	struct ntrip_task **task;
 	int ntask;
 	struct caster_state *caster;
+
+	// Reference counter
+	REFCNT;
 };
 
 void syncer_queue(struct syncer *this, char *json);
@@ -22,5 +25,7 @@ struct syncer *syncer_new(struct caster_state *caster,
 void syncer_free(struct syncer *this);
 void syncer_stop(struct syncer *this);
 void syncer_start_all(struct syncer *this, struct config *new_config);
+REFCNT_INCREF_DECL(syncer_incref, struct syncer);
+REFCNT_DECREF_DECL(syncer_decref, struct syncer);
 
 #endif
