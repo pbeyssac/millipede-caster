@@ -935,13 +935,16 @@ static int caster_set_signals(struct caster_state *this) {
 	this->sigint_info.signame = "SIGINT";
 	this->sigterm_info.signame = "SIGTERM";
 	this->sigterm_info.caster = this;
-	this->signalint_event = evsignal_new(caster_get_eventbase(this), SIGINT, signal_cb, (void *)&this->sigint_info);
+
+	/* Use base[0] to set all handlers because libevent wants all signals on the same event base */
+
+	this->signalint_event = evsignal_new(this->base[0], SIGINT, signal_cb, (void *)&this->sigint_info);
 	if (!this->signalint_event || event_add(this->signalint_event, NULL) < 0) {
 		fprintf(stderr, "Could not create/add SIGINT signal event!\n");
 		return -1;
 	}
 
-	this->signalterm_event = evsignal_new(caster_get_eventbase(this), SIGTERM, signal_cb, (void *)&this->sigterm_info);
+	this->signalterm_event = evsignal_new(this->base[0], SIGTERM, signal_cb, (void *)&this->sigterm_info);
 	if (!this->signalterm_event || event_add(this->signalterm_event, NULL) < 0) {
 		fprintf(stderr, "Could not create/add SIGTERM signal event!\n");
 		return -1;
@@ -949,7 +952,7 @@ static int caster_set_signals(struct caster_state *this) {
 
 	signal(SIGPIPE, SIG_IGN);
 
-	this->signalhup_event = evsignal_new(caster_get_eventbase(this), SIGHUP, signalhup_cb, (void *)this);
+	this->signalhup_event = evsignal_new(this->base[0], SIGHUP, signalhup_cb, (void *)this);
 	if (!this->signalhup_event || event_add(this->signalhup_event, 0) < 0) {
 		fprintf(stderr, "Could not create/add SIGHUP signal event!\n");
 		return -1;
