@@ -11,12 +11,12 @@ rounds = 30
 n = 10
 
 quota_list = [
-	(b'GET / HTTP/1.1\nUser-Agent: NTRIP test\n', 3, True),
-	(b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9\nConnection: keep-alive\n', 6, False),
-	(b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.8.7.6,9.9.9.9\nConnection: keep-alive\n', 6, False),
-	(b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9,9.8.7.6\nConnection: keep-alive\n', 0, False),
-	(b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9,::9:8:7:6\nConnection: keep-alive\n', 0, False),
-	(b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9,::9\nConnection: keep-alive\n', 6, False),
+  (b'GET / HTTP/1.1\nUser-Agent: NTRIP test\n', 3, True),
+  (b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9\nConnection: keep-alive\n', 6, False),
+  (b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.8.7.6,9.9.9.9\nConnection: keep-alive\n', 6, False),
+  (b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9,9.8.7.6\nConnection: keep-alive\n', 0, False),
+  (b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9,::9:8:7:6\nConnection: keep-alive\n', 0, False),
+  (b'GET / HTTP/1.1\nUser-Agent: NTRIP test\nX-Forwarded-For: 9.9.9.9,::9\nConnection: keep-alive\n', 6, False),
 ]
 
 for req, quota, simult in quota_list:
