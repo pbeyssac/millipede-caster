@@ -21,7 +21,7 @@ err = 0
 source_stream = testlib.SourceStream((HOST, PORT), "C63", "test1:testpw!", 2000)
 source_stream.start()
 
-s = "$GNGGA,172829.20,4546.2000000,N,00306.0000000,E,5,12,0.68,158.545,M,47.390,M,1.2,0000*6F\r\n"
+s = "$GNGGA,172829.20,4546.2000000,N,00306.0000000,E,5,12,0.68,158.545,M,47.390,M,1.2,0000*66\r\n"
 
 for i in range(100):
   client_stream = testlib.ClientStream((HOST, PORT), "V", 0, s)

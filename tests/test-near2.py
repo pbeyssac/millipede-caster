@@ -19,7 +19,7 @@ source1.start()
 source2 = testlib.SourceStream((HOST, PORT), "C43", "test1:testpw!", 2000, start_packet=testlib.rtcm_1006)
 source2.start()
 
-s = "$GNGGA,172829.20,4546.2000000,N,00306.0000000,E,5,12,0.68,158.545,M,47.390,M,1.2,0000*6F\r\n"
+s = "$GNGGA,172829.20,4546.2000000,N,00306.0000000,E,5,12,0.68,158.545,M,47.390,M,1.2,0000*66\r\n"
 
 #
 # Check for seamless base switch in case the current base dies

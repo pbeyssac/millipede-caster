@@ -213,7 +213,39 @@ char *b64decode(char *str, size_t len, int add_nul) {
 }
 
 /*
+ * Compute the NMEA checksum of a sentence: the XOR of all the
+ * characters between the $ and the *.
+ * Return 0 and store the checksum in *cksum, or -1 if the
+ * sentence contains no $ or no *.
+ */
+int nmea_checksum(const char *line, int *pcksum, int *pfound) {
+	const char *dollar = strchr(line, '$');
+	if (dollar == NULL)
+		return -1;
+	int cksum = 0;
+	const char *p;
+	for (p = dollar + 1; *p && *p != '*'; p++)
+		cksum ^= (unsigned char)*p;
+	if (*p != '*'
+	    || !isxdigit((unsigned char)p[1])
+	    || !isxdigit((unsigned char)p[2])
+	    || p[3] != '\0')
+		return -1;
+
+	int found = 0;
+	for (int i = 1; i <= 2; i++) {
+		char c = tolower((unsigned char)p[i]);
+		found = found*16 + (isdigit(c) ? c - '0' : c - 'a' + 10);
+	}
+	if (found != cksum)
+		return -1;
+	*pcksum = cksum;
+	return 0;
+}
+
+/*
  * Parse a NMEA "GGA" line and return geographical position, if valid.
+ * The NMEA checksum is verified.
  */
 int parse_gga(const char *line, pos_t *pos) {
 	pos_t p;
@@ -236,6 +268,14 @@ int parse_gga(const char *line, pos_t *pos) {
 		return -1;
 	if (line[3] != 'G' || line[4] != 'G' || line[5] != 'A')
 		return -1;
+
+	/*
+	 * Verify the NMEA checksum.
+	 */
+	int cksum, found;
+	if (nmea_checksum(line, &cksum, &found) < 0)
+		return -1;
+
 	int err = 0;
 	char *token;
 	char *gga_line = mystrdup(line);
