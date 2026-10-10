@@ -45,7 +45,7 @@ for tests in test_series:
     with urllib.request.urlopen("%s?%s" % (url, params)) as r:
       data = json.loads(r.read().decode())
 
-    j = [m for m in date.values() if 'mountpoint' in m and m['mountpoint'] == 'TEST1']
+    j = [m for m in data.values() if 'mountpoint' in m and m['mountpoint'] == 'TEST1']
     j = j[0]
 
     print(".", end='')
