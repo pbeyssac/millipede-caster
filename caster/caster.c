@@ -868,7 +868,11 @@ static int caster_load(struct caster_state *this, int restart) {
 	}
 	new_config->dyn = newdyn;
 	new_config->free_callback = dynconfig_free_callback;
+
 	old_config = atomic_load(&this->config);
+	if (old_config)
+		config_incref(old_config);
+
 	olddyn = old_config?old_config->dyn:NULL;
 
 	if (caster_reopen_logs(this, new_config) < 0)
@@ -896,8 +900,10 @@ static int caster_load(struct caster_state *this, int restart) {
 	if (caster_reload_listeners(this, new_config, olddyn, newdyn) < 0)
 		r = -1;
 
-	if (old_config)
-		config_decref(old_config);
+	if (old_config) {
+		config_decref(old_config);	// our temporary reference
+		config_decref(old_config);	// caster's reference
+	}
 
 	if (restart && caster_start(this, new_config, 0) < 0)
 		r = -1;
