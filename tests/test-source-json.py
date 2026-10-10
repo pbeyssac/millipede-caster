@@ -15,11 +15,11 @@ HOST='::1'
 PORT=2103
 
 test_series = [
-  [(b'AB\r\n', (('received_bytes', 96), ('sent_bytes', 180))),
-   (b'b\r\n12345', (('received_bytes', 104), ('sent_bytes', 180))),
-   (b'6789A\n\r\n8\r\nABCDEFG\n\r\n', (('received_bytes', 125), ('sent_bytes', 180))),
-   (b'4\r\nDEF\n\r\n', (('received_bytes', 134), ('sent_bytes', 180))),
-   (b'0\r\n\r\n', (('received_bytes', 139), ('sent_bytes', 180))),
+  [(b'AB\r\n', (('received_bytes', 104), ('sent_bytes', 203))),
+   (b'b\r\n12345', (('received_bytes', 112), ('sent_bytes', 203))),
+   (b'6789A\n\r\n8\r\nABCDEFG\n\r\n', (('received_bytes', 133), ('sent_bytes', 203))),
+   (b'4\r\nDEF\n\r\n', (('received_bytes', 142), ('sent_bytes', 203))),
+   (b'0\r\n\r\n', (('received_bytes', 147), ('sent_bytes', 203))),
   ],
 ]
 
@@ -36,9 +36,27 @@ for tests in test_series:
   sclient.connect((HOST, PORT))
   sclient.sendall(b'GET /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\n\n')
 
+  # Drain the ICY reply sent on subscription. The caster updates the source
+  # byte counters before forwarding data to clients, so waiting for the
+  # forwarded bytes guarantees the counters have been updated before the
+  # API query below.
+  reply = b''
+  while b'\r\n\r\n' not in reply:
+    d = sclient.recv(1024)
+    if not d:
+      break
+    reply += d
+  forwarded = reply.split(b'\r\n\r\n', 1)[1] if b'\r\n\r\n' in reply else b''
+
+  expected_forwarded = 0
   for send, expect in tests:
     ssource.sendall(send)
-    data = sclient.recv(1024)
+    expected_forwarded += len(send)
+    while len(forwarded) < expected_forwarded:
+      d = sclient.recv(1024)
+      if not d:
+        break
+      forwarded += d
 
     url = "http://[%s]:%d/adm/api/v1/net" % (HOST, PORT)
     params = urllib.parse.urlencode({'user': 'admin', 'password': '=adminpw...'})
