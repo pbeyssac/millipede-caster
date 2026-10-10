@@ -8,11 +8,13 @@
 
 #include "bitfield.h"
 #include "conf.h"
+#include "config.h"
 #include "ip.h"
 #include "json.h"
 #include "livesource.h"
 #include "log.h"
 #include "rtcm.h"
+#include "syncer.h"
 #include "util.h"
 
 static int urldecode_test() {
@@ -741,6 +743,50 @@ static void log_cb(void *arg, struct gelf_entry *g, int level, const char *fmt, 
 	putchar('\n');
 }
 
+/*
+ * syncer_queue_json() on the state a reload leaves behind.
+ *
+ * caster_reload_syncers() hands each syncer to the new dynconfig and nulls the entry in the old
+ * one, so a worker thread still holding the previous configuration sees syncers_count at 1 with
+ * syncers[0] already NULL. syncer_queue_json() tested the count and dereferenced the entry, and
+ * the caster died on any livesource change during a reload. This builds that state directly
+ * instead of waiting for the race.
+ */
+static int test_syncer_queue_json_handed_over() {
+	int fail = 0;
+
+	puts("test_syncer_queue_json_handed_over");
+
+	struct caster_state caster;
+	struct config config;
+	struct caster_dynconfig dyn;
+	struct syncer *syncers[1] = {NULL};
+
+	memset(&caster, 0, sizeof caster);
+	memset(&config, 0, sizeof config);
+	memset(&dyn, 0, sizeof dyn);
+	log_init(&caster.flog, NULL, &log_cb, -1, -1, -1, -1, &caster.flog);
+	P_RWLOCK_INIT(&caster.configlock, NULL);
+	REFCNT_INIT(&config);
+	dyn.syncers = syncers;
+	dyn.syncers_count = 1;
+	config.dyn = &dyn;
+	atomic_store(&caster.config, &config);
+
+	syncer_queue_json(&caster, json_object_new_object());
+
+	/* the configuration reference taken must have been given back */
+	if (atomic_load(&config.refcnt) != 1) {
+		fail++;
+		printf("FAIL: configuration refcnt %d after syncer_queue_json, expected 1\n",
+			atomic_load(&config.refcnt));
+	} else
+		putchar('.');
+
+	putchar('\n');
+	return fail;
+}
+
 static int file_parse_test(const char *test_dir) {
 	struct log flog;
 	log_init(&flog, NULL, &log_cb, -1, -1, -1, -1, &flog);
@@ -1041,6 +1087,7 @@ int main(int argc, const char **argv) {
 	fail += test_setbits();
 	fail += test_rtcm_typeset_parse();
 	fail += test_prefix_table();
+	fail += test_syncer_queue_json_handed_over();
 	fail += test_ip_convert();
 	fail += test_msm7_msm4();
 	fail += timeval_from_iso_date_test();

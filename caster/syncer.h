@@ -6,6 +6,12 @@
 #include "util.h"
 
 struct syncer {
+	/*
+	 * task/ntask are replaced by syncer_reload() on a configuration reload while worker
+	 * threads walk them in syncer_queue(): both are protected by lock.
+	 */
+	P_RWLOCK_T lock;
+
 	struct ntrip_task **task;
 	int ntask;
 	struct caster_state *caster;

@@ -169,14 +169,16 @@ static void
 dynconfig_free_syncers(struct caster_dynconfig *dyn) {
 	if (dyn->syncers == NULL)
 		return;
-	for (int i = 0; i < dyn->syncers_count; i++) {
+	/* Stop anyone else looking before the entries go away, not after. */
+	int n = dyn->syncers_count;
+	dyn->syncers_count = 0;
+	for (int i = 0; i < n; i++) {
 		if (dyn->syncers[i] != NULL) {
 			syncer_decref(dyn->syncers[i]);
 			dyn->syncers[i] = NULL;
 		}
 	}
 	free(dyn->syncers);
-	dyn->syncers_count = 0;
 	dyn->syncers = NULL;
 }
 
