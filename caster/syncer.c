@@ -70,9 +70,10 @@ static void queue_checkserial(struct syncer *this, struct ntrip_task *task, int 
 /*
  * Take the tasks with a reference under the lock
  */
-static struct ntrip_task **get_task_array(struct syncer *this) {
+static struct ntrip_task **get_task_array(struct syncer *this, int *pntask) {
 	P_RWLOCK_RDLOCK(&this->lock);
 	int ntask = this->ntask;
+	*pntask = ntask;
 	struct ntrip_task **tasks = ntask ? (struct ntrip_task **)malloc(sizeof(struct ntrip_task *)*ntask) : NULL;
 	if (tasks != NULL)
 		for (int i = 0; i < ntask; i++) {
@@ -94,8 +95,8 @@ void syncer_queue(struct syncer *this, char *json) {
 	}
 
 	/* Take the tasks with a reference under the lock, then queue without it */
-	int ntask = this->ntask;
-	struct ntrip_task **tasks = get_task_array(this);
+	int ntask;
+	struct ntrip_task **tasks = get_task_array(this, &ntask);
 	if (ntask && tasks == NULL) {
 		logfmt(&this->caster->flog, LOG_CRIT, "Out of memory when allocating syncer output, dropping");
 		packet_decref(packet);
