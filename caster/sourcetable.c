@@ -1,6 +1,7 @@
 #include "conf.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -695,6 +696,15 @@ struct sourcetable *stack_flatten_dist(struct caster_state *caster, sourcetable_
 		HASH_FOREACH(e, s->key_val, hi) {
 			struct sourceline *sp = (struct sourceline *)e->value;
 			/*
+			 * Out of range: never added, whatever else is true. Test it first, as it is
+			 * cheap and drops most of the table, before the locked lookups below.
+			 */
+			if (pos) {
+				double dist =  distance(&sp->pos, pos);
+				if (isnan(dist) || dist >= max_dist)
+					continue;
+			}
+			/*
 			 * If the mountpoint is from our local table, skip if not live.
 			 */
 			if (local_table && (!sp->virtual && !livesource_exists(caster, sp->key, &sp->pos)))
@@ -702,18 +712,11 @@ struct sourcetable *stack_flatten_dist(struct caster_state *caster, sourcetable_
 
 			struct element *e = hash_table_get_element(r->key_val, sp->key);
 
-			if (e == NULL) {
-				/*
-				 * Entry not found, meaning it has the highest priority:
-				 * add it if within maximum distance.
-				 */
-				if (!pos || distance(&sp->pos, pos) < max_dist) {
-					if (_sourcetable_add_direct(r, sp) < 0) {
-						P_RWLOCK_UNLOCK(&s->lock);
-						P_RWLOCK_UNLOCK(&this->lock);
-						goto cancel;
-					}
-				}
+			/* Entry not found, meaning it has the highest priority: add it. */
+			if (e == NULL && _sourcetable_add_direct(r, sp) < 0) {
+					P_RWLOCK_UNLOCK(&s->lock);
+					P_RWLOCK_UNLOCK(&this->lock);
+					goto cancel;
 			}
 		}
 
