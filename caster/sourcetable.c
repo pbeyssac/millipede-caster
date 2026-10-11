@@ -197,14 +197,25 @@ struct mime_content *sourcetable_get(struct sourcetable *this) {
 		int ne;
 		ep = hash_array(this->key_val, &ne);
 
-		strcpy(s, this->header);
+		/*
+		 * Append at a running offset: strcat() would rescan the whole string for
+		 * each line, quadratic in the size of the table (about 300 MB read per
+		 * request for 1 500 lines).
+		 */
+		char *p = s;
+		size_t l = strlen(this->header);
+		memcpy(p, this->header, l);
+		p += l;
 		for (int i = 0; i < ne; i++) {
 			e = ep[i];
 			n = (struct sourceline *)e->value;
-			strcat(s, n->value);
-			strcat(s, "\r\n");
+			l = strlen(n->value);
+			memcpy(p, n->value, l);
+			p += l;
+			memcpy(p, "\r\n", 2);
+			p += 2;
 		}
-		strcat(s, "ENDSOURCETABLE\r\n");
+		strcpy(p, "ENDSOURCETABLE\r\n");
 		hash_array_free(ep);
 	}
 	P_RWLOCK_UNLOCK(&this->lock);
