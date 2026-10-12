@@ -629,6 +629,9 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 								ntrip_set_state(st, NTRIP_WAIT_CLIENT_CONTENT);
 							else
 								ntrip_set_state(st, NTRIP_WAIT_HTTP_METHOD);
+							/* A pipelined request reads its own line: free ours first */
+							free(line);
+							line = NULL;
 							continue;
 						} else {
 							ntrip_set_state(st, NTRIP_WAIT_CLOSE);
@@ -702,6 +705,8 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 							ntrip_set_state(st, NTRIP_WAIT_CLIENT_CONTENT);
 							struct timeval adm_read_timeout = { 0, 0 };
 							bufferevent_set_timeouts(bev, &adm_read_timeout, NULL);
+							free(line);
+							line = NULL;
 							continue;
 						}
 						if (!st->scheme_basic) {

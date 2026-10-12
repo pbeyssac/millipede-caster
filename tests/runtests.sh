@@ -178,7 +178,7 @@ for caster_args in "${CASTER_ARGS1}" "${CASTER_ARGS2}"; do
 	stop ${type} ${PID}
 
 	start ${type} ${caster_args} -c testconfig/caster.yaml
-	run ${type} ${PID} test-keepalive.py test-api-race.py test-fetcher-reload-race.py test-livesource-race.py test-livesource-race2.py test-send-expect.py test-chunks.py test-chunks2.py test-source-json.py test-timeout.py test-syncer-timeout.py test-near1.py test-near2.py test-rtcm.py test-rtcm2.py
+	run ${type} ${PID} test-keepalive.py test-api-race.py test-fetcher-reload-race.py test-livesource-race.py test-livesource-race2.py test-send-expect.py test-chunks.py test-chunks2.py test-source-json.py test-timeout.py test-syncer-timeout.py test-near1.py test-near2.py test-rtcm.py test-rtcm2.py test-sourcetable-pipeline.py
 
 	start ${type} ${caster_args} -c testconfig/caster2.yaml
 	run ${type} ${PID} test-syncer-ondemand.py test-headers.py test-fetched.py test-httpclient.py test-syncer-client-timeout.py test-quota.py test-send-expect2.py test-graylog-reload.py test-near3.py test-access_log.py test-json-leak.py
