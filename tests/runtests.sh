@@ -1,6 +1,7 @@
 #!/bin/sh
 
 VALGRIND_PATH=`command -v valgrind`
+CASTER_PATH="../caster/caster"
 TMP=tmp
 
 VALGRIND_ARGS_HELGRIND="--tool=helgrind -s --log-file=${TMP}/valgrind-helgrind.%p.log --gen-suppressions=all --suppressions=valgrind.suppressions"
@@ -23,7 +24,7 @@ start() {
 	TYPE="$1"
 	shift
 	ARGS=$*
-	ln ../caster/caster ${TMP}/castertmp
+	ln ${CASTER_PATH} ${TMP}/castertmp
 	rm -f test-caster.log test-access.log
 
 	case "$TYPE" in
