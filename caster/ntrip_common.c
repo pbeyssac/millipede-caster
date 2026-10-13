@@ -11,6 +11,7 @@
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <event2/event.h>
 
 #include "conf.h"
 #include "caster.h"
@@ -280,6 +281,18 @@ void ntrip_set_localaddr(struct ntrip_state *this) {
 	ip_str(&this->myaddr, this->local_addr, sizeof this->local_addr);
 }
 
+/*
+ * Close a file descriptor, from the event loop of its former bufferevent.
+ *
+ * Log close() failures (typically EBADF), which are an early sign
+ * of something amiss.
+ */
+static void deferred_close_cb(evutil_socket_t fd, short what, void *arg) {
+	struct caster_state *caster = arg;
+	if (close(fd) < 0)
+		logfmt(&caster->flog, LOG_NOTICE, "CLOSE fd %d err %d", fd, errno);
+}
+
 static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *bev) {
 	if (!this->bev_freed) {
 		ntrip_log(this, LOG_EDEBUG, "bufferevent_free %p", bev);
@@ -309,11 +322,23 @@ static void my_bufferevent_free(struct ntrip_state *this, struct bufferevent *be
 			bufferevent_setfd(this->bev, -1);
 
 			/*
-			 * Log close() failures (typically EBADF), which are an early sign
-			 * of something amiss.
+			 * Don't close() here: the bufferevent's event loop may already
+			 * be running one of its callbacks with this fd, waiting for the
+			 * lock we hold. Closed now, the fd can be reused by accept()
+			 * before that callback runs, which then reads or writes the new
+			 * connection. Close it from that event loop instead, after any
+			 * callback it has already dispatched.
+			 *
+			 * EV_WRITE with a zero timeout: the callback runs on the next loop
+			 * iteration and, unlike a pure timer, is passed the fd, so nothing
+			 * is allocated here that could leak if the loop stops first.
+			 *
+			 * close() here as a last resort iff event_base_once() fails.
 			 */
-			if (close(this->fd) < 0)
-				ntrip_log(this, LOG_NOTICE, "CLOSE fd %d err %d", this->fd, errno);
+			struct timeval now = { 0, 0 };
+			if (event_base_once(bufferevent_get_base(bev), this->fd, EV_WRITE, deferred_close_cb, this->caster, &now) < 0
+			    && close(this->fd) < 0)
+				ntrip_log(this, LOG_NOTICE, "event_base_once failed; CLOSE fd %d err %d", this->fd, errno);
 		}
 		bufferevent_free(bev);
 		this->bev_freed = 1;
