@@ -67,9 +67,9 @@ run() {
 		if ! ./${file} >${OUT} 2>&1; then
 			nfail=`expr $nfail + 1`
 			keeperr ${file} ${OUT}
-			echo " FAIL"
+			echo " ${RED}FAIL"${NC}
 		else
-			echo " OK"
+			echo " ${GREEN}OK"${NC}
 			rm -f ${OUT}
 		fi
 		if ! kill -0 ${PID} 2>/dev/null; then
@@ -149,6 +149,15 @@ cleanup() {
 
 DELAY_START=1
 
+if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
+    RED=$(tput setaf 1)
+    GREEN=$(tput setaf 2)
+    YELLOW=$(tput setaf 3)
+    BLUE=$(tput setaf 4)
+    BOLD=$(tput bold)
+    NC=$(tput sgr0)
+fi
+
 excode=0
 for i in testconfig/*; do
 	if [ -f "$i" -a -w "$i" ]; then
@@ -215,5 +224,9 @@ for caster_args in "${CASTER_ARGS1}" "${CASTER_ARGS2}"; do
     totalfail=`expr $totalfail + $nfail`
 done
 
-echo TOTAL FAILS $totalfail$
+if [ "$totalfail" = "0" ]; then
+	echo ${GREEN}NO FAIL${NC}
+else
+	echo ${RED}TOTAL FAILS $totalfail${NC}
+fi
 exit $totalfail
