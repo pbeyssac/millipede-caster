@@ -124,7 +124,7 @@ static void jobs_cond_broadcast(struct joblist *this) {
  */
 static void jobs_cond_signal(struct joblist *this) {
 	P_MUTEX_LOCK(&this->condlock);
-	if (pthread_cond_signal(&this->condjob) < 0)
+	if (pthread_cond_signal(&this->condjob) != 0)
 		caster_log_error(this->caster, "pthread_cond_signal");
 	P_MUTEX_UNLOCK(&this->condlock);
 }
