@@ -32,6 +32,8 @@ struct joblist *joblist_new(struct caster_state *caster) {
 		this->append_ntrip_njobs = 0;
 		this->njobs = 0;
 		this->append_njobs = 0;
+		this->nidle = 0;
+		this->pending = 0;
 		this->caster = caster;
 		this->nthreads = 0;
 		this->threads = NULL;
@@ -124,7 +126,8 @@ static void jobs_cond_broadcast(struct joblist *this) {
  */
 static void jobs_cond_signal(struct joblist *this) {
 	P_MUTEX_LOCK(&this->condlock);
-	if (pthread_cond_signal(&this->condjob) != 0)
+	this->pending = 1;
+	if (this->nidle > 0 && pthread_cond_signal(&this->condjob) != 0)
 		caster_log_error(this->caster, "pthread_cond_signal");
 	P_MUTEX_UNLOCK(&this->condlock);
 }
@@ -224,8 +227,17 @@ void joblist_run(struct joblist *this) {
 					P_MUTEX_UNLOCK(&this->condlock);
 					return;
 				}
-				if (pthread_cond_wait(&this->condjob, &this->condlock) != 0)
-					caster_log_error(this->caster, "pthread_cond_wait");
+				/*
+				 * Sleep only if nothing was queued since the queues were found empty
+				 * above: a signal sent before we wait would be lost.
+				 */
+				if (!this->pending) {
+					this->nidle++;
+					if (pthread_cond_wait(&this->condjob, &this->condlock) != 0)
+						caster_log_error(this->caster, "pthread_cond_wait");
+					this->nidle--;
+				}
+				this->pending = 0;
 				P_MUTEX_UNLOCK(&this->condlock);
 				P_MUTEX_LOCK(&this->mutex);
 				continue;
@@ -237,8 +249,11 @@ void joblist_run(struct joblist *this) {
 			int tmpn = this->ntrip_njobs;
 			this->ntrip_njobs = this->append_ntrip_njobs;
 			this->append_ntrip_njobs = tmpn;
+			int more = this->ntrip_njobs > 1;
 			P_MUTEX_UNLOCK(&this->append_mutex);
-			jobs_cond_broadcast(this);
+			/* This thread takes the first session; wake one more worker if there are others */
+			if (more)
+				jobs_cond_signal(this);
 		}
 
 		/*

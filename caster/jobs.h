@@ -159,6 +159,15 @@ struct joblist {
 
 	/* Set by jobs_stop_threads(): workers exit once the queues are empty. Protected by condlock. */
 	char stop;		// Flag: stop
+
+	/*
+	 * Protected by condlock: the number of workers waiting on condjob, and whether a job was
+	 * appended or the work queue refilled since a worker last found the queues empty. A
+	 * worker sleeps only if pending is clear, so a job appended between its check of the
+	 * queues and its pthread_cond_wait() is not left waiting for the next one.
+	 */
+	int nidle;
+	char pending;
 };
 
 struct joblist *joblist_new(struct caster_state *caster);
