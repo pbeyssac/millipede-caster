@@ -862,7 +862,12 @@ void ntripsrv_readcb(struct bufferevent *bev, void *arg) {
 		else if (err >= 100)
 			send_server_reply(st, output, err, &opt_headers, NULL, NULL);
 		ntrip_log(st, LOG_EDEBUG, "ntripsrv_readcb err %d", err);
-		ntrip_set_state(st, NTRIP_WAIT_CLOSE);
+		if (evbuffer_get_length(output) == 0)
+			/* Nothing to send, force close */
+			ntrip_set_state(st, NTRIP_FORCE_CLOSE);
+		else
+			/* Wait for a write callback before closing, to flush the remaining data */
+			ntrip_set_state(st, NTRIP_WAIT_CLOSE);
 	}
 	evhttp_clear_headers(&opt_headers);
 	if (ntrip_get_state(st) == NTRIP_FORCE_CLOSE)
