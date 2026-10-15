@@ -30,6 +30,8 @@ tests = [
    b'^HTTP/1\\.1 200 OK\r\n'),
   (b'POST /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic dGVzdDE6dGVzdHB3IQ==\n\n',
    b'^HTTP/1\\.1 200 OK\r\n'),
+  (b'POST /test1 HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic dGVzdDE6dGVzdHB3IQ==\n\n',
+   b'^HTTP/1\\.1 401 Unauthorized\r\n'),
   (b'POST /TEST1 HTTP/1.1\nUser-Agent: NTRIP test\nAuthorization: Basic dGVzdDE6dGVzdHB3IQ==\nTransfer-Encoding: chunked\n\n',
    b'^HTTP/1\\.1 200 OK\r\n'),
   (b'SOURCE testpw! TEST1\nUser-Agent: NTRIP test\n\n',
