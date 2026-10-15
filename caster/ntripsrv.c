@@ -123,7 +123,7 @@ static int _ntripsrv_send_result_ok(struct ntrip_state *this, struct evbuffer *o
 	struct evkeyvalq headers;
 	struct evkeyval *np;
 	if (this->client_version == 1) {
-		evbuffer_add_reference(output, "ICY 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", 52, NULL, NULL);
+		evbuffer_add_reference(output, "ICY 200 OK\r\n\r\n", 14, NULL, NULL);
 		this->sent_bytes += 52;
 	} else {
 		TAILQ_INIT(&headers);
