@@ -32,8 +32,8 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 	 * Build a hash table from them.
 	 */
 	if (!strcmp(method, "POST")) {
-		if (st->content_type
-		    && (strcmp(st->content_type, "application/x-www-form-urlencoded") && strcmp(st->content_type, "application/json"))) {
+		if (!st->content_type
+		    || (strcmp(st->content_type, "application/x-www-form-urlencoded") && strcmp(st->content_type, "application/json"))) {
 			request_free(req);
 			*err = 415;
 			return -1;

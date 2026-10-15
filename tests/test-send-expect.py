@@ -92,6 +92,10 @@ tests = [
    b'^HTTP/1.1 404 Not Found\r\nServer: NTRIP Millipede Server \\S+\r\nDate: .* GMT\r\nNtrip-Version: Ntrip/2\\.0\r\nConnection: close\r\n\r\n$'),
   (b'POST /adm/api/v1/reload HTTP/1.1\r\nContent-Length: 33\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nuser=admin&password=%3dadminpw...',
    b'^HTTP/1\\.1 200 OK\r\n(?s:.)*Content-Length: 14\r\nContent-Type: application/json\r\n(?s:.)*\r\n\\{"result": 0\\}\n$'),
+  (b'POST /adm/api/v1/reload HTTP/1.1\r\nContent-Length: 33\r\n\r\nuser=admin&password=%3dadminpw...',
+   b'^HTTP/1\\.1 415 Unsupported Media Type\r\n'),
+  (b'POST /adm/api/v1/reload HTTP/1.1\r\nContent-Length: 33\r\nContent-Type: text/plain\r\n\r\nuser=admin&password=%3dadminpw...',
+   b'^HTTP/1\\.1 415 Unsupported Media Type\r\n'),
  ]
 e = [
   (b'POST /adm/api/v1/reload HTTP/1.1\r\nContent-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n',
