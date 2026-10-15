@@ -186,9 +186,14 @@ static int livesource_kill_subscribers_unlocked(struct livesource *this, int kil
 		}
 
 		if (kill_backlogged == 0 || backlogged) {
+			/*
+			 * Here a subscriber is either backlogged, or a direct one of a closed source
+			 * (virtual ones were moved to another source above): close it in both cases,
+			 * so that a client too slow to follow reconnects rather than waits for data
+			 * that will not come.
+			 */
 			_livesource_del_subscriber_unlocked(st);
-			if (!backlogged && !virtual)
-				ntrip_decref_end(st, "livesource_kill_subscribers_unlocked");
+			ntrip_decref_end(st, "livesource_kill_subscribers_unlocked");
 		}
 		bufferevent_unlock(bev);
 	}
