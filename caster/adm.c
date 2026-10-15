@@ -35,7 +35,7 @@ int admsrv(struct ntrip_state *st, const char *method, const char *root_uri, con
 		if (st->content_type
 		    && (strcmp(st->content_type, "application/x-www-form-urlencoded") && strcmp(st->content_type, "application/json"))) {
 			request_free(req);
-			*err = 503;
+			*err = 415;
 			return -1;
 		}
 		if (!strcmp(st->content_type, "application/json"))

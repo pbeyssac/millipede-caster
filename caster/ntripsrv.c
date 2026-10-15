@@ -39,6 +39,7 @@ static struct httpcode httpcodes[] = {
 	{405, "Method Not Allowed"},
 	{409, "Conflict"},
 	{413, "Content Too Large"},
+	{415, "Unsupported Media Type"},
 	{431, "Request Header Fields Too Large"},
 	{500, "Internal Server Error"},
 	{501, "Not Implemented"},
